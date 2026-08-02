@@ -1,0 +1,11 @@
+[package]
+name = "luma-cuda-kernel"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "cuda kernel implement"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+
