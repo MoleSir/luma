@@ -1,0 +1,119 @@
+//! `impl BoolOps for Cpu`. Bool storage is a plain `Vec<bool>`, so no per-dtype
+//! dispatch is needed; kernels operate on it directly.
+
+use super::kernels::{elementwise as ew, reduce, shape as shape_k};
+use super::{Cpu, CpuBoolStorage, CpuFloatStorage, CpuIntStorage};
+use crate::dtype::{BoolDType, FloatDType, IntDType};
+use crate::{BoolOps, Device, Error, Layout, Result, Shape};
+
+impl BoolOps<Cpu> for Cpu {
+    fn b_falses(shape: &Shape, _device: &Cpu, _dtype: BoolDType) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(vec![false; shape.element_count()]))
+    }
+
+    fn b_trues(shape: &Shape, _device: &Cpu, _dtype: BoolDType) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(vec![true; shape.element_count()]))
+    }
+
+    fn b_from_bool(data: &[bool], _device: &Cpu, _dtype: BoolDType) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(data.to_vec()))
+    }
+
+    fn b_contiguous(x: &<Cpu as Device>::BoolStorage, l: &Layout) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(super::kernels::iter::gather(&x.0, l)))
+    }
+
+    fn b_cast_float(x: &CpuBoolStorage, layout: &Layout, to: FloatDType) -> Result<CpuFloatStorage> {
+        let s = match to {
+            FloatDType::F32 => CpuFloatStorage::F32(layout.storage_indices().map(|i| if x.0[i] { 1.0 } else { 0.0 }).collect()),
+            FloatDType::F64 => CpuFloatStorage::F64(layout.storage_indices().map(|i| if x.0[i] { 1.0 } else { 0.0 }).collect()),
+        };
+        Ok(s)
+    }
+
+    fn b_cast_int(x: &CpuBoolStorage, layout: &Layout, to: IntDType) -> Result<CpuIntStorage> {
+        let s = match to {
+            IntDType::I32 => CpuIntStorage::I32(layout.storage_indices().map(|i| x.0[i] as i32).collect()),
+            IntDType::U32 => CpuIntStorage::U32(layout.storage_indices().map(|i| x.0[i] as u32).collect()),
+            IntDType::U8 => CpuIntStorage::U8(layout.storage_indices().map(|i| x.0[i] as u8).collect()),
+        };
+        Ok(s)
+    }
+
+    fn b_cast_bool(x: &CpuBoolStorage, layout: &Layout, _to: BoolDType) -> Result<CpuBoolStorage> {
+        Ok(CpuBoolStorage(layout.storage_indices().map(|i| x.0[i]).collect()))
+    }
+
+    fn b_to_vec(x: &<Cpu as Device>::BoolStorage, layout: &Layout) -> Result<Vec<bool>> {
+        Ok(layout.storage_indices().map(|i| x.0[i]).collect())
+    }
+
+    fn b_and(
+        lhs: &<Cpu as Device>::BoolStorage,
+        lhs_l: &Layout,
+        rhs: &<Cpu as Device>::BoolStorage,
+        rhs_l: &Layout,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(ew::binary(&lhs.0, lhs_l, &rhs.0, rhs_l, |a, b| a & b)))
+    }
+
+    fn b_or(
+        lhs: &<Cpu as Device>::BoolStorage,
+        lhs_l: &Layout,
+        rhs: &<Cpu as Device>::BoolStorage,
+        rhs_l: &Layout,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(ew::binary(&lhs.0, lhs_l, &rhs.0, rhs_l, |a, b| a | b)))
+    }
+
+    fn b_xor(
+        lhs: &<Cpu as Device>::BoolStorage,
+        lhs_l: &Layout,
+        rhs: &<Cpu as Device>::BoolStorage,
+        rhs_l: &Layout,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(ew::binary(&lhs.0, lhs_l, &rhs.0, rhs_l, |a, b| a ^ b)))
+    }
+
+    fn b_not(x: &<Cpu as Device>::BoolStorage, l: &Layout) -> Result<<Cpu as Device>::BoolStorage> {
+        Ok(CpuBoolStorage(ew::unary(&x.0, l, |v| !v)))
+    }
+
+    fn b_reduce_all(
+        x: &<Cpu as Device>::BoolStorage,
+        l: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+    ) -> Result<(<Cpu as Device>::BoolStorage, Shape)> {
+        // reduce as u8 with min (all true == min == 1), then back to bool.
+        let as_u8: Vec<u8> = super::kernels::iter::gather(&x.0, l).iter().map(|&b| b as u8).collect();
+        let contig = Layout::contiguous(l.shape().clone());
+        let (v, shape) = reduce::reduce_dims(&as_u8, &contig, dims, keepdim, reduce::Reducer::Min)?;
+        Ok((CpuBoolStorage(v.into_iter().map(|u| u != 0).collect()), shape))
+    }
+
+    fn b_reduce_any(
+        x: &<Cpu as Device>::BoolStorage,
+        l: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+    ) -> Result<(<Cpu as Device>::BoolStorage, Shape)> {
+        let as_u8: Vec<u8> = super::kernels::iter::gather(&x.0, l).iter().map(|&b| b as u8).collect();
+        let contig = Layout::contiguous(l.shape().clone());
+        let (v, shape) = reduce::reduce_dims(&as_u8, &contig, dims, keepdim, reduce::Reducer::Max)?;
+        Ok((CpuBoolStorage(v.into_iter().map(|u| u != 0).collect()), shape))
+    }
+
+    fn b_true_count(x: &<Cpu as Device>::BoolStorage, l: &Layout) -> Result<usize> {
+        Ok(l.storage_indices().filter(|&i| x.0[i]).count())
+    }
+
+    fn b_cat(srcs: &[(&<Cpu as Device>::BoolStorage, &Layout)], dim: usize) -> Result<(<Cpu as Device>::BoolStorage, Shape)> {
+        if srcs.is_empty() {
+            return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
+        }
+        let views: Vec<(&[bool], &Layout)> = srcs.iter().map(|(s, l)| (s.0.as_slice(), *l)).collect();
+        let (v, shape) = shape_k::cat(&views, dim)?;
+        Ok((CpuBoolStorage(v), shape))
+    }
+}

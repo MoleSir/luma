@@ -1,0 +1,17 @@
+[package]
+name = "luma-tensor"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "tensor crate with autograd"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+thiserror =  { workspace = true }
+rand =  { workspace = true }
+rand_distr =  { workspace = true }
+gemm =  { workspace = true }
+libm =  { workspace = true }
+num_cpus =  { workspace = true }
+paste =  { workspace = true }
