@@ -9,3 +9,5 @@ license = { workspace = true }
 
 [dependencies]
 
+[build-dependencies]
+bindgen_cuda = "0.1.1"

@@ -24,19 +24,42 @@ impl<D: Device> Tensor<D, Int> {
     }
 }
 
-// ---- allclose (Float only) ----
+// ---- allclose ----
 
 impl<D: Device> Tensor<D, Float> {
-    /// `|self - other| <= atol + rtol * |other|` for all elements.
     pub fn allclose(&self, other: &Self, rtol: f64, atol: f64) -> crate::Result<bool> {
-        let a = self.to_vec()?;
-        let b = other.to_vec()?;
-        if a.len() != b.len() {
+        if self.element_count() != other.element_count() {
             return Ok(false);
         }
-        Ok(a.iter()
-            .zip(b.iter())
-            .all(|(&x, &y)| (x - y).abs() <= atol + rtol * y.abs()))
+        D::f_allclose(
+            &*self.storage_read()?, self.layout(),
+            &*other.storage_read()?, other.layout(),
+            rtol, atol,
+        )
+    }
+}
+
+impl<D: Device> Tensor<D, Int> {
+    pub fn allclose(&self, other: &Self) -> crate::Result<bool> {
+        if self.element_count() != other.element_count() {
+            return Ok(false);
+        }
+        D::i_allclose(
+            &*self.storage_read()?, self.layout(),
+            &*other.storage_read()?, other.layout(),
+        )
+    }
+}
+
+impl<D: Device> Tensor<D, Bool> {
+    pub fn allclose(&self, other: &Self) -> crate::Result<bool> {
+        if self.element_count() != other.element_count() {
+            return Ok(false);
+        }
+        D::b_allclose(
+            &*self.storage_read()?, self.layout(),
+            &*other.storage_read()?, other.layout(),
+        )
     }
 }
 

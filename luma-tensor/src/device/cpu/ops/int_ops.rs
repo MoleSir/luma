@@ -122,6 +122,63 @@ impl IntOps<Cpu> for Cpu {
         Ok(dispatch_int!(x, |d| ew::unary(d, l, CpuNum::abs)))
     }
 
+    fn i_sign(x: &<Cpu as Device>::IntStorage, l: &Layout) -> Result<<Cpu as Device>::IntStorage> {
+        use super::kernels::element::CpuNum;
+        Ok(dispatch_int!(x, |d| ew::unary(d, l, CpuNum::signum)))
+    }
+
+    fn i_affine(x: &<Cpu as Device>::IntStorage, l: &Layout, mul: i64, add: i64) -> Result<<Cpu as Device>::IntStorage> {
+        let (mul, add) = (mul, add);
+        Ok(match x {
+            CpuIntStorage::I32(d) => CpuIntStorage::I32(ew::unary(d, l, |v| (v as i64 * mul + add) as i32)),
+            CpuIntStorage::U32(d) => CpuIntStorage::U32(ew::unary(d, l, |v| (v as u64 * mul as u64 + add as u64) as u32)),
+            CpuIntStorage::U8(d) => CpuIntStorage::U8(ew::unary(d, l, |v| (v as i64 * mul + add) as u8)),
+        })
+    }
+
+    fn i_pow(x: &<Cpu as Device>::IntStorage, l: &Layout, exp: i64) -> Result<<Cpu as Device>::IntStorage> {
+        Ok(match x {
+            CpuIntStorage::I32(d) => CpuIntStorage::I32(ew::unary(d, l, |v| (v as i64).pow(exp as u32) as i32)),
+            CpuIntStorage::U32(d) => CpuIntStorage::U32(ew::unary(d, l, |v| (v as u64).pow(exp as u32) as u32)),
+            CpuIntStorage::U8(d) => CpuIntStorage::U8(ew::unary(d, l, |v| (v as u64).pow(exp as u32) as u8)),
+        })
+    }
+
+    fn i_clamp(x: &<Cpu as Device>::IntStorage, l: &Layout, min: Option<i64>, max: Option<i64>) -> Result<<Cpu as Device>::IntStorage> {
+        Ok(match x {
+            CpuIntStorage::I32(d) => {
+                let lo = min.map(|v| v as i32);
+                let hi = max.map(|v| v as i32);
+                CpuIntStorage::I32(ew::unary(d, l, |v| {
+                    let mut val = v;
+                    if let Some(lo) = lo { val = val.max(lo); }
+                    if let Some(hi) = hi { val = val.min(hi); }
+                    val
+                }))
+            }
+            CpuIntStorage::U32(d) => {
+                let lo = min.map(|v| v.max(0) as u32);
+                let hi = max.map(|v| v as u32);
+                CpuIntStorage::U32(ew::unary(d, l, |v| {
+                    let mut val = v;
+                    if let Some(lo) = lo { val = val.max(lo); }
+                    if let Some(hi) = hi { val = val.min(hi); }
+                    val
+                }))
+            }
+            CpuIntStorage::U8(d) => {
+                let lo = min.map(|v| v.max(0) as u8);
+                let hi = max.map(|v| v as u8);
+                CpuIntStorage::U8(ew::unary(d, l, |v| {
+                    let mut val = v;
+                    if let Some(lo) = lo { val = val.max(lo); }
+                    if let Some(hi) = hi { val = val.min(hi); }
+                    val
+                }))
+            }
+        })
+    }
+
     fn i_matmul(
         lhs: &<Cpu as Device>::IntStorage,
         lhs_l: &Layout,
@@ -319,7 +376,7 @@ impl IntOps<Cpu> for Cpu {
         }
     }
 
-    fn i_if_else(
+    fn i_pick(
         mask: &<Cpu as Device>::BoolStorage,
         mask_l: &Layout,
         on_true: &<Cpu as Device>::IntStorage,
@@ -344,7 +401,76 @@ impl IntOps<Cpu> for Cpu {
                 let fv: Vec<u8> = false_l.storage_indices().map(|i| f[i]).collect();
                 Ok(CpuIntStorage::U8(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { fv[i] }).collect()))
             }
-            (l, r) => Err(Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: "if_else" }),
+            (l, r) => Err(Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: "pick" }),
+        }
+    }
+
+    fn i_pick_true(
+        mask: &<Cpu as Device>::BoolStorage,
+        mask_l: &Layout,
+        value: i64,
+        on_false: &<Cpu as Device>::IntStorage,
+        false_l: &Layout,
+    ) -> Result<<Cpu as Device>::IntStorage> {
+        let m: Vec<bool> = mask_l.storage_indices().map(|i| mask.0[i]).collect();
+        match on_false {
+            CpuIntStorage::I32(f) => {
+                let fv: Vec<i32> = false_l.storage_indices().map(|i| f[i]).collect();
+                let val = value as i32;
+                Ok(CpuIntStorage::I32(m.iter().enumerate().map(|(i, &c)| if c { val } else { fv[i] }).collect()))
+            }
+            CpuIntStorage::U32(f) => {
+                let fv: Vec<u32> = false_l.storage_indices().map(|i| f[i]).collect();
+                let val = value as u32;
+                Ok(CpuIntStorage::U32(m.iter().enumerate().map(|(i, &c)| if c { val } else { fv[i] }).collect()))
+            }
+            CpuIntStorage::U8(f) => {
+                let fv: Vec<u8> = false_l.storage_indices().map(|i| f[i]).collect();
+                let val = value as u8;
+                Ok(CpuIntStorage::U8(m.iter().enumerate().map(|(i, &c)| if c { val } else { fv[i] }).collect()))
+            }
+        }
+    }
+
+    fn i_pick_false(
+        mask: &<Cpu as Device>::BoolStorage,
+        mask_l: &Layout,
+        on_true: &<Cpu as Device>::IntStorage,
+        true_l: &Layout,
+        value: i64,
+    ) -> Result<<Cpu as Device>::IntStorage> {
+        let m: Vec<bool> = mask_l.storage_indices().map(|i| mask.0[i]).collect();
+        match on_true {
+            CpuIntStorage::I32(t) => {
+                let tv: Vec<i32> = true_l.storage_indices().map(|i| t[i]).collect();
+                let val = value as i32;
+                Ok(CpuIntStorage::I32(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { val }).collect()))
+            }
+            CpuIntStorage::U32(t) => {
+                let tv: Vec<u32> = true_l.storage_indices().map(|i| t[i]).collect();
+                let val = value as u32;
+                Ok(CpuIntStorage::U32(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { val }).collect()))
+            }
+            CpuIntStorage::U8(t) => {
+                let tv: Vec<u8> = true_l.storage_indices().map(|i| t[i]).collect();
+                let val = value as u8;
+                Ok(CpuIntStorage::U8(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { val }).collect()))
+            }
+        }
+    }
+
+    fn i_allclose(a: &CpuIntStorage, a_l: &Layout, b: &CpuIntStorage, b_l: &Layout) -> Result<bool> {
+        match (a, b) {
+            (CpuIntStorage::I32(av), CpuIntStorage::I32(bv)) => {
+                Ok(a_l.storage_indices().zip(b_l.storage_indices()).all(|(ai, bi)| av[ai] == bv[bi]))
+            }
+            (CpuIntStorage::U32(av), CpuIntStorage::U32(bv)) => {
+                Ok(a_l.storage_indices().zip(b_l.storage_indices()).all(|(ai, bi)| av[ai] == bv[bi]))
+            }
+            (CpuIntStorage::U8(av), CpuIntStorage::U8(bv)) => {
+                Ok(a_l.storage_indices().zip(b_l.storage_indices()).all(|(ai, bi)| av[ai] == bv[bi]))
+            }
+            _ => Err(crate::Error::DTypeMismatch { lhs: a.dtype(), rhs: b.dtype(), op: "allclose" }),
         }
     }
 }

@@ -1,0 +1,10 @@
+pub const BINARY: &str = include_str!(concat!(env!("OUT_DIR"), "/binary.ptx"));
+pub const UNARY: &str = include_str!(concat!(env!("OUT_DIR"), "/unary.ptx"));
+pub const REDUCE: &str = include_str!(concat!(env!("OUT_DIR"), "/reduce.ptx"));
+pub const CAST: &str = include_str!(concat!(env!("OUT_DIR"), "/cast.ptx"));
+pub const BINARY_SCALAR: &str = include_str!(concat!(env!("OUT_DIR"), "/binary_scalar.ptx"));
+pub const COPY: &str = include_str!(concat!(env!("OUT_DIR"), "/copy.ptx"));
+pub const INDEXING: &str = include_str!(concat!(env!("OUT_DIR"), "/indexing.ptx"));
+pub const PICK: &str = include_str!(concat!(env!("OUT_DIR"), "/pick.ptx"));
+pub const ALLCLOSE: &str = include_str!(concat!(env!("OUT_DIR"), "/allclose.ptx"));
+pub const NN: &str = include_str!(concat!(env!("OUT_DIR"), "/nn.ptx"));

@@ -11,6 +11,14 @@ pub trait TensorMeta<D: Device, K: DTypeKind<D> + Sized>: Default + Send + Sync 
     // ---- Unary operations ----
     fn on_unary(t: &Tensor<D, K>, op: UnaryOp) -> Self;
 
+    // ---- Elementwise ops shared by Float and Int ----
+    fn on_neg(t: &Tensor<D, K>) -> Self;
+    fn on_abs(t: &Tensor<D, K>) -> Self;
+    fn on_sign(t: &Tensor<D, K>) -> Self;
+    fn on_pow(t: &Tensor<D, K>, exp: K::Scalar) -> Self;
+    fn on_affine(t: &Tensor<D, K>, mul: K::Scalar, add: K::Scalar) -> Self;
+    fn on_clamp(t: &Tensor<D, K>, min: Option<K::Scalar>, max: Option<K::Scalar>) -> Self;
+
     // ---- Reductions ----
     fn on_reduce(t: &Tensor<D, K>, dims: &[usize], op: ReduceOp) -> Self;
 
@@ -37,7 +45,7 @@ pub trait TensorMeta<D: Device, K: DTypeKind<D> + Sized>: Default + Send + Sync 
     fn on_scatter_add(init: &Tensor<D, K>, idx: &Tensor<D, Int>, src: &Tensor<D, K>, dim: usize) -> Self;
 
     // ---- Conditional operations ----
-    fn on_if_else(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, K>>, fv: Option<&Tensor<D, K>>) -> Self;
+    fn on_pick(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, K>>, fv: Option<&Tensor<D, K>>) -> Self;
 
     // ---- NN operations (Float-specific, but included for completeness) ----
     fn on_rms_norm(input: &Tensor<D, K>, weight: &Tensor<D, K>, eps: f64) -> Self;
@@ -160,9 +168,33 @@ impl<D: Device> FloatMeta<D> {
         Self::record(t.requires_grad(), || Op::Cast(t.clone()))
     }
 
-    pub fn on_if_else(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, Float>>, fv: Option<&Tensor<D, Float>>) -> Self {
+    pub fn on_neg(t: &Tensor<D, Float>) -> Self {
+        Self::record(t.requires_grad(), || Op::Neg(t.clone()))
+    }
+
+    pub fn on_abs(t: &Tensor<D, Float>) -> Self {
+        Self::record(t.requires_grad(), || Op::Abs(t.clone()))
+    }
+
+    pub fn on_sign(t: &Tensor<D, Float>) -> Self {
+        Self::record(t.requires_grad(), || Op::Sign(t.clone()))
+    }
+
+    pub fn on_pow(t: &Tensor<D, Float>, exp: f64) -> Self {
+        Self::record(t.requires_grad(), || Op::Pow(t.clone(), exp))
+    }
+
+    pub fn on_affine(t: &Tensor<D, Float>, mul: f64, add: f64) -> Self {
+        Self::record(t.requires_grad(), || Op::Affine(t.clone(), mul, add))
+    }
+
+    pub fn on_clamp(t: &Tensor<D, Float>, min: Option<f64>, max: Option<f64>) -> Self {
+        Self::record(t.requires_grad(), || Op::Clamp(t.clone(), min, max))
+    }
+
+    pub fn on_pick(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, Float>>, fv: Option<&Tensor<D, Float>>) -> Self {
         let record = tv.map(|t| t.requires_grad()).unwrap_or(false) || fv.map(|f| f.requires_grad()).unwrap_or(false);
-        Self::record(record, || Op::IfElse(mask.clone(), tv.cloned(), fv.cloned()))
+        Self::record(record, || Op::Pick(mask.clone(), tv.cloned(), fv.cloned()))
     }
 
     pub fn on_index_select(t: &Tensor<D, Float>, idx: &Tensor<D, Int>, dim: usize) -> Self {
@@ -290,8 +322,8 @@ impl<D: Device> TensorMeta<D, Float> for FloatMeta<D> {
         FloatMeta::on_scatter_add(init, idx, src, dim)
     }
 
-    fn on_if_else(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, Float>>, fv: Option<&Tensor<D, Float>>) -> Self {
-        FloatMeta::on_if_else(mask, tv, fv)
+    fn on_pick(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, Float>>, fv: Option<&Tensor<D, Float>>) -> Self {
+        FloatMeta::on_pick(mask, tv, fv)
     }
 
     fn on_rms_norm(input: &Tensor<D, Float>, weight: &Tensor<D, Float>, eps: f64) -> Self {
@@ -300,6 +332,30 @@ impl<D: Device> TensorMeta<D, Float> for FloatMeta<D> {
 
     fn on_softmax(input: &Tensor<D, Float>, dim: usize) -> Self {
         FloatMeta::on_softmax(input, dim)
+    }
+
+    fn on_neg(t: &Tensor<D, Float>) -> Self {
+        FloatMeta::on_neg(t)
+    }
+
+    fn on_abs(t: &Tensor<D, Float>) -> Self {
+        FloatMeta::on_abs(t)
+    }
+
+    fn on_sign(t: &Tensor<D, Float>) -> Self {
+        FloatMeta::on_sign(t)
+    }
+
+    fn on_pow(t: &Tensor<D, Float>, exp: f64) -> Self {
+        FloatMeta::on_pow(t, exp)
+    }
+
+    fn on_affine(t: &Tensor<D, Float>, mul: f64, add: f64) -> Self {
+        FloatMeta::on_affine(t, mul, add)
+    }
+
+    fn on_clamp(t: &Tensor<D, Float>, min: Option<f64>, max: Option<f64>) -> Self {
+        FloatMeta::on_clamp(t, min, max)
     }
 }
 
@@ -327,7 +383,13 @@ impl<D: Device, K: crate::DTypeKind<D>> TensorMeta<D, K> for () {
     fn on_gather(_: &Tensor<D, K>, _: &Tensor<D, Int>, _: usize) -> Self {}
     fn on_index_add(_: &Tensor<D, K>, _: &Tensor<D, Int>, _: &Tensor<D, K>, _: usize) -> Self {}
     fn on_scatter_add(_: &Tensor<D, K>, _: &Tensor<D, Int>, _: &Tensor<D, K>, _: usize) -> Self {}
-    fn on_if_else(_: &Tensor<D, Bool>, _: Option<&Tensor<D, K>>, _: Option<&Tensor<D, K>>) -> Self {}
+    fn on_pick(_: &Tensor<D, Bool>, _: Option<&Tensor<D, K>>, _: Option<&Tensor<D, K>>) -> Self {}
     fn on_rms_norm(_: &Tensor<D, K>, _: &Tensor<D, K>, _: f64) -> Self {}
     fn on_softmax(_: &Tensor<D, K>, _: usize) -> Self {}
+    fn on_neg(_: &Tensor<D, K>) -> Self {}
+    fn on_abs(_: &Tensor<D, K>) -> Self {}
+    fn on_sign(_: &Tensor<D, K>) -> Self {}
+    fn on_pow(_: &Tensor<D, K>, _: K::Scalar) -> Self {}
+    fn on_affine(_: &Tensor<D, K>, _: K::Scalar, _: K::Scalar) -> Self {}
+    fn on_clamp(_: &Tensor<D, K>, _: Option<K::Scalar>, _: Option<K::Scalar>) -> Self {}
 }

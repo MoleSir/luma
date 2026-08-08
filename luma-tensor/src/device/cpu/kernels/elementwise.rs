@@ -118,8 +118,6 @@ pub fn float_unary<T: CpuFloat>(x: &[T], layout: &Layout, op: UnaryOp) -> Vec<T>
         UnaryOp::Sin => unary(x, layout, |v| v.sin()),
         UnaryOp::Cos => unary(x, layout, |v| v.cos()),
         UnaryOp::Tanh => unary(x, layout, |v| v.tanh()),
-        UnaryOp::Abs => unary(x, layout, |v| v.abs()),
-        UnaryOp::Neg => unary(x, layout, |v| -v),
         UnaryOp::Sqr => unary(x, layout, |v| v.sqr()),
         UnaryOp::Sqrt => unary(x, layout, |v| v.sqrt()),
         UnaryOp::Recip => unary(x, layout, |v| v.recip()),
@@ -132,32 +130,9 @@ pub fn float_unary<T: CpuFloat>(x: &[T], layout: &Layout, op: UnaryOp) -> Vec<T>
         UnaryOp::Floor => unary(x, layout, |v| v.floor()),
         UnaryOp::Ceil => unary(x, layout, |v| v.ceil()),
         UnaryOp::Round => unary(x, layout, |v| v.round()),
-        UnaryOp::Sign => unary(x, layout, |v| v.signum()),
         UnaryOp::LeakyRelu(a) => {
             let a = T::from_f64(a);
             unary(x, layout, |v| v.leaky_relu(a))
-        }
-        UnaryOp::Pow(e) => {
-            let e = T::from_f64(e);
-            unary(x, layout, |v| v.powf(e))
-        }
-        UnaryOp::Affine { mul, add } => {
-            let (mul, add) = (T::from_f64(mul), T::from_f64(add));
-            unary(x, layout, |v| v * mul + add)
-        }
-        UnaryOp::Clamp { min, max } => {
-            let lo = min.map(T::from_f64);
-            let hi = max.map(T::from_f64);
-            unary(x, layout, |v| {
-                let mut val = v;
-                if let Some(lo) = lo {
-                    val = T::maximum(val, lo);
-                }
-                if let Some(hi) = hi {
-                    val = T::minimum(val, hi);
-                }
-                val
-            })
         }
     }
 }

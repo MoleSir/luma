@@ -32,4 +32,33 @@ pub trait BoolOps<D: super::Device> {
 
     // ---- shape ----
     fn b_cat(srcs: &[(&D::BoolStorage, &Layout)], dim: usize) -> Result<(D::BoolStorage, Shape)>;
+
+    // ---- pick via a bool mask ----
+    fn b_pick(
+        mask: &D::BoolStorage,
+        mask_l: &Layout,
+        on_true: &D::BoolStorage,
+        true_l: &Layout,
+        on_false: &D::BoolStorage,
+        false_l: &Layout,
+    ) -> Result<D::BoolStorage>;
+
+    fn b_pick_true(
+        mask: &D::BoolStorage,
+        mask_l: &Layout,
+        value: bool,
+        on_false: &D::BoolStorage,
+        false_l: &Layout,
+    ) -> Result<D::BoolStorage>;
+
+    fn b_pick_false(
+        mask: &D::BoolStorage,
+        mask_l: &Layout,
+        on_true: &D::BoolStorage,
+        true_l: &Layout,
+        value: bool,
+    ) -> Result<D::BoolStorage>;
+
+    // ---- allclose ----
+    fn b_allclose(a: &D::BoolStorage, a_l: &Layout, b: &D::BoolStorage, b_l: &Layout) -> Result<bool>;
 }

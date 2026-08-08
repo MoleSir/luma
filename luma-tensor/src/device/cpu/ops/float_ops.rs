@@ -129,6 +129,53 @@ impl FloatOps<Cpu> for Cpu {
         Ok(dispatch_float!(x, |d| ew::float_unary(d, l, op)))
     }
 
+    fn f_neg(x: &<Cpu as Device>::FloatStorage, l: &Layout) -> Result<<Cpu as Device>::FloatStorage> {
+        Ok(dispatch_float!(x, |d| ew::unary(d, l, |v| -v)))
+    }
+
+    fn f_abs(x: &<Cpu as Device>::FloatStorage, l: &Layout) -> Result<<Cpu as Device>::FloatStorage> {
+        Ok(dispatch_float!(x, |d| ew::unary(d, l, |v| v.abs())))
+    }
+
+    fn f_sign(x: &<Cpu as Device>::FloatStorage, l: &Layout) -> Result<<Cpu as Device>::FloatStorage> {
+        Ok(dispatch_float!(x, |d| ew::unary(d, l, |v| v.signum())))
+    }
+
+    fn f_affine(x: &<Cpu as Device>::FloatStorage, l: &Layout, mul: f64, add: f64) -> Result<<Cpu as Device>::FloatStorage> {
+        match x {
+            CpuFloatStorage::F32(d) => Ok(CpuFloatStorage::F32(ew::unary(d, l, |v| v * mul as f32 + add as f32))),
+            CpuFloatStorage::F64(d) => Ok(CpuFloatStorage::F64(ew::unary(d, l, |v| v * mul + add))),
+        }
+    }
+
+    fn f_pow(x: &<Cpu as Device>::FloatStorage, l: &Layout, exp: f64) -> Result<<Cpu as Device>::FloatStorage> {
+        match x {
+            CpuFloatStorage::F32(d) => Ok(CpuFloatStorage::F32(ew::unary(d, l, |v| v.powf(exp as f32)))),
+            CpuFloatStorage::F64(d) => Ok(CpuFloatStorage::F64(ew::unary(d, l, |v| v.powf(exp)))),
+        }
+    }
+
+    fn f_clamp(x: &<Cpu as Device>::FloatStorage, l: &Layout, min: Option<f64>, max: Option<f64>) -> Result<<Cpu as Device>::FloatStorage> {
+        match x {
+            CpuFloatStorage::F32(d) => {
+                let lo = min.map(|v| v as f32);
+                let hi = max.map(|v| v as f32);
+                Ok(CpuFloatStorage::F32(ew::unary(d, l, |v| {
+                    let mut val = v;
+                    if let Some(lo) = lo { val = lo.max(val); }
+                    if let Some(hi) = hi { val = hi.min(val); }
+                    val
+                })))
+            }
+            CpuFloatStorage::F64(d) => Ok(CpuFloatStorage::F64(ew::unary(d, l, |v| {
+                let mut val = v;
+                if let Some(lo) = min { val = lo.max(val); }
+                if let Some(hi) = max { val = hi.min(val); }
+                val
+            }))),
+        }
+    }
+
     fn f_cmp(
         lhs: &<Cpu as Device>::FloatStorage,
         lhs_l: &Layout,
@@ -346,7 +393,7 @@ impl FloatOps<Cpu> for Cpu {
         }
     }
 
-    fn f_if_else(
+    fn f_pick(
         mask: &<Cpu as Device>::BoolStorage,
         mask_l: &Layout,
         on_true: &<Cpu as Device>::FloatStorage,
@@ -366,7 +413,69 @@ impl FloatOps<Cpu> for Cpu {
                 let fv = super::kernels::iter::gather(f, false_l);
                 Ok(CpuFloatStorage::F64(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { fv[i] }).collect()))
             }
-            (l, r) => Err(Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: "if_else" }),
+            (l, r) => Err(Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: "pick" }),
+        }
+    }
+
+    fn f_pick_true(
+        mask: &<Cpu as Device>::BoolStorage,
+        mask_l: &Layout,
+        value: f64,
+        on_false: &<Cpu as Device>::FloatStorage,
+        false_l: &Layout,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
+        let m: Vec<bool> = mask_l.storage_indices().map(|i| mask.0[i]).collect();
+        match on_false {
+            CpuFloatStorage::F32(f) => {
+                let fv = super::kernels::iter::gather(f, false_l);
+                let val = value as f32;
+                Ok(CpuFloatStorage::F32(m.iter().enumerate().map(|(i, &c)| if c { val } else { fv[i] }).collect()))
+            }
+            CpuFloatStorage::F64(f) => {
+                let fv = super::kernels::iter::gather(f, false_l);
+                Ok(CpuFloatStorage::F64(m.iter().enumerate().map(|(i, &c)| if c { value } else { fv[i] }).collect()))
+            }
+        }
+    }
+
+    fn f_pick_false(
+        mask: &<Cpu as Device>::BoolStorage,
+        mask_l: &Layout,
+        on_true: &<Cpu as Device>::FloatStorage,
+        true_l: &Layout,
+        value: f64,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
+        let m: Vec<bool> = mask_l.storage_indices().map(|i| mask.0[i]).collect();
+        match on_true {
+            CpuFloatStorage::F32(t) => {
+                let tv = super::kernels::iter::gather(t, true_l);
+                let val = value as f32;
+                Ok(CpuFloatStorage::F32(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { val }).collect()))
+            }
+            CpuFloatStorage::F64(t) => {
+                let tv = super::kernels::iter::gather(t, true_l);
+                Ok(CpuFloatStorage::F64(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { value }).collect()))
+            }
+        }
+    }
+
+    fn f_allclose(a: &CpuFloatStorage, a_l: &Layout, b: &CpuFloatStorage, b_l: &Layout, rtol: f64, atol: f64) -> Result<bool> {
+        match (a, b) {
+            (CpuFloatStorage::F32(av), CpuFloatStorage::F32(bv)) => {
+                let rtol = rtol as f32;
+                let atol = atol as f32;
+                Ok(a_l.storage_indices().zip(b_l.storage_indices()).all(|(ai, bi)| {
+                    let diff = (av[ai] - bv[bi]).abs();
+                    diff <= atol + rtol * bv[bi].abs()
+                }))
+            }
+            (CpuFloatStorage::F64(av), CpuFloatStorage::F64(bv)) => {
+                Ok(a_l.storage_indices().zip(b_l.storage_indices()).all(|(ai, bi)| {
+                    let diff = (av[ai] - bv[bi]).abs();
+                    diff <= atol + rtol * bv[bi].abs()
+                }))
+            }
+            _ => return Err(crate::Error::DTypeMismatch { lhs: a.dtype(), rhs: b.dtype(), op: "allclose" }),
         }
     }
 }

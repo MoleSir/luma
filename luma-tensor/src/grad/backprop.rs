@@ -84,7 +84,8 @@ fn op_inputs<D: Device>(op: &Op<D>) -> Vec<&Tensor<D, Float>> {
         | Op::Softmax(a, _) => vec![a],
         Op::IndexAdd(a, _, b, _) | Op::ScatterAdd(a, _, b, _) | Op::RmsNorm(a, b, _) => vec![a, b],
         Op::Cat(args, _) => args.iter().collect(),
-        Op::IfElse(_, tv, fv) => tv.iter().chain(fv.iter()).collect(),
+        Op::Pick(_, tv, fv) => tv.iter().chain(fv.iter()).collect(),
+        Op::Neg(a) | Op::Abs(a) | Op::Sign(a) | Op::Pow(a, _) | Op::Affine(a, _, _) | Op::Clamp(a, _, _) => vec![a],
     }
 }
 
@@ -172,6 +173,38 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
         }
 
         Op::Unary(arg, uop) => backward_unary(node, arg, *uop, grad, grads)?,
+
+        // ---- elementwise ops ----
+        Op::Neg(arg) => {
+            grads.or_insert(arg)?.impl_add_(&grad.neg()?)?;
+        }
+        Op::Abs(arg) => {
+            let g = grad.mul(&arg.sign()?)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
+        Op::Sign(_) => {} // gradient is zero everywhere
+        Op::Pow(arg, e) => {
+            let g = grad.mul(&arg.pow(e - 1.0)?)?.mul_scalar(*e)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
+        Op::Affine(arg, mul, _add) => {
+            let g = grad.mul_scalar(*mul)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
+        Op::Clamp(arg, min, max) => {
+            let dtype = arg.dtype();
+            let mut mask = arg.ones_like()?;
+            if let Some(lo) = min {
+                let t_lo = arg.zeros_like()?.add_scalar(*lo)?;
+                mask = mask.mul(&arg.gt(&t_lo)?.cast_float(dtype)?)?;
+            }
+            if let Some(hi) = max {
+                let t_hi = arg.zeros_like()?.add_scalar(*hi)?;
+                mask = mask.mul(&arg.lt(&t_hi)?.cast_float(dtype)?)?;
+            }
+            let g = grad.mul(&mask)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
 
         // ---- Matmul ----
         Op::Matmul(lhs, rhs) => {
@@ -267,14 +300,14 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
             grads.or_insert(src)?.impl_add_(&src_grad)?;
         }
 
-        // ---- if_else: route grad through the mask to each branch ----
-        Op::IfElse(mask, tv, fv) => {
+        // ---- pick: route grad through the mask to each branch ----
+        Op::Pick(mask, tv, fv) => {
             if let Some(tv) = tv {
-                let g = mask.if_else_scalar_false(grad, 0.0)?;
+                let g = mask.pick_false(grad, 0.0)?;
                 grads.or_insert(tv)?.impl_add_(&g)?;
             }
             if let Some(fv) = fv {
-                let g = mask.if_else_scalar_true(0.0, grad)?;
+                let g = mask.pick_true(0.0, grad)?;
                 grads.or_insert(fv)?.impl_add_(&g)?;
             }
         }
@@ -395,8 +428,6 @@ fn backward_unary<D: Device>(
             // 1/(2 sqrt x) = 0.5 / node
             grad.mul_scalar(0.5)?.div(node)?
         }
-        UnaryOp::Abs => grad.mul(&arg.sign()?)?,
-        UnaryOp::Neg => grad.neg()?,
         UnaryOp::Recip => {
             // -1/x^2 = -node^2
             grad.mul(&node.sqr()?)?.neg()?
@@ -421,11 +452,6 @@ fn backward_unary<D: Device>(
             let scale = 2.0 / std::f64::consts::PI.sqrt();
             grad.mul(&arg.sqr()?.neg()?.exp()?)?.mul_scalar(scale)?
         }
-        UnaryOp::Pow(e) => {
-            // e * x^(e-1)
-            grad.mul(&arg.pow(e - 1.0)?)?.mul_scalar(e)?
-        }
-        UnaryOp::Affine { mul, .. } => grad.mul_scalar(mul)?,
         UnaryOp::Silu => {
             // sig = sigmoid(x); silu = x*sig; d = sig*(1 - silu) + silu
             let sig = arg.sigmoid()?;
@@ -457,22 +483,8 @@ fn backward_unary<D: Device>(
             let factor = scaled_exp.add(&erf_term)?.add_scalar(0.5)?;
             grad.mul(&factor)?
         }
-        UnaryOp::Clamp { min, max } => {
-            // grad only flows where min < x < max
-            let dtype = arg.dtype();
-            let mut mask = arg.ones_like()?;
-            if let Some(lo) = min {
-                let t_lo = arg.zeros_like()?.add_scalar(lo)?;
-                mask = mask.mul(&arg.gt(&t_lo)?.cast_float(dtype)?)?;
-            }
-            if let Some(hi) = max {
-                let t_hi = arg.zeros_like()?.add_scalar(hi)?;
-                mask = mask.mul(&arg.lt(&t_hi)?.cast_float(dtype)?)?;
-            }
-            grad.mul(&mask)?
-        }
-        UnaryOp::Floor | UnaryOp::Ceil | UnaryOp::Round | UnaryOp::Sign => {
-            return Err(crate::Error::BackwardNotSupported("floor/ceil/round/sign"));
+        UnaryOp::Floor | UnaryOp::Ceil | UnaryOp::Round => {
+            return Err(crate::Error::BackwardNotSupported("floor/ceil/round"));
         }
     };
     grads.or_insert(arg)?.impl_add_(&contrib)?;

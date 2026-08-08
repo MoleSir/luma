@@ -1,6 +1,7 @@
 use crate::Result;
-use crate::dtype::{BoolDType, FloatDType, IntDType};
+use crate::dtype::{BoolDType, FloatDType, IntDType, Storage};
 use crate::tensor::{Layout, Shape};
+use crate::Float;
 
 /// Operations for floating-point tensors.
 pub trait FloatOps<D: super::Device> {
@@ -34,6 +35,13 @@ pub trait FloatOps<D: super::Device> {
 
     // ---- unary ----
     fn f_unary(x: &D::FloatStorage, layout: &Layout, op: crate::UnaryOp) -> Result<D::FloatStorage>;
+
+    fn f_neg(x: &D::FloatStorage, layout: &Layout) -> Result<D::FloatStorage>;
+    fn f_abs(x: &D::FloatStorage, layout: &Layout) -> Result<D::FloatStorage>;
+    fn f_sign(x: &D::FloatStorage, layout: &Layout) -> Result<D::FloatStorage>;
+    fn f_affine(x: &D::FloatStorage, layout: &Layout, mul: f64, add: f64) -> Result<D::FloatStorage>;
+    fn f_pow(x: &D::FloatStorage, layout: &Layout, exp: f64) -> Result<D::FloatStorage>;
+    fn f_clamp(x: &D::FloatStorage, layout: &Layout, min: Option<f64>, max: Option<f64>) -> Result<D::FloatStorage>;
 
     // ---- comparison -> bool storage ----
     fn f_cmp(lhs: &D::FloatStorage, lhs_l: &Layout, rhs: &D::FloatStorage, rhs_l: &Layout, op: crate::CmpOp) -> Result<D::BoolStorage>;
@@ -102,12 +110,52 @@ pub trait FloatOps<D: super::Device> {
     fn f_cat(srcs: &[(&D::FloatStorage, &Layout)], dim: usize) -> Result<(D::FloatStorage, Shape)>;
 
     // ---- nn fused kernels ----
-    fn f_softmax(x: &D::FloatStorage, layout: &Layout, dim: usize) -> Result<D::FloatStorage>;
+    fn f_softmax(x: &D::FloatStorage, layout: &Layout, dim: usize) -> Result<D::FloatStorage> {
+        let data = D::f_to_vec(x, layout)?;
+        let dims = layout.dims();
+        let reduce_size = dims[dim];
+        let outer: usize = dims[..dim].iter().product();
+        let inner: usize = dims[dim + 1..].iter().product();
+        let mut out = vec![0f64; data.len()];
 
-    fn f_rms_norm(x: &D::FloatStorage, x_l: &Layout, weight: &D::FloatStorage, weight_l: &Layout, eps: f64) -> Result<D::FloatStorage>;
+        for o in 0..outer {
+            for i in 0..inner {
+                let row: Vec<f64> = (0..reduce_size).map(|r| data[o * reduce_size * inner + r * inner + i]).collect();
+                let max_val = row.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+                let exp_sum: f64 = row.iter().map(|&v| (v - max_val).exp()).sum();
+                for r in 0..reduce_size {
+                    out[o * reduce_size * inner + r * inner + i] = ((row[r] - max_val).exp()) / exp_sum;
+                }
+            }
+        }
 
-    // ---- masked select via a bool mask ----
-    fn f_if_else(
+        let dtype = <D::FloatStorage as Storage<D, Float>>::dtype(x);
+        D::f_from_f64(&out, dtype)
+    }
+
+    fn f_rms_norm(x: &D::FloatStorage, x_l: &Layout, weight: &D::FloatStorage, weight_l: &Layout, eps: f64) -> Result<D::FloatStorage> {
+        let x_data = D::f_to_vec(x, x_l)?;
+        let w_data = D::f_to_vec(weight, weight_l)?;
+        let last_dim = x_l.shape().rank() - 1;
+        let last_dim_size = x_l.dims()[last_dim];
+        let batch = x_data.len() / last_dim_size;
+
+        let mut out = vec![0f64; x_data.len()];
+        for b in 0..batch {
+            let (b_start, b_end) = (b * last_dim_size, (b + 1) * last_dim_size);
+            let mean_sq = x_data[b_start..b_end].iter().map(|&v| v * v).sum::<f64>() / last_dim_size as f64;
+            let inv_rms = 1.0 / (mean_sq + eps).sqrt();
+            for i in 0..last_dim_size {
+                out[b_start + i] = x_data[b_start + i] * inv_rms * w_data[i];
+            }
+        }
+
+        let dtype = <D::FloatStorage as Storage<D, Float>>::dtype(x);
+        D::f_from_f64(&out, dtype)
+    }
+
+    // ---- pick via a bool mask ----
+    fn f_pick(
         mask: &D::BoolStorage,
         mask_l: &Layout,
         on_true: &D::FloatStorage,
@@ -115,4 +163,23 @@ pub trait FloatOps<D: super::Device> {
         on_false: &D::FloatStorage,
         false_l: &Layout,
     ) -> Result<D::FloatStorage>;
+
+    fn f_pick_true(
+        mask: &D::BoolStorage,
+        mask_l: &Layout,
+        value: f64,
+        on_false: &D::FloatStorage,
+        false_l: &Layout,
+    ) -> Result<D::FloatStorage>;
+
+    fn f_pick_false(
+        mask: &D::BoolStorage,
+        mask_l: &Layout,
+        on_true: &D::FloatStorage,
+        true_l: &Layout,
+        value: f64,
+    ) -> Result<D::FloatStorage>;
+
+    // ---- allclose ----
+    fn f_allclose(a: &D::FloatStorage, a_l: &Layout, b: &D::FloatStorage, b_l: &Layout, rtol: f64, atol: f64) -> Result<bool>;
 }

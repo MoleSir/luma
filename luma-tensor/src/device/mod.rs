@@ -1,5 +1,8 @@
-pub mod bool_ops;
 pub mod cpu;
+#[cfg(feature = "cuda")]
+pub mod cuda;
+
+pub mod bool_ops;
 pub mod float_ops;
 pub mod int_ops;
 
@@ -11,8 +14,8 @@ pub use int_ops::IntOps;
 use crate::{dtype::Storage, Bool, Float, Int};
 
 pub trait Device: 
-    'static + Copy + Clone + 
-    Send + Sync + 
+    'static + 
+    Clone + Send + Sync + 
     Default +
     FloatOps<Self> + 
     IntOps<Self> +

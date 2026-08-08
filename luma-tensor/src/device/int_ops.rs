@@ -28,6 +28,10 @@ pub trait IntOps<D: super::Device> {
 
     fn i_neg(x: &D::IntStorage, layout: &Layout) -> Result<D::IntStorage>;
     fn i_abs(x: &D::IntStorage, layout: &Layout) -> Result<D::IntStorage>;
+    fn i_sign(x: &D::IntStorage, layout: &Layout) -> Result<D::IntStorage>;
+    fn i_affine(x: &D::IntStorage, layout: &Layout, mul: i64, add: i64) -> Result<D::IntStorage>;
+    fn i_pow(x: &D::IntStorage, layout: &Layout, exp: i64) -> Result<D::IntStorage>;
+    fn i_clamp(x: &D::IntStorage, layout: &Layout, min: Option<i64>, max: Option<i64>) -> Result<D::IntStorage>;
 
     // ---- matmul (batched); out shape computed by the caller / this fn ----
     fn i_matmul(lhs: &D::IntStorage, lhs_l: &Layout, rhs: &D::IntStorage, rhs_l: &Layout) -> Result<(D::IntStorage, Shape)>;
@@ -69,8 +73,8 @@ pub trait IntOps<D: super::Device> {
     // ---- shape ----
     fn i_cat(srcs: &[(&D::IntStorage, &Layout)], dim: usize) -> Result<(D::IntStorage, Shape)>;
 
-    // ---- masked select via a bool mask ----
-    fn i_if_else(
+    // ---- pick via a bool mask ----
+    fn i_pick(
         mask: &D::BoolStorage,
         mask_l: &Layout,
         on_true: &D::IntStorage,
@@ -78,4 +82,23 @@ pub trait IntOps<D: super::Device> {
         on_false: &D::IntStorage,
         false_l: &Layout,
     ) -> Result<D::IntStorage>;
+
+    fn i_pick_true(
+        mask: &D::BoolStorage,
+        mask_l: &Layout,
+        value: i64,
+        on_false: &D::IntStorage,
+        false_l: &Layout,
+    ) -> Result<D::IntStorage>;
+
+    fn i_pick_false(
+        mask: &D::BoolStorage,
+        mask_l: &Layout,
+        on_true: &D::IntStorage,
+        true_l: &Layout,
+        value: i64,
+    ) -> Result<D::IntStorage>;
+
+    // ---- allclose ----
+    fn i_allclose(a: &D::IntStorage, a_l: &Layout, b: &D::IntStorage, b_l: &Layout) -> Result<bool>;
 }

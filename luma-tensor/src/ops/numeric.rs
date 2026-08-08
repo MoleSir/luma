@@ -11,9 +11,13 @@ pub trait NumericDTypeKind<D: Device>: DTypeKind<D> + Sized {
     fn binary_scalar_lhs_dispatch(lhs: &Self::Storage, lhs_l: &Layout, rhs: Self::Scalar, op: BinaryOp) -> crate::Result<Self::Storage>;
 
     fn cmp_dispatch(lhs: &Self::Storage, lhs_l: &Layout, rhs: &Self::Storage, rhs_l: &Layout, op: CmpOp) -> crate::Result<D::BoolStorage>;
-    
+
     fn neg_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage>;
     fn abs_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage>;
+    fn sign_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage>;
+    fn affine_dispatch(x: &Self::Storage, l: &Layout, mul: Self::Scalar, add: Self::Scalar) -> crate::Result<Self::Storage>;
+    fn pow_dispatch(x: &Self::Storage, l: &Layout, exp: Self::Scalar) -> crate::Result<Self::Storage>;
+    fn clamp_dispatch(x: &Self::Storage, l: &Layout, min: Option<Self::Scalar>, max: Option<Self::Scalar>) -> crate::Result<Self::Storage>;
 }
 
 impl<D: Device> NumericDTypeKind<D> for Float {
@@ -34,11 +38,27 @@ impl<D: Device> NumericDTypeKind<D> for Float {
     }
 
     fn neg_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage> {
-        D::f_unary(x, l, UnaryOp::Neg)
+        D::f_neg(x, l)
     }
 
     fn abs_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage> {
-        D::f_unary(x, l, UnaryOp::Abs)
+        D::f_abs(x, l)
+    }
+
+    fn sign_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage> {
+        D::f_sign(x, l)
+    }
+
+    fn affine_dispatch(x: &Self::Storage, l: &Layout, mul: Self::Scalar, add: Self::Scalar) -> crate::Result<Self::Storage> {
+        D::f_affine(x, l, mul, add)
+    }
+
+    fn pow_dispatch(x: &Self::Storage, l: &Layout, exp: Self::Scalar) -> crate::Result<Self::Storage> {
+        D::f_pow(x, l, exp)
+    }
+
+    fn clamp_dispatch(x: &Self::Storage, l: &Layout, min: Option<Self::Scalar>, max: Option<Self::Scalar>) -> crate::Result<Self::Storage> {
+        D::f_clamp(x, l, min, max)
     }
 }
 
@@ -65,6 +85,22 @@ impl<D: Device> NumericDTypeKind<D> for Int {
 
     fn abs_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage> {
         D::i_abs(x, l)
+    }
+
+    fn sign_dispatch(x: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage> {
+        D::i_sign(x, l)
+    }
+
+    fn affine_dispatch(x: &Self::Storage, l: &Layout, mul: Self::Scalar, add: Self::Scalar) -> crate::Result<Self::Storage> {
+        D::i_affine(x, l, mul, add)
+    }
+
+    fn pow_dispatch(x: &Self::Storage, l: &Layout, exp: Self::Scalar) -> crate::Result<Self::Storage> {
+        D::i_pow(x, l, exp)
+    }
+
+    fn clamp_dispatch(x: &Self::Storage, l: &Layout, min: Option<Self::Scalar>, max: Option<Self::Scalar>) -> crate::Result<Self::Storage> {
+        D::i_clamp(x, l, min, max)
     }
 }
 
@@ -114,7 +150,7 @@ macro_rules! binary_impl {
             pub fn [<broadcast_ $name>](&self, rhs: &Self) -> crate::Result<Self> {
                 self.binary_broadcast_impl(rhs, BinaryOp::$variant, stringify!([<broadcast_ $name>]))
             }
-            
+
             #[inline]
             pub fn [<$name _scalar>](&self, rhs: K::Scalar) -> crate::Result<Self> {
                 self.binary_scalar_rhs_impl(rhs, BinaryOp::$variant)
@@ -139,13 +175,37 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     pub fn neg(&self) -> crate::Result<Self> {
         let s = K::neg_dispatch(&*self.storage_read()?, self.layout())?;
         assert_eq!(self.dtype(), s.dtype());
-        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_unary(self, UnaryOp::Neg)))
+        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_neg(self)))
     }
 
     pub fn abs(&self) -> crate::Result<Self> {
         let s = K::abs_dispatch(&*self.storage_read()?, self.layout())?;
         assert_eq!(self.dtype(), s.dtype());
-        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_unary(self, UnaryOp::Abs)))
+        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_abs(self)))
+    }
+
+    pub fn sign(&self) -> crate::Result<Self> {
+        let s = K::sign_dispatch(&*self.storage_read()?, self.layout())?;
+        assert_eq!(self.dtype(), s.dtype());
+        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_sign(self)))
+    }
+
+    pub fn affine(&self, mul: K::Scalar, add: K::Scalar) -> crate::Result<Self> {
+        let s = K::affine_dispatch(&*self.storage_read()?, self.layout(), mul, add)?;
+        assert_eq!(self.dtype(), s.dtype());
+        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_affine(self, mul, add)))
+    }
+
+    pub fn pow(&self, exp: K::Scalar) -> crate::Result<Self> {
+        let s = K::pow_dispatch(&*self.storage_read()?, self.layout(), exp)?;
+        assert_eq!(self.dtype(), s.dtype());
+        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_pow(self, exp)))
+    }
+
+    pub fn clamp(&self, min: Option<K::Scalar>, max: Option<K::Scalar>) -> crate::Result<Self> {
+        let s = K::clamp_dispatch(&*self.storage_read()?, self.layout(), min, max)?;
+        assert_eq!(self.dtype(), s.dtype());
+        Ok(Self::from_storage(s, self.shape().clone(), K::Meta::on_clamp(self, min, max)))
     }
 }
 
@@ -229,22 +289,8 @@ impl<D: Device> Tensor<D, Float> {
     unary_method!(floor, Floor);
     unary_method!(ceil, Ceil);
     unary_method!(round, Round);
-    unary_method!(sign, Sign);
 
     pub fn leaky_relu(&self, negative_slope: f64) -> crate::Result<Self> {
         self.unary_impl(UnaryOp::LeakyRelu(negative_slope))
-    }
-
-    pub fn pow(&self, e: f64) -> crate::Result<Self> {
-        self.unary_impl(UnaryOp::Pow(e))
-    }
-
-    pub fn affine(&self, mul: f64, add: f64) -> crate::Result<Self> {
-        self.unary_impl(UnaryOp::Affine { mul, add })
-    }
-
-    /// Clamp values to `[min, max]`. Pass `None` to skip one bound.
-    pub fn clamp(&self, min: Option<f64>, max: Option<f64>) -> crate::Result<Self> {
-        self.unary_impl(UnaryOp::Clamp { min, max })
     }
 }

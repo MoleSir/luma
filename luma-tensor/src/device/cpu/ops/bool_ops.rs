@@ -116,4 +116,46 @@ impl BoolOps<Cpu> for Cpu {
         let (v, shape) = shape_k::cat(&views, dim)?;
         Ok((CpuBoolStorage(v), shape))
     }
+
+    fn b_pick(
+        mask: &<Cpu as Device>::BoolStorage,
+        mask_l: &Layout,
+        on_true: &<Cpu as Device>::BoolStorage,
+        true_l: &Layout,
+        on_false: &<Cpu as Device>::BoolStorage,
+        false_l: &Layout,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
+        let m: Vec<bool> = mask_l.storage_indices().map(|i| mask.0[i]).collect();
+        let tv: Vec<bool> = true_l.storage_indices().map(|i| on_true.0[i]).collect();
+        let fv: Vec<bool> = false_l.storage_indices().map(|i| on_false.0[i]).collect();
+        Ok(CpuBoolStorage(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { fv[i] }).collect()))
+    }
+
+    fn b_pick_true(
+        mask: &<Cpu as Device>::BoolStorage,
+        mask_l: &Layout,
+        value: bool,
+        on_false: &<Cpu as Device>::BoolStorage,
+        false_l: &Layout,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
+        let m: Vec<bool> = mask_l.storage_indices().map(|i| mask.0[i]).collect();
+        let fv: Vec<bool> = false_l.storage_indices().map(|i| on_false.0[i]).collect();
+        Ok(CpuBoolStorage(m.iter().enumerate().map(|(i, &c)| if c { value } else { fv[i] }).collect()))
+    }
+
+    fn b_pick_false(
+        mask: &<Cpu as Device>::BoolStorage,
+        mask_l: &Layout,
+        on_true: &<Cpu as Device>::BoolStorage,
+        true_l: &Layout,
+        value: bool,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
+        let m: Vec<bool> = mask_l.storage_indices().map(|i| mask.0[i]).collect();
+        let tv: Vec<bool> = true_l.storage_indices().map(|i| on_true.0[i]).collect();
+        Ok(CpuBoolStorage(m.iter().enumerate().map(|(i, &c)| if c { tv[i] } else { value }).collect()))
+    }
+
+    fn b_allclose(a: &CpuBoolStorage, a_l: &Layout, b: &CpuBoolStorage, b_l: &Layout) -> Result<bool> {
+        Ok(a_l.storage_indices().zip(b_l.storage_indices()).all(|(ai, bi)| a.0[ai] == b.0[bi]))
+    }
 }

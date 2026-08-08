@@ -147,7 +147,7 @@ impl Layout {
     ///
     /// Example for shape = (2, 2) in row-major layout:
     /// yields: `0, 1, 2, 3`
-    pub fn storage_indices(&self) -> StorageIndices {
+    pub fn storage_indices<'a>(&'a self) -> StorageIndices<'a> {
         StorageIndices::from_layout(self)
     }
 }

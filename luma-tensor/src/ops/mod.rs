@@ -52,13 +52,20 @@ pub enum Op<D: Device> {
     Transpose(Tensor<D, Float>, usize, usize),
     Permute(Tensor<D, Float>, Vec<usize>),
     Cat(Vec<Tensor<D, Float>>, usize),
-    IfElse(Tensor<D, Bool>, Option<Tensor<D, Float>>, Option<Tensor<D, Float>>),
+    Pick(Tensor<D, Bool>, Option<Tensor<D, Float>>, Option<Tensor<D, Float>>),
     Copy(Tensor<D, Float>),
     RmsNorm(Tensor<D, Float>, Tensor<D, Float>, f64),
     Softmax(Tensor<D, Float>, usize),
     /// Precision cast within the float kind (e.g. f32 -> f64). Records the input
     /// so the gradient can be cast back — the key capability the old design lacked.
     Cast(Tensor<D, Float>),
+    // ---- elementwise ops shared by Float and Int ----
+    Neg(Tensor<D, Float>),
+    Abs(Tensor<D, Float>),
+    Sign(Tensor<D, Float>),
+    Pow(Tensor<D, Float>, f64),
+    Affine(Tensor<D, Float>, f64, f64),
+    Clamp(Tensor<D, Float>, Option<f64>, Option<f64>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -87,8 +94,6 @@ pub enum UnaryOp {
     Sin,
     Cos,
     Tanh,
-    Abs,
-    Neg,
     Sqr,
     Sqrt,
     Recip,
@@ -102,10 +107,6 @@ pub enum UnaryOp {
     Floor,
     Ceil,
     Round,
-    Sign,
-    Affine { mul: f64, add: f64 },
-    Pow(f64),
-    Clamp { min: Option<f64>, max: Option<f64> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

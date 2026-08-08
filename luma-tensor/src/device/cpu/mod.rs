@@ -1,9 +1,6 @@
-mod bool_ops;
-mod float_ops;
-mod int_ops;
+mod ops;
 pub mod kernels;
 mod storage;
-
 pub use storage::*;
 
 use crate::{DType, Device};

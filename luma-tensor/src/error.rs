@@ -109,6 +109,10 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
 
+    #[cfg(feature = "cuda")]
+    #[error(transparent)]
+    Cuda(#[from] crate::device::cuda::CudaError),
+
     #[error(transparent)]
     Utf8(#[from] Utf8Error),
 
