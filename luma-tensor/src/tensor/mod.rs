@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
 use crate::dtype::Storage;
-use crate::{Cpu, DTypeKind, Device, Float};
+use crate::{Bool, Cpu, DTypeKind, Device, Float, Int};
 
 /// Unique, monotonically increasing tensor identity. Used as a map key during
 /// autograd (a tensor's storage/layout may change, but its id never does).
@@ -37,6 +37,9 @@ impl TensorId {
 ///
 /// `Float` is the default kind so `Tensor<Cpu>` means a float tensor.
 pub struct Tensor<D: Device = Cpu, K: DTypeKind<D> = Float>(pub(crate) Arc<TensorImpl<D, K>>);
+pub type FloatTensor<D = Cpu> = Tensor<D, Float>;
+pub type IntTensor<D = Cpu> = Tensor<D, Int>;
+pub type BoolTensor<D = Cpu> = Tensor<D, Bool>;
 
 pub struct TensorImpl<D, K>
 where
@@ -44,20 +47,14 @@ where
     K: DTypeKind<D>,
 {
     pub(crate) id: TensorId,
-    
+
     pub(crate) storage: Option<Arc<RwLock<K::Storage>>>,
     pub(crate) layout: Layout,
-    
+
     pub(crate) meta: K::Meta,
 
     pub(crate) dtype: K::DType,
-    pub(crate) device: D, 
-}
-
-impl<D: Device, K: DTypeKind<D>> Clone for Tensor<D, K> {
-    fn clone(&self) -> Self {
-        Self(self.0.clone())
-    }
+    pub(crate) device: D,
 }
 
 impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
@@ -111,7 +108,7 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     }
 
     /// Access the underlying storage, erroring on a meta tensor.
-    pub(crate) fn storage(&self) -> crate::Result<&Arc<RwLock<K::Storage>>> {
+    pub fn storage(&self) -> crate::Result<&Arc<RwLock<K::Storage>>> {
         self.0.storage.as_ref().ok_or(crate::Error::MetaTensor)
     }
 
@@ -133,13 +130,6 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
         Ok(self.shape())
     }
 
-    // pub(crate) fn same_device(&self, rhs: &Self, op: &'static str) -> crate::Result<&D> {
-    //     if self.device() != rhs.device() {
-    //         return Err(crate::Error::DeviceMismatchBinaryOp { lhs: self.device().name(), rhs: rhs.device().name(), op });
-    //     }
-    //     Ok(self.device())
-    // }
-
     /// Build a tensor from a freshly-computed storage + layout + autograd meta.
     pub(crate) fn from_storage<L: Into<Layout>>(storage: K::Storage, layout: L, meta: K::Meta) -> Self {
         let device = storage.device().clone();
@@ -153,17 +143,38 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
         }))
     }
 
-    /// Build a view that shares `self`'s storage `Arc` but installs a new layout
-    /// and meta (used by transpose/slice/broadcast/etc.).
-    pub(crate) fn share_storage<L: Into<Layout>>(&self, layout: L, meta: K::Meta) -> Self {
+    pub(crate) fn phantom_storage<L: Into<Layout>>(layout: L, dtype: K::DType, device: D) -> Self {
+        Tensor(Arc::new(TensorImpl {
+            id: TensorId::new(),
+            dtype,
+            storage: None,
+            layout: layout.into(),
+            meta: K::Meta::default(),
+            device,
+        }))
+    }
+
+    /// Build a view that installs a new layout and meta (used by
+    /// transpose/slice/broadcast/etc.).
+    ///
+    /// The caller resolves `storage`: compute devices pass `self.0.storage.clone()`
+    /// (alias), while a tracing device passes a freshly-built storage so the view
+    /// is a distinct graph value. See `ShapeDTypeKind::view_dispatch`.
+    pub(crate) fn share_storage<L: Into<Layout>>(&self, layout: L, meta: K::Meta, storage: Option<Arc<RwLock<K::Storage>>>) -> Self {
         Tensor(Arc::new(TensorImpl {
             id: TensorId::new(),
             dtype: self.0.dtype,
-            storage: self.0.storage.clone(),
+            storage,
             layout: layout.into(),
             meta,
             device: self.device().clone(),
         }))
+    }
+}
+
+impl<D: Device, K: DTypeKind<D>> Clone for Tensor<D, K> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }
 

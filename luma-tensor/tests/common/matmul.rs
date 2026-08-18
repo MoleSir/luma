@@ -1,6 +1,6 @@
-use luma_tensor::{Device, Shape, Tensor};
-use luma_tensor::dtype::FloatDType;
 use super::*;
+use luma_tensor::dtype::FloatDType;
+use luma_tensor::{Device, Shape, Tensor};
 
 #[allow(dead_code)]
 pub fn test_matmul_2x2(device: &impl Device) {

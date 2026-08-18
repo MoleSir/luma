@@ -21,12 +21,7 @@ fn main() {
         let builder = bindgen_cuda::Builder::default()
             .compute_cap(52)
             .include_paths(vec!["./kernels/utils.cuh"])
-            .kernel_paths(
-                kernels
-                    .iter()
-                    .map(|(name, _)| format!("./kernels/{name}.cu"))
-                    .collect(),
-            );
+            .kernel_paths(kernels.iter().map(|(name, _)| format!("./kernels/{name}.cu")).collect());
         println!("cargo:info={builder:?}");
         let bindings = builder.build_ptx().unwrap();
         bindings.write("src/ptx.rs").unwrap();
@@ -45,9 +40,7 @@ fn main() {
         let ptx_rs: String = kernels
             .iter()
             .map(|(name, const_name)| {
-                format!(
-                    "pub const {const_name}: &str = include_str!(concat!(env!(\"OUT_DIR\"), \"/{name}.ptx\"));\n"
-                )
+                format!("pub const {const_name}: &str = include_str!(concat!(env!(\"OUT_DIR\"), \"/{name}.ptx\"));\n")
             })
             .collect();
         fs::write("src/ptx.rs", ptx_rs).unwrap();

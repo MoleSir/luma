@@ -25,5 +25,3 @@ impl Module {
         self.ptx
     }
 }
-
-

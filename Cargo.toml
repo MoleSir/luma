@@ -2,6 +2,12 @@
 members = [
     "luma-tensor",
     "luma-cuda-kernel",
+    "luma-nn",
+    "luma-optim",
+    "luma-dataset",
+    "luma-macros",
+    "luma-io",
+    "luma-ir",
 ]
 
 [workspace.package]
@@ -15,12 +21,31 @@ license = "MIT"
 [workspace.dependencies]
 luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.0.1" }
 luma-cuda-kernel = { path = "./luma-cuda-kernel", package = "luma-cuda-kernel", version = "0.0.1" }
+luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.0.1" }
+luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.0.1" }
+luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.0.1" }
+luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.0.1" }
+luma-io = { path = "./luma-io", package = "luma-io", version = "0.0.1" }
+luma-ir = { path = "./luma-ir", package = "luma-ir", version = "0.0.1" }
 
 thiserror = "2.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["std"] }
 rand = "0.9.2"
 rand_distr = "0.5.1"
 gemm = "0.19"
 libm = "0.2.15"
 num_cpus = "1.17"
 paste = "1.0.15"
+bytemuck = "1"
 cudarc = "0.19.8"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = "2.0"
+proc-macro-crate = "3.3"
+thiserrorctx = "2.0"
+dirs = "6.0"
+reqwest = "0.12"
+indicatif = "0.18"
+flate2 = "1.1"
+memmap2 = "0.9.9"

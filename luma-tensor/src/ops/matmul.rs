@@ -1,4 +1,4 @@
-use crate::{DTypeKind, Device, Float, Int, Layout, Shape, Tensor, TensorMeta, Storage};
+use crate::{DTypeKind, Device, Float, Int, Layout, Shape, Storage, Tensor, TensorMeta};
 
 pub trait MatmulDTypeKind<D: Device>: DTypeKind<D> + Sized {
     fn matmul_dispatch(lhs: &Self::Storage, lhs_l: &Layout, rhs: &Self::Storage, rhs_l: &Layout) -> crate::Result<(Self::Storage, Shape)>;

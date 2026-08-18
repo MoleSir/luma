@@ -20,4 +20,5 @@ gemm =  { workspace = true }
 libm =  { workspace = true }
 num_cpus =  { workspace = true }
 paste =  { workspace = true }
+bytemuck = { workspace = true }
 cudarc = { workspace = true, optional = true, features = ["cuda-version-from-build-system", "driver", "nvrtc", "cublas"] }

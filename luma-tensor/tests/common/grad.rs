@@ -1,5 +1,5 @@
-use luma_tensor::Device;
 use super::*;
+use luma_tensor::Device;
 
 #[allow(dead_code)]
 pub fn test_grad_add(device: &impl Device) {
@@ -165,6 +165,27 @@ pub fn test_grad_transpose(device: &impl Device) {
     let loss = t.sum_all().unwrap();
     let grads = loss.backward().unwrap();
     assert_close(&grads.get(&x).unwrap().to_vec().unwrap(), &[1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 1e-5, 1e-5);
+}
+
+#[allow(dead_code)]
+pub fn test_grad_accumulate(device: &impl Device) {
+    let x = tensor_f32_dev(&[1.0, 2.0, 3.0], (3,), device);
+    x.set_requires_grad(true);
+
+    // Two micro-batches accumulated into the same store.
+    let loss1 = x.mul_scalar(2.0).unwrap().sum_all().unwrap();
+    let loss2 = x.mul_scalar(3.0).unwrap().sum_all().unwrap();
+    let mut store = luma_tensor::GradStore::new();
+    loss1.backward_into(&mut store).unwrap();
+    loss2.backward_into(&mut store).unwrap();
+    assert_close(&store.get(&x).unwrap().to_vec().unwrap(), &[5.0, 5.0, 5.0], 1e-5, 1e-5);
+
+    // Equivalent to a single backward of the summed loss.
+    let x2 = tensor_f32_dev(&[1.0, 2.0, 3.0], (3,), device);
+    x2.set_requires_grad(true);
+    let combined = x2.mul_scalar(2.0).unwrap().add(&x2.mul_scalar(3.0).unwrap()).unwrap().sum_all().unwrap();
+    let grads = combined.backward().unwrap();
+    assert_close(&grads.get(&x2).unwrap().to_vec().unwrap(), &[5.0, 5.0, 5.0], 1e-5, 1e-5);
 }
 
 #[allow(dead_code)]

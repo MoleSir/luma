@@ -1,5 +1,5 @@
-mod ops;
 pub mod kernels;
+mod ops;
 mod storage;
 pub use storage::*;
 

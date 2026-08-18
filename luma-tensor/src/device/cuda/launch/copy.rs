@@ -1,8 +1,8 @@
-use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
-use crate::builder_arg;
 use crate::Layout;
-use crate::device::cuda::{Cuda, CudaError, CudaResult};
+use crate::builder_arg;
 use crate::device::cuda::kernel;
+use crate::device::cuda::{Cuda, CudaError, CudaResult};
+use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 
 pub(crate) fn launch_copy_offset<T: DeviceRepr>(
     device: &Cuda,
@@ -46,18 +46,20 @@ pub(crate) fn launch_copy2d<T: DeviceRepr>(
     src: &CudaSlice<T>,
     src_offset: usize,
     dst: &CudaSlice<T>,
+    dst_offset: usize,
 ) -> CudaResult<()> {
     let func = device.load_function(kernel_name, module)?;
     let total = d1 * d2;
 
     let mut builder = func.builder();
     let src_view = src.slice(src_offset..);
+    let dst_view = dst.slice(dst_offset..);
     builder_arg!(builder, d1);
     builder_arg!(builder, d2);
     builder_arg!(builder, src_s);
     builder_arg!(builder, dst_s);
     builder.arg(&src_view);
-    builder.arg(dst);
+    builder.arg(&dst_view);
 
     let config = LaunchConfig::for_num_elems(total as u32);
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;

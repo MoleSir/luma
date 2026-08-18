@@ -1,7 +1,7 @@
-use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
+use super::super::{Cuda, CudaError, CudaResult, kernel};
 use crate::builder_arg;
 use crate::{CmpOp, Layout};
-use super::super::{Cuda, CudaError, CudaResult, kernel};
+use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 
 pub(crate) fn cmp_kernel_name(op: CmpOp, suffix: &str) -> String {
     let op_str = match op {
@@ -50,4 +50,18 @@ pub(crate) fn launch_cmp<T: DeviceRepr>(
     let config = LaunchConfig::for_num_elems(elem_count as u32);
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(output)
+}
+
+pub(crate) fn launch_cmp_scalar<T: DeviceRepr>(
+    device: &Cuda,
+    op: CmpOp,
+    type_name: &str,
+    module: &kernel::Module,
+    lhs: &CudaSlice<T>,
+    lhs_l: &Layout,
+    rhs: T,
+) -> CudaResult<CudaSlice<u8>> {
+    let rhs_dev = device.memcpy_stod(&[rhs])?;
+    let broadcast_l = Layout::contiguous(lhs_l.shape().clone());
+    launch_cmp(device, op, type_name, module, lhs, &rhs_dev, lhs_l, &broadcast_l)
 }

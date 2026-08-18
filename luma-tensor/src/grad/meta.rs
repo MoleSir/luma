@@ -1,23 +1,17 @@
-use std::sync::RwLock;
-use crate::{BinaryOp, Bool, Device, Float, Int, Op, ReduceOp, Tensor, UnaryOp, DTypeKind, is_grad_enabled};
+use crate::{
+    BinaryOp, Bool, DTypeKind, Device, Float, FloatUnaryOp, Int, Op, ReduceOp, Tensor, TensorId, TensorImpl, UnaryOp, is_grad_enabled,
+};
+use std::sync::{Arc, RwLock};
 
 /// Trait for metadata that knows how to construct itself when a tensor operation is performed.
 pub trait TensorMeta<D: Device, K: DTypeKind<D> + Sized>: Default + Send + Sync {
     // ---- Binary operations ----
     fn on_binary(lhs: &Tensor<D, K>, rhs: &Tensor<D, K>, op: BinaryOp) -> Self;
-    fn on_binary_scalar_rhs(lhs: &Tensor<D, K>, rhs: K::Scalar, op: BinaryOp) -> Self;
-    fn on_binary_scalar_lhs(lhs: K::Scalar, rhs: &Tensor<D, K>, op: BinaryOp) -> Self;
+    fn on_binary_scalar(lhs: &Tensor<D, K>, rhs: K::Scalar, op: BinaryOp) -> Self;
 
     // ---- Unary operations ----
-    fn on_unary(t: &Tensor<D, K>, op: UnaryOp) -> Self;
-
-    // ---- Elementwise ops shared by Float and Int ----
-    fn on_neg(t: &Tensor<D, K>) -> Self;
-    fn on_abs(t: &Tensor<D, K>) -> Self;
-    fn on_sign(t: &Tensor<D, K>) -> Self;
-    fn on_pow(t: &Tensor<D, K>, exp: K::Scalar) -> Self;
-    fn on_affine(t: &Tensor<D, K>, mul: K::Scalar, add: K::Scalar) -> Self;
-    fn on_clamp(t: &Tensor<D, K>, min: Option<K::Scalar>, max: Option<K::Scalar>) -> Self;
+    fn on_unary(t: &Tensor<D, K>, op: UnaryOp<K::Scalar>) -> Self;
+    fn on_float_unary(t: &Tensor<D, K>, op: FloatUnaryOp) -> Self;
 
     // ---- Reductions ----
     fn on_reduce(t: &Tensor<D, K>, dims: &[usize], op: ReduceOp) -> Self;
@@ -108,16 +102,16 @@ impl<D: Device> FloatMeta<D> {
         Self::record(lhs.requires_grad() || rhs.requires_grad(), || Op::Binary(lhs.clone(), rhs.clone(), op))
     }
 
-    pub fn on_binary_scalar_rhs(lhs: &Tensor<D, Float>, rhs: f64, op: BinaryOp) -> Self {
+    pub fn on_binary_scalar(lhs: &Tensor<D, Float>, rhs: f64, op: BinaryOp) -> Self {
         Self::record(lhs.requires_grad(), || Op::BinaryScalarRhs(lhs.clone(), rhs, op))
     }
 
-    pub fn on_binary_scalar_lhs(lhs: f64, rhs: &Tensor<D, Float>, op: BinaryOp) -> Self {
-        Self::record(rhs.requires_grad(), || Op::BinaryScalarLhs(lhs, rhs.clone(), op))
+    pub fn on_unary(t: &Tensor<D, Float>, op: UnaryOp<f64>) -> Self {
+        Self::record(t.requires_grad(), || Op::Unary(t.clone(), op))
     }
 
-    pub fn on_unary(t: &Tensor<D, Float>, op: UnaryOp) -> Self {
-        Self::record(t.requires_grad(), || Op::Unary(t.clone(), op))
+    pub fn on_float_unary(t: &Tensor<D, Float>, op: FloatUnaryOp) -> Self {
+        Self::record(t.requires_grad(), || Op::FloatUnary(t.clone(), op))
     }
 
     pub fn on_broadcast(t: &Tensor<D, Float>) -> Self {
@@ -168,30 +162,6 @@ impl<D: Device> FloatMeta<D> {
         Self::record(t.requires_grad(), || Op::Cast(t.clone()))
     }
 
-    pub fn on_neg(t: &Tensor<D, Float>) -> Self {
-        Self::record(t.requires_grad(), || Op::Neg(t.clone()))
-    }
-
-    pub fn on_abs(t: &Tensor<D, Float>) -> Self {
-        Self::record(t.requires_grad(), || Op::Abs(t.clone()))
-    }
-
-    pub fn on_sign(t: &Tensor<D, Float>) -> Self {
-        Self::record(t.requires_grad(), || Op::Sign(t.clone()))
-    }
-
-    pub fn on_pow(t: &Tensor<D, Float>, exp: f64) -> Self {
-        Self::record(t.requires_grad(), || Op::Pow(t.clone(), exp))
-    }
-
-    pub fn on_affine(t: &Tensor<D, Float>, mul: f64, add: f64) -> Self {
-        Self::record(t.requires_grad(), || Op::Affine(t.clone(), mul, add))
-    }
-
-    pub fn on_clamp(t: &Tensor<D, Float>, min: Option<f64>, max: Option<f64>) -> Self {
-        Self::record(t.requires_grad(), || Op::Clamp(t.clone(), min, max))
-    }
-
     pub fn on_pick(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, Float>>, fv: Option<&Tensor<D, Float>>) -> Self {
         let record = tv.map(|t| t.requires_grad()).unwrap_or(false) || fv.map(|f| f.requires_grad()).unwrap_or(false);
         Self::record(record, || Op::Pick(mask.clone(), tv.cloned(), fv.cloned()))
@@ -224,6 +194,21 @@ impl<D: Device> FloatMeta<D> {
 
 /// Convenience accessors on a `Float` tensor for its autograd state.
 impl<D: Device> Tensor<D, Float> {
+    pub fn detach(&self) -> Self {
+        if !self.requires_grad() {
+            self.clone()
+        } else {
+            Self(Arc::new(TensorImpl {
+                id: TensorId::new(),
+                storage: self.0.storage.clone(),
+                layout: self.layout().clone(),
+                dtype: self.dtype(),
+                device: self.device().clone(),
+                meta: FloatMeta::val(),
+            }))
+        }
+    }
+
     pub fn requires_grad(&self) -> bool {
         self.0.meta.requires_grad()
     }
@@ -236,7 +221,7 @@ impl<D: Device> Tensor<D, Float> {
         self.0.meta.is_leaf()
     }
 
-    pub(crate) fn op(&self) -> Option<&Op<D>> {
+    pub fn op(&self) -> Option<&Op<D>> {
         self.0.meta.op()
     }
 }
@@ -250,16 +235,16 @@ impl<D: Device> TensorMeta<D, Float> for FloatMeta<D> {
         FloatMeta::on_binary(lhs, rhs, op)
     }
 
-    fn on_binary_scalar_rhs(lhs: &Tensor<D, Float>, rhs: f64, op: BinaryOp) -> Self {
-        FloatMeta::on_binary_scalar_rhs(lhs, rhs, op)
+    fn on_binary_scalar(lhs: &Tensor<D, Float>, rhs: f64, op: BinaryOp) -> Self {
+        FloatMeta::on_binary_scalar(lhs, rhs, op)
     }
 
-    fn on_binary_scalar_lhs(lhs: f64, rhs: &Tensor<D, Float>, op: BinaryOp) -> Self {
-        FloatMeta::on_binary_scalar_lhs(lhs, rhs, op)
-    }
-
-    fn on_unary(t: &Tensor<D, Float>, op: UnaryOp) -> Self {
+    fn on_unary(t: &Tensor<D, Float>, op: UnaryOp<f64>) -> Self {
         FloatMeta::on_unary(t, op)
+    }
+
+    fn on_float_unary(t: &Tensor<D, Float>, op: FloatUnaryOp) -> Self {
+        FloatMeta::on_float_unary(t, op)
     }
 
     fn on_reduce(t: &Tensor<D, Float>, dims: &[usize], op: ReduceOp) -> Self {
@@ -333,30 +318,6 @@ impl<D: Device> TensorMeta<D, Float> for FloatMeta<D> {
     fn on_softmax(input: &Tensor<D, Float>, dim: usize) -> Self {
         FloatMeta::on_softmax(input, dim)
     }
-
-    fn on_neg(t: &Tensor<D, Float>) -> Self {
-        FloatMeta::on_neg(t)
-    }
-
-    fn on_abs(t: &Tensor<D, Float>) -> Self {
-        FloatMeta::on_abs(t)
-    }
-
-    fn on_sign(t: &Tensor<D, Float>) -> Self {
-        FloatMeta::on_sign(t)
-    }
-
-    fn on_pow(t: &Tensor<D, Float>, exp: f64) -> Self {
-        FloatMeta::on_pow(t, exp)
-    }
-
-    fn on_affine(t: &Tensor<D, Float>, mul: f64, add: f64) -> Self {
-        FloatMeta::on_affine(t, mul, add)
-    }
-
-    fn on_clamp(t: &Tensor<D, Float>, min: Option<f64>, max: Option<f64>) -> Self {
-        FloatMeta::on_clamp(t, min, max)
-    }
 }
 
 // ============================================================================
@@ -365,9 +326,9 @@ impl<D: Device> TensorMeta<D, Float> for FloatMeta<D> {
 
 impl<D: Device, K: crate::DTypeKind<D>> TensorMeta<D, K> for () {
     fn on_binary(_: &Tensor<D, K>, _: &Tensor<D, K>, _: BinaryOp) -> Self {}
-    fn on_binary_scalar_rhs(_: &Tensor<D, K>, _: K::Scalar, _: BinaryOp) -> Self {}
-    fn on_binary_scalar_lhs(_: K::Scalar, _: &Tensor<D, K>, _: BinaryOp) -> Self {}
-    fn on_unary(_: &Tensor<D, K>, _: UnaryOp) -> Self {}
+    fn on_binary_scalar(_: &Tensor<D, K>, _: K::Scalar, _: BinaryOp) -> Self {}
+    fn on_unary(_: &Tensor<D, K>, _: UnaryOp<K::Scalar>) -> Self {}
+    fn on_float_unary(_: &Tensor<D, K>, _: FloatUnaryOp) -> Self {}
     fn on_reduce(_: &Tensor<D, K>, _: &[usize], _: ReduceOp) -> Self {}
     fn on_matmul(_: &Tensor<D, K>, _: &Tensor<D, K>) -> Self {}
     fn on_broadcast(_: &Tensor<D, K>) -> Self {}
@@ -386,10 +347,4 @@ impl<D: Device, K: crate::DTypeKind<D>> TensorMeta<D, K> for () {
     fn on_pick(_: &Tensor<D, Bool>, _: Option<&Tensor<D, K>>, _: Option<&Tensor<D, K>>) -> Self {}
     fn on_rms_norm(_: &Tensor<D, K>, _: &Tensor<D, K>, _: f64) -> Self {}
     fn on_softmax(_: &Tensor<D, K>, _: usize) -> Self {}
-    fn on_neg(_: &Tensor<D, K>) -> Self {}
-    fn on_abs(_: &Tensor<D, K>) -> Self {}
-    fn on_sign(_: &Tensor<D, K>) -> Self {}
-    fn on_pow(_: &Tensor<D, K>, _: K::Scalar) -> Self {}
-    fn on_affine(_: &Tensor<D, K>, _: K::Scalar, _: K::Scalar) -> Self {}
-    fn on_clamp(_: &Tensor<D, K>, _: Option<K::Scalar>, _: Option<K::Scalar>) -> Self {}
 }

@@ -1,0 +1,14 @@
+[package]
+name = "luma-optim"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "Optimizer for update grads"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+luma-io = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["std"] }

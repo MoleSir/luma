@@ -1,0 +1,19 @@
+[package]
+name = "luma-dataset"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+thiserror = { workspace = true }
+dirs = { workspace = true }
+reqwest = { workspace = true, features = ["blocking"] }
+indicatif = { workspace = true }
+flate2 = { workspace = true }
+rand = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }

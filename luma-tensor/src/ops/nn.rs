@@ -1,4 +1,4 @@
-use crate::{Device, Dim, Float, FloatMeta, Tensor, Storage};
+use crate::{Device, Dim, Float, FloatMeta, Storage, Tensor};
 
 impl<D: Device> Tensor<D, Float> {
     /// Softmax over `dim`. Records `Op::Softmax`.

@@ -1,8 +1,8 @@
-use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
-use crate::builder_arg;
 use crate::Layout;
-use crate::device::cuda::{Cuda, CudaError, CudaResult};
+use crate::builder_arg;
 use crate::device::cuda::kernel;
+use crate::device::cuda::{Cuda, CudaError, CudaResult};
+use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 
 pub(crate) fn indexing_kernel_name(op: &str, idx_suffix: &str, val_suffix: &str) -> String {
     format!("{}_{}_{}", op, idx_suffix, val_suffix)
@@ -10,7 +10,8 @@ pub(crate) fn indexing_kernel_name(op: &str, idx_suffix: &str, val_suffix: &str)
 
 pub(crate) fn launch_index_select<T: DeviceRepr, I: DeviceRepr>(
     device: &Cuda,
-    idx_suffix: &str, val_suffix: &str,
+    idx_suffix: &str,
+    val_suffix: &str,
     module: &kernel::Module,
     src: &CudaSlice<T>,
     src_l: &Layout,
@@ -50,7 +51,8 @@ pub(crate) fn launch_index_select<T: DeviceRepr, I: DeviceRepr>(
 
 pub(crate) fn launch_gather<T: DeviceRepr, I: DeviceRepr>(
     device: &Cuda,
-    idx_suffix: &str, val_suffix: &str,
+    idx_suffix: &str,
+    val_suffix: &str,
     module: &kernel::Module,
     src: &CudaSlice<T>,
     src_l: &Layout,
@@ -84,7 +86,8 @@ pub(crate) fn launch_gather<T: DeviceRepr, I: DeviceRepr>(
 
 pub(crate) fn launch_index_add<T: DeviceRepr, I: DeviceRepr>(
     device: &Cuda,
-    idx_suffix: &str, val_suffix: &str,
+    idx_suffix: &str,
+    val_suffix: &str,
     module: &kernel::Module,
     init: &CudaSlice<T>,
     init_l: &Layout,
@@ -124,7 +127,8 @@ pub(crate) fn launch_index_add<T: DeviceRepr, I: DeviceRepr>(
 
 pub(crate) fn launch_scatter_add<T: DeviceRepr, I: DeviceRepr>(
     device: &Cuda,
-    idx_suffix: &str, val_suffix: &str,
+    idx_suffix: &str,
+    val_suffix: &str,
     module: &kernel::Module,
     init: &CudaSlice<T>,
     init_l: &Layout,

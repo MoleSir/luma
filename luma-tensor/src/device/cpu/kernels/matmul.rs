@@ -130,14 +130,7 @@ pub fn out_shape(lhs: &Shape, rhs: &Shape) -> Result<Shape> {
 ///
 /// `dst_l` must be contiguous for best performance (the gemm path requires it);
 /// the caller (`f_add_matmul_`) ensures this.
-pub fn add_matmul<T: CpuNum>(
-    dst: &mut [T],
-    dst_l: &Layout,
-    lhs: &[T],
-    lhs_l: &Layout,
-    rhs: &[T],
-    rhs_l: &Layout,
-) -> Result<()> {
+pub fn add_matmul<T: CpuNum>(dst: &mut [T], dst_l: &Layout, lhs: &[T], lhs_l: &Layout, rhs: &[T], rhs_l: &Layout) -> Result<()> {
     let (batch, m, n, k, _out_shape) = matmul_dims(lhs_l, rhs_l)?;
     let mns = m * n;
     let rank = lhs_l.shape().rank();
@@ -156,7 +149,9 @@ pub fn add_matmul<T: CpuNum>(
             let dst_slice = &mut dst[d_off..d_off + mns];
             unsafe {
                 gemm::gemm(
-                    m, n, k,
+                    m,
+                    n,
+                    k,
                     dst_slice.as_mut_ptr(),
                     1,
                     n as isize,
@@ -167,8 +162,8 @@ pub fn add_matmul<T: CpuNum>(
                     rhs.as_ptr().offset(r_off as isize),
                     r_stride_n,
                     r_stride_k,
-                    T::ONE,  // alpha: accumulate
-                    T::ONE,  // beta
+                    T::ONE, // alpha: accumulate
+                    T::ONE, // beta
                     false,
                     false,
                     false,

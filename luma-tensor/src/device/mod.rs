@@ -11,16 +11,9 @@ pub use cpu::Cpu;
 pub use float_ops::FloatOps;
 pub use int_ops::IntOps;
 
-use crate::{dtype::Storage, Bool, Float, Int};
+use crate::{Bool, Float, Int, dtype::Storage};
 
-pub trait Device: 
-    'static + 
-    Clone + Send + Sync + 
-    Default +
-    FloatOps<Self> + 
-    IntOps<Self> +
-    BoolOps<Self> 
-{
+pub trait Device: 'static + Clone + Send + Sync + Default + FloatOps<Self> + IntOps<Self> + BoolOps<Self> {
     type FloatStorage: Storage<Self, Float>;
     type IntStorage: Storage<Self, Int>;
     type BoolStorage: Storage<Self, Bool>;

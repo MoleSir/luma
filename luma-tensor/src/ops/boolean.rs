@@ -181,26 +181,14 @@ impl<D: Device> Tensor<D, Bool> {
 
     /// `mask ? value : on_false` with a scalar true-value.
     pub fn pick_true<K: PickDTypeKind<D>>(&self, value: K::Scalar, on_false: &Tensor<D, K>) -> crate::Result<Tensor<D, K>> {
-        let storage = K::pick_true_dispatch(
-            &*self.storage_read()?,
-            self.layout(),
-            value,
-            &*on_false.storage_read()?,
-            on_false.layout(),
-        )?;
+        let storage = K::pick_true_dispatch(&*self.storage_read()?, self.layout(), value, &*on_false.storage_read()?, on_false.layout())?;
         let meta = K::Meta::on_pick(self, None, Some(on_false));
         Ok(Tensor::from_storage(storage, on_false.shape().clone(), meta))
     }
 
     /// `mask ? on_true : value` with a scalar false-value.
     pub fn pick_false<K: PickDTypeKind<D>>(&self, on_true: &Tensor<D, K>, value: K::Scalar) -> crate::Result<Tensor<D, K>> {
-        let storage = K::pick_false_dispatch(
-            &*self.storage_read()?,
-            self.layout(),
-            &*on_true.storage_read()?,
-            on_true.layout(),
-            value,
-        )?;
+        let storage = K::pick_false_dispatch(&*self.storage_read()?, self.layout(), &*on_true.storage_read()?, on_true.layout(), value)?;
         let meta = K::Meta::on_pick(self, Some(on_true), None);
         Ok(Tensor::from_storage(storage, on_true.shape().clone(), meta))
     }

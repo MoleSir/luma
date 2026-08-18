@@ -1,5 +1,5 @@
+use crate::{Device, FloatMeta, grad::TensorMeta};
 use std::fmt::Debug;
-use crate::{grad::TensorMeta, Device, FloatMeta};
 
 /// Binds a tensor kind to its per-device storage type and its autograd metadata.
 ///
@@ -15,14 +15,12 @@ pub trait DTypeKind<D: Device>: Sized {
     const KIND: KindTag;
 }
 
-pub trait Storage<D: Device, K: DTypeKind<D>> : Send + Sync + 'static {
+pub trait Storage<D: Device, K: DTypeKind<D>>: Send + Sync + 'static {
     fn dtype(&self) -> K::DType;
     fn device(&self) -> &D;
-} 
-
-pub trait DTypeT: Send + Sync + Clone + Copy + 'static + PartialEq + Eq + Debug + Default {
-
 }
+
+pub trait DTypeT: Send + Sync + Clone + Copy + 'static + PartialEq + Eq + Debug + Default {}
 
 /// Runtime element type. The tensor *kind* (`Float`/`Int`/`Bool`) is a compile-time
 /// generic; the concrete precision inside a kind is this enum, decided at runtime.

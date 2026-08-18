@@ -1,4 +1,4 @@
-use crate::{Device, Float, Tensor, TensorId};
+use crate::{Device, Float, Tensor, TensorId, no_grad};
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -56,6 +56,33 @@ impl<D: Device> GradStore<D> {
 
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    /// Global L2 norm of all gradients: `sqrt(sum ||g||^2)`.
+    pub fn global_norm(&self) -> crate::Result<f64> {
+        let mut total = 0.0f64;
+        for g in self.0.values() {
+            total += g.sqr()?.sum_all()?.to_scalar()?;
+        }
+        Ok(total.sqrt())
+    }
+
+    /// Clip all gradients by their global norm: if `norm > max_norm`, scale
+    /// every gradient by `max_norm / norm`. Returns the (pre-clip) norm.
+    pub fn clip_grad_norm(&mut self, max_norm: f64) -> crate::Result<f64> {
+        no_grad!();
+        let norm = self.global_norm()?;
+        if norm > max_norm {
+            let scale = max_norm / norm;
+            for g in self.0.values_mut() {
+                g.mul_scalar_(scale)?;
+            }
+        }
+        Ok(norm)
+    }
+
+    pub fn clear(&mut self) {
+        self.0.clear();
     }
 }
 

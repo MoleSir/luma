@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use luma_tensor::Device;
 use super::*;
+use luma_tensor::Device;
 
 // ---- Binary (elementwise, same-shape) ----
 
@@ -219,6 +219,20 @@ pub fn test_add_scalar_f32(device: &impl Device) {
 }
 
 #[allow(dead_code)]
+pub fn test_sub_scalar_f32(device: &impl Device) {
+    let a = tensor_f32_dev(&[10.0, 20.0, 30.0], (3,), device);
+    let c = a.sub_scalar(3.0).unwrap();
+    assert_close(&c.to_vec().unwrap(), &[7.0, 17.0, 27.0], 1e-5, 1e-5);
+}
+
+#[allow(dead_code)]
+pub fn test_sub_scalar_lhs_f32(device: &impl Device) {
+    let a = tensor_f32_dev(&[1.0, 2.0, 3.0], (3,), device);
+    let c = a.sub_scalar_lhs(10.0).unwrap();
+    assert_close(&c.to_vec().unwrap(), &[9.0, 8.0, 7.0], 1e-5, 1e-5);
+}
+
+#[allow(dead_code)]
 pub fn test_mul_scalar_f32(device: &impl Device) {
     let a = tensor_f32_dev(&[1.0, 2.0, 3.0], (3,), device);
     let c = a.mul_scalar(3.0).unwrap();
@@ -226,17 +240,17 @@ pub fn test_mul_scalar_f32(device: &impl Device) {
 }
 
 #[allow(dead_code)]
-pub fn test_add_scalar_lhs_f32(device: &impl Device) {
-    let a = tensor_f32_dev(&[1.0, 2.0], (2,), device);
-    let c = a.add_scalar_lhs(10.0).unwrap();
-    assert_close(&c.to_vec().unwrap(), &[11.0, 12.0], 1e-5, 1e-5);
-}
-
-#[allow(dead_code)]
 pub fn test_div_scalar_f32(device: &impl Device) {
     let a = tensor_f32_dev(&[6.0, 8.0, 10.0], (3,), device);
     let c = a.div_scalar(2.0).unwrap();
     assert_close(&c.to_vec().unwrap(), &[3.0, 4.0, 5.0], 1e-5, 1e-5);
+}
+
+#[allow(dead_code)]
+pub fn test_div_scalar_lhs_f32(device: &impl Device) {
+    let a = tensor_f32_dev(&[2.0, 4.0, 5.0], (3,), device);
+    let c = a.div_scalar_lhs(10.0).unwrap();
+    assert_close(&c.to_vec().unwrap(), &[5.0, 2.5, 2.0], 1e-5, 1e-5);
 }
 
 // ---- Cmp ops ----
@@ -375,6 +389,50 @@ pub fn test_clamp_i32(device: &impl Device) {
     let a = tensor_i32_dev(&[-5, 0, 10], (3,), device);
     let c = a.clamp(Some(0), Some(5)).unwrap();
     assert_eq!(c.to_vec().unwrap(), vec![0, 0, 5]);
+}
+
+// ---- Int scalar ops ----
+
+#[allow(dead_code)]
+pub fn test_add_scalar_i32(device: &impl Device) {
+    let a = tensor_i32_dev(&[1, 2, 3], (3,), device);
+    let c = a.add_scalar(10).unwrap();
+    assert_eq!(c.to_vec().unwrap(), vec![11, 12, 13]);
+}
+
+#[allow(dead_code)]
+pub fn test_sub_scalar_i32(device: &impl Device) {
+    let a = tensor_i32_dev(&[10, 20, 30], (3,), device);
+    let c = a.sub_scalar(5).unwrap();
+    assert_eq!(c.to_vec().unwrap(), vec![5, 15, 25]);
+}
+
+#[allow(dead_code)]
+pub fn test_sub_scalar_lhs_i32(device: &impl Device) {
+    let a = tensor_i32_dev(&[1, 2, 3], (3,), device);
+    let c = a.sub_scalar_lhs(10).unwrap();
+    assert_eq!(c.to_vec().unwrap(), vec![9, 8, 7]);
+}
+
+#[allow(dead_code)]
+pub fn test_mul_scalar_i32(device: &impl Device) {
+    let a = tensor_i32_dev(&[1, 2, 3], (3,), device);
+    let c = a.mul_scalar(4).unwrap();
+    assert_eq!(c.to_vec().unwrap(), vec![4, 8, 12]);
+}
+
+#[allow(dead_code)]
+pub fn test_div_scalar_i32(device: &impl Device) {
+    let a = tensor_i32_dev(&[10, 20, 30], (3,), device);
+    let c = a.div_scalar(5).unwrap();
+    assert_eq!(c.to_vec().unwrap(), vec![2, 4, 6]);
+}
+
+#[allow(dead_code)]
+pub fn test_div_scalar_lhs_i32(device: &impl Device) {
+    let a = tensor_i32_dev(&[2, 4, 5], (3,), device);
+    let c = a.div_scalar_lhs(20).unwrap();
+    assert_eq!(c.to_vec().unwrap(), vec![10, 5, 4]);
 }
 
 // ---- Broadcast ops ----

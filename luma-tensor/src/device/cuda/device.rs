@@ -1,7 +1,18 @@
-use cudarc::{cublas::CudaBlas, curand::CudaRng, driver::{CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, DeviceRepr, HostSlice, LaunchArgs, ValidAsZeroBits}, nvrtc::Ptx};
-use std::{collections::HashMap, sync::{Arc, Mutex, RwLock}};
 use super::kernel;
-use crate::{Device, device::cuda::{CudaBoolStorage, CudaError, CudaFloatStorage, CudaIntStorage, CudaResult}};
+use crate::{
+    Device,
+    device::cuda::{CudaBoolStorage, CudaError, CudaFloatStorage, CudaIntStorage, CudaResult},
+};
+use cudarc::{
+    cublas::CudaBlas,
+    curand::CudaRng,
+    driver::{CudaContext, CudaFunction, CudaModule, CudaSlice, CudaStream, DeviceRepr, HostSlice, LaunchArgs, ValidAsZeroBits},
+    nvrtc::Ptx,
+};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex, RwLock},
+};
 
 #[derive(Clone)]
 pub struct Cuda(pub(crate) Arc<CudaImpl>);
@@ -26,10 +37,10 @@ impl Cuda {
         let stream = context.default_stream();
         let curand = CudaRng::new(299792458, stream.clone())?;
         let blas = CudaBlas::new(stream.clone())?;
-        Ok(Cuda(Arc::new(CudaImpl { 
-            ordinal, 
-            context, 
-            stream, 
+        Ok(Cuda(Arc::new(CudaImpl {
+            ordinal,
+            context,
+            stream,
             curand: Arc::new(Mutex::new(curand)),
             modules: RwLock::new(HashMap::new()),
             blas: Mutex::new(blas),
@@ -38,7 +49,7 @@ impl Cuda {
 
     pub fn same_ordinal(&self, other: &Self, op: impl ToString) -> CudaResult<()> {
         if self.0.ordinal != other.0.ordinal {
-            Err(CudaError::DiffCudaInBinary(self.name(), other.name(), op.to_string()))?;
+            Err(CudaError::DiffCuda(self.name(), other.name(), op.to_string()))?;
         }
         Ok(())
     }
@@ -50,6 +61,11 @@ impl Cuda {
     pub fn synchronize(&self) -> CudaResult<()> {
         self.0.stream.synchronize()?;
         Ok(())
+    }
+
+    /// Returns `(free_bytes, total_bytes)` on this device.
+    pub fn mem_get_info(&self) -> (usize, usize) {
+        self.0.context.mem_get_info().unwrap_or((0, 0))
     }
 
     pub fn alloc<T: DeviceRepr>(&self, n: usize) -> CudaResult<CudaSlice<T>> {
@@ -77,7 +93,7 @@ impl Cuda {
             let modules = self.0.modules.read().expect("read modules");
             if let Some(ref cached) = modules.get(module.name()) {
                 let f = cached.load_function(kernel_name)?;
-                return Ok( CudaBindedFunction { function: f, stream: self.0.stream.clone() } );
+                return Ok(CudaBindedFunction { function: f, stream: self.0.stream.clone() });
             }
         }
         {
@@ -86,7 +102,7 @@ impl Cuda {
             let cuda_module = self.0.context.load_module(ptx)?;
             let f = cuda_module.load_function(kernel_name)?;
             modules.insert(module.name(), cuda_module);
-            Ok( CudaBindedFunction { function: f, stream: self.0.stream.clone() } )
+            Ok(CudaBindedFunction { function: f, stream: self.0.stream.clone() })
         }
     }
 }
@@ -101,7 +117,7 @@ impl Device for Cuda {
     type BoolStorage = CudaBoolStorage;
     type FloatStorage = CudaFloatStorage;
     type IntStorage = CudaIntStorage;
-    
+
     fn name(&self) -> String {
         format!("cuda:{}", self.0.ordinal)
     }

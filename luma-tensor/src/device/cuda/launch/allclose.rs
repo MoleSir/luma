@@ -1,15 +1,15 @@
-use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
-use crate::Layout;
 use super::super::{Cuda, CudaError, CudaResult, kernel};
+use crate::Layout;
+use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 
 pub(crate) fn launch_allclose_float<T: DeviceRepr>(
     device: &Cuda,
     val_suffix: &str,
-    a: &CudaSlice<T>, 
+    a: &CudaSlice<T>,
     a_l: &Layout,
-    b: &CudaSlice<T>, 
+    b: &CudaSlice<T>,
     b_l: &Layout,
-    rtol: T, 
+    rtol: T,
     atol: T,
 ) -> CudaResult<bool> {
     let dims = a_l.dims();
@@ -45,9 +45,9 @@ pub(crate) fn launch_allclose_float<T: DeviceRepr>(
 pub(crate) fn launch_allclose_int<T: DeviceRepr>(
     device: &Cuda,
     val_suffix: &str,
-    a: &CudaSlice<T>, 
+    a: &CudaSlice<T>,
     a_l: &Layout,
-    b: &CudaSlice<T>, 
+    b: &CudaSlice<T>,
     b_l: &Layout,
 ) -> CudaResult<bool> {
     let dims = a_l.dims();

@@ -1,8 +1,15 @@
 use crate::{DTypeKind, Device, Dim, Dims, Float, Int, Layout, ReduceOp, Shape, Tensor, TensorMeta};
 
 pub trait ReduceDTypeKind<D: Device>: DTypeKind<D> {
-    fn arg_reduce_dispatch(x: &Self::Storage, layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> crate::Result<(D::IntStorage, Shape)>;
-    fn reduce_dispatch(x: &Self::Storage, l: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp) -> crate::Result<(Self::Storage, Shape)>;
+    fn arg_reduce_dispatch(
+        x: &Self::Storage,
+        layout: &Layout,
+        dim: usize,
+        keepdim: bool,
+        take_max: bool,
+    ) -> crate::Result<(D::IntStorage, Shape)>;
+    fn reduce_dispatch(x: &Self::Storage, l: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp)
+    -> crate::Result<(Self::Storage, Shape)>;
 }
 
 impl<D: Device> ReduceDTypeKind<D> for Float {
@@ -16,7 +23,13 @@ impl<D: Device> ReduceDTypeKind<D> for Float {
         D::f_arg_reduce(x, layout, dim, keepdim, take_max)
     }
 
-    fn reduce_dispatch(x: &Self::Storage, l: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp) -> crate::Result<(Self::Storage, Shape)> {
+    fn reduce_dispatch(
+        x: &Self::Storage,
+        l: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+        op: ReduceOp,
+    ) -> crate::Result<(Self::Storage, Shape)> {
         D::f_reduce(x, l, dims, keepdim, op)
     }
 }
@@ -32,7 +45,13 @@ impl<D: Device> ReduceDTypeKind<D> for Int {
         D::i_arg_reduce(x, layout, dim, keepdim, take_max)
     }
 
-    fn reduce_dispatch(x: &Self::Storage, l: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp) -> crate::Result<(Self::Storage, Shape)> {
+    fn reduce_dispatch(
+        x: &Self::Storage,
+        l: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+        op: ReduceOp,
+    ) -> crate::Result<(Self::Storage, Shape)> {
         D::i_reduce(x, l, dims, keepdim, op)
     }
 }
@@ -153,7 +172,7 @@ macro_rules! reduce_dispatch {
             let d = dim.to_index(self.shape(), stringify!($keep))?;
             self.reduce_impl(&[d], true, ReduceOp::$variant)
         }
-        
+
         pub fn $all(&self) -> crate::Result<Self> {
             let dims: Vec<usize> = (0..self.rank()).collect();
             self.reduce_impl(&dims, false, ReduceOp::$variant)

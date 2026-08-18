@@ -70,4 +70,18 @@ BINARY_SCALAR_OP_OUT(double,   double,   bsmax_f64, maxg(x, y))
 BINARY_SCALAR_OP_OUT(int32_t,  int32_t,  bsmax_i32, maxg(x, y))
 BINARY_SCALAR_OP_OUT(uint32_t, uint32_t, bsmax_u32, maxg(x, y))
 BINARY_SCALAR_OP_OUT(uint8_t,  uint8_t,  bsmax_u8,  maxg(x, y))
+
+// ---- sub (scalar - tensor) ----
+BINARY_SCALAR_OP_OUT(float,    float,    bslsub_f32, y - x)
+BINARY_SCALAR_OP_OUT(double,   double,   bslsub_f64, y - x)
+BINARY_SCALAR_OP_OUT(int32_t,  int32_t,  bslsub_i32, y - x)
+BINARY_SCALAR_OP_OUT(uint32_t, uint32_t, bslsub_u32, y - x)
+BINARY_SCALAR_OP_OUT(uint8_t,  uint8_t,  bslsub_u8,  y - x)
+
+// ---- div (scalar / tensor) ----
+BINARY_SCALAR_OP_OUT(float,    float,    bsldiv_f32, y / x)
+BINARY_SCALAR_OP_OUT(double,   double,   bsldiv_f64, y / x)
+BINARY_SCALAR_OP_OUT(int32_t,  int32_t,  bsldiv_i32, y / x)
+BINARY_SCALAR_OP_OUT(uint32_t, uint32_t, bsldiv_u32, y / x)
+BINARY_SCALAR_OP_OUT(uint8_t,  uint8_t,  bsldiv_u8,  y / x)
 \

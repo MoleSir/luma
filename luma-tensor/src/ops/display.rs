@@ -1,7 +1,7 @@
 //! Display, to_scalar, allclose, false_count, and other utility ops.
 
-use crate::{Bool, Device, Float, Int, Tensor};
 use crate::dtype::{FloatDType, IntDType};
+use crate::{Bool, Device, Float, Int, Tensor};
 
 // ---- to_scalar ----
 
@@ -31,11 +31,7 @@ impl<D: Device> Tensor<D, Float> {
         if self.element_count() != other.element_count() {
             return Ok(false);
         }
-        D::f_allclose(
-            &*self.storage_read()?, self.layout(),
-            &*other.storage_read()?, other.layout(),
-            rtol, atol,
-        )
+        D::f_allclose(&*self.storage_read()?, self.layout(), &*other.storage_read()?, other.layout(), rtol, atol)
     }
 }
 
@@ -44,10 +40,7 @@ impl<D: Device> Tensor<D, Int> {
         if self.element_count() != other.element_count() {
             return Ok(false);
         }
-        D::i_allclose(
-            &*self.storage_read()?, self.layout(),
-            &*other.storage_read()?, other.layout(),
-        )
+        D::i_allclose(&*self.storage_read()?, self.layout(), &*other.storage_read()?, other.layout())
     }
 }
 
@@ -56,10 +49,7 @@ impl<D: Device> Tensor<D, Bool> {
         if self.element_count() != other.element_count() {
             return Ok(false);
         }
-        D::b_allclose(
-            &*self.storage_read()?, self.layout(),
-            &*other.storage_read()?, other.layout(),
-        )
+        D::b_allclose(&*self.storage_read()?, self.layout(), &*other.storage_read()?, other.layout())
     }
 }
 

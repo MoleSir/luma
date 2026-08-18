@@ -1,6 +1,8 @@
 //! `impl BoolOps for Cpu`. Bool storage is a plain `Vec<bool>`, so no per-dtype
 //! dispatch is needed; kernels operate on it directly.
 
+use std::borrow::Cow;
+
 use super::kernels::{elementwise as ew, reduce, shape as shape_k};
 use super::{Cpu, CpuBoolStorage, CpuFloatStorage, CpuIntStorage};
 use crate::dtype::{BoolDType, FloatDType, IntDType};
@@ -15,8 +17,17 @@ impl BoolOps<Cpu> for Cpu {
         Ok(CpuBoolStorage(vec![true; shape.element_count()]))
     }
 
-    fn b_from_bool(data: &[bool], _device: &Cpu, _dtype: BoolDType) -> Result<<Cpu as Device>::BoolStorage> {
-        Ok(CpuBoolStorage(data.to_vec()))
+    fn b_from_bool<'a>(data: impl Into<Cow<'a, [bool]>>, _device: &Cpu) -> Result<<Cpu as Device>::BoolStorage> {
+        let data = data.into();
+        Ok(match data {
+            Cow::Owned(v) => CpuBoolStorage(v),
+            Cow::Borrowed(s) => CpuBoolStorage(s.to_vec()),
+        })
+    }
+
+    fn b_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _device: &Cpu, _dtype: BoolDType) -> Result<<Cpu as Device>::BoolStorage> {
+        let bytes = bytes.into();
+        Ok(CpuBoolStorage(bytes.iter().map(|&x| x != 0).collect()))
     }
 
     fn b_contiguous(x: &<Cpu as Device>::BoolStorage, l: &Layout) -> Result<<Cpu as Device>::BoolStorage> {
@@ -46,6 +57,18 @@ impl BoolOps<Cpu> for Cpu {
 
     fn b_to_vec(x: &<Cpu as Device>::BoolStorage, layout: &Layout) -> Result<Vec<bool>> {
         Ok(layout.storage_indices().map(|i| x.0[i]).collect())
+    }
+
+    fn b_to_bytes<'a>(x: &'a <Cpu as Device>::BoolStorage, layout: &Layout) -> Result<Cow<'a, [u8]>> {
+        // bool is not Pod, so bytemuck doesn't work — convert manually.
+        if layout.is_contiguous() {
+            let bytes: Vec<u8> = x.0.iter().map(|&b| b as u8).collect();
+            Ok(Cow::Owned(bytes))
+        } else {
+            let contig = Self::b_contiguous(x, layout)?;
+            let bytes: Vec<u8> = contig.0.iter().map(|&b| b as u8).collect();
+            Ok(Cow::Owned(bytes))
+        }
     }
 
     fn b_and(

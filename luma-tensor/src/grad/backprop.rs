@@ -2,16 +2,20 @@
 //! graph in reverse-topological order, and accumulates gradients into a
 //! [`GradStore`]. Only `Float` tensors participate.
 
-use crate::{BinaryOp, Device, Float, GradStore, Op, ReduceOp, Shape, Tensor, TensorId, UnaryOp};
+use crate::{BinaryOp, Device, Float, FloatUnaryOp, GradStore, Op, ReduceOp, Shape, Tensor, TensorId, UnaryOp, no_grad};
 use std::collections::HashMap;
 
 impl<D: Device> Tensor<D, Float> {
-    /// Compute gradients of `self` w.r.t. all leaf tensors that require grad.
-    pub fn backward(&self) -> crate::Result<GradStore<D>> {
-        let _guard = crate::NoGradGuard::new();
-
+    /// Accumulate gradients of `self` w.r.t. all leaf tensors that require grad
+    /// into an existing [`GradStore`].
+    ///
+    /// Unlike [`Tensor::backward`], this does not create a fresh store; leaf
+    /// gradients are added onto whatever is already present. Calling it multiple
+    /// times with different loss tensors (e.g. one per micro-batch) and then
+    /// stepping the optimizer once implements gradient accumulation.
+    pub fn backward_into(&self, grads: &mut GradStore<D>) -> crate::Result<()> {
+        no_grad!();
         let sorted = self.sorted_nodes();
-        let mut grads = GradStore::new();
         grads.insert(self, self.ones_like()?);
 
         for node in sorted.iter() {
@@ -23,8 +27,16 @@ impl<D: Device> Tensor<D, Float> {
                 Some(op) => op,
             };
             let grad = grads.remove(node).expect("grad not populated");
-            backward_op(node, op, &grad, &mut grads)?;
+            backward_op(node, op, &grad, grads)?;
         }
+
+        Ok(())
+    }
+
+    /// Compute gradients of `self` w.r.t. all leaf tensors that require grad.
+    pub fn backward(&self) -> crate::Result<GradStore<D>> {
+        let mut grads = GradStore::new();
+        self.backward_into(&mut grads)?;
         Ok(grads)
     }
 
@@ -69,7 +81,8 @@ fn op_inputs<D: Device>(op: &Op<D>) -> Vec<&Tensor<D, Float>> {
     match op {
         Op::Binary(a, b, _) | Op::Matmul(a, b) => vec![a, b],
         Op::BinaryScalarRhs(a, _, _) | Op::BinaryScalarLhs(_, a, _) => vec![a],
-        Op::Unary(a, _)
+        Op::FloatUnary(a, _)
+        | Op::Unary(a, _)
         | Op::Reduce(a, _, _)
         | Op::Broadcast(a)
         | Op::Narrow(a, _, _, _)
@@ -85,7 +98,6 @@ fn op_inputs<D: Device>(op: &Op<D>) -> Vec<&Tensor<D, Float>> {
         Op::IndexAdd(a, _, b, _) | Op::ScatterAdd(a, _, b, _) | Op::RmsNorm(a, b, _) => vec![a, b],
         Op::Cat(args, _) => args.iter().collect(),
         Op::Pick(_, tv, fv) => tv.iter().chain(fv.iter()).collect(),
-        Op::Neg(a) | Op::Abs(a) | Op::Sign(a) | Op::Pow(a, _) | Op::Affine(a, _, _) | Op::Clamp(a, _, _) => vec![a],
     }
 }
 
@@ -172,39 +184,9 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
             grads.or_insert(rhs)?.impl_add_(&rg)?;
         }
 
-        Op::Unary(arg, uop) => backward_unary(node, arg, *uop, grad, grads)?,
+        Op::FloatUnary(arg, uop) => backward_float_unary(node, arg, *uop, grad, grads)?,
 
-        // ---- elementwise ops ----
-        Op::Neg(arg) => {
-            grads.or_insert(arg)?.impl_add_(&grad.neg()?)?;
-        }
-        Op::Abs(arg) => {
-            let g = grad.mul(&arg.sign()?)?;
-            grads.or_insert(arg)?.impl_add_(&g)?;
-        }
-        Op::Sign(_) => {} // gradient is zero everywhere
-        Op::Pow(arg, e) => {
-            let g = grad.mul(&arg.pow(e - 1.0)?)?.mul_scalar(*e)?;
-            grads.or_insert(arg)?.impl_add_(&g)?;
-        }
-        Op::Affine(arg, mul, _add) => {
-            let g = grad.mul_scalar(*mul)?;
-            grads.or_insert(arg)?.impl_add_(&g)?;
-        }
-        Op::Clamp(arg, min, max) => {
-            let dtype = arg.dtype();
-            let mut mask = arg.ones_like()?;
-            if let Some(lo) = min {
-                let t_lo = arg.zeros_like()?.add_scalar(*lo)?;
-                mask = mask.mul(&arg.gt(&t_lo)?.cast_float(dtype)?)?;
-            }
-            if let Some(hi) = max {
-                let t_hi = arg.zeros_like()?.add_scalar(*hi)?;
-                mask = mask.mul(&arg.lt(&t_hi)?.cast_float(dtype)?)?;
-            }
-            let g = grad.mul(&mask)?;
-            grads.or_insert(arg)?.impl_add_(&g)?;
-        }
+        Op::Unary(arg, uop) => backward_unary(node, arg, *uop, grad, grads)?,
 
         // ---- Matmul ----
         Op::Matmul(lhs, rhs) => {
@@ -330,11 +312,7 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
                 grad
             } else {
                 let grad_len = grad.dims()[*dim];
-                let span_len = if grad_len > 0 {
-                    (grad_len - 1) * step + 1
-                } else {
-                    0
-                };
+                let span_len = if grad_len > 0 { (grad_len - 1) * step + 1 } else { 0 };
 
                 // Insert a dim of size 1 after `dim`, so that each grad element
                 // can be interleaved with (step-1) zeros.
@@ -345,12 +323,10 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
                 // Build the gap zeros alongside the unsqueezed dim.
                 let mut zeros_shape = grad_unsqueezed.dims().to_vec();
                 zeros_shape[*dim + 1] = step - 1;
-                let zeros_gap =
-                    Tensor::<D, Float>::zeros(Shape::from(zeros_shape), arg_dtype)?;
+                let zeros_gap = Tensor::<D, Float>::zeros(Shape::from(zeros_shape), (arg.device(), arg_dtype))?;
 
                 // Interleave: cat along the new dim, then flatten back.
-                let dilated =
-                    Tensor::cat(&[&grad_unsqueezed, &zeros_gap], *dim + 1)?;
+                let dilated = Tensor::cat(&[&grad_unsqueezed, &zeros_gap], *dim + 1)?;
                 let mut flattened_shape = grad.dims().to_vec();
                 flattened_shape[*dim] = grad_len * step;
                 let flattened = dilated.reshape(Shape::from(flattened_shape))?;
@@ -382,19 +358,11 @@ fn pad_grad_along<D: Device>(
     let make_pad = |size: usize| {
         let mut dims = arg_dims.to_vec();
         dims[dim] = size;
-        Tensor::<D, Float>::zeros(Shape::from(dims), arg.dtype())
+        Tensor::<D, Float>::zeros(Shape::from(dims), (arg.device(), arg.dtype()))
     };
     let right = arg_dims[dim] - start - len;
-    let left_pad = if start != 0 {
-        Some(make_pad(start)?)
-    } else {
-        None
-    };
-    let right_pad = if right != 0 {
-        Some(make_pad(right)?)
-    } else {
-        None
-    };
+    let left_pad = if start != 0 { Some(make_pad(start)?) } else { None };
+    let right_pad = if right != 0 { Some(make_pad(right)?) } else { None };
     match (left_pad, right_pad) {
         (None, None) => Ok(grad.clone()),
         (Some(l), None) => Tensor::cat(&[&l, grad], dim),
@@ -405,61 +373,61 @@ fn pad_grad_along<D: Device>(
 
 /// Gradient of unary ops. Fused kernels in luma-core are expanded here into
 /// composed tensor ops (correctness first; can be fused later).
-fn backward_unary<D: Device>(
+fn backward_float_unary<D: Device>(
     node: &Tensor<D, Float>,
     arg: &Tensor<D, Float>,
-    op: UnaryOp,
+    op: FloatUnaryOp,
     grad: &Tensor<D, Float>,
     grads: &mut GradStore<D>,
 ) -> crate::Result<()> {
     // local gradient factor `local` such that d(arg) += grad * local
     let contrib = match op {
-        UnaryOp::Exp => grad.mul(node)?,               // d/dx e^x = e^x = node
-        UnaryOp::Ln => grad.div(arg)?,                 // 1/x
-        UnaryOp::Sin => grad.mul(&arg.cos()?)?,        // cos x
-        UnaryOp::Cos => grad.mul(&arg.sin()?)?.neg()?, // -sin x
-        UnaryOp::Tanh => {
+        FloatUnaryOp::Exp => grad.mul(node)?,               // d/dx e^x = e^x = node
+        FloatUnaryOp::Ln => grad.div(arg)?,                 // 1/x
+        FloatUnaryOp::Sin => grad.mul(&arg.cos()?)?,        // cos x
+        FloatUnaryOp::Cos => grad.mul(&arg.sin()?)?.neg()?, // -sin x
+        FloatUnaryOp::Tanh => {
             // 1 - tanh^2 = 1 - node^2
             let factor = node.sqr()?.neg()?.add_scalar(1.0)?;
             grad.mul(&factor)?
         }
-        UnaryOp::Sqr => grad.mul(arg)?.mul_scalar(2.0)?, // 2x
-        UnaryOp::Sqrt => {
+        FloatUnaryOp::Sqr => grad.mul(arg)?.mul_scalar(2.0)?, // 2x
+        FloatUnaryOp::Sqrt => {
             // 1/(2 sqrt x) = 0.5 / node
             grad.mul_scalar(0.5)?.div(node)?
         }
-        UnaryOp::Recip => {
+        FloatUnaryOp::Recip => {
             // -1/x^2 = -node^2
             grad.mul(&node.sqr()?)?.neg()?
         }
-        UnaryOp::Relu => {
+        FloatUnaryOp::Relu => {
             // mask = arg > 0
             let mask = arg.gt(&arg.zeros_like()?)?.cast_float(arg.dtype())?;
             grad.mul(&mask)?
         }
-        UnaryOp::LeakyRelu(slope) => {
+        FloatUnaryOp::LeakyRelu(slope) => {
             let pos = arg.gt(&arg.zeros_like()?)?.cast_float(arg.dtype())?;
             let neg = pos.neg()?.add_scalar(1.0)?.mul_scalar(slope)?;
             grad.mul(&pos.add(&neg)?)?
         }
-        UnaryOp::Sigmoid => {
+        FloatUnaryOp::Sigmoid => {
             // node * (1 - node)
             let factor = node.neg()?.add_scalar(1.0)?.mul(node)?;
             grad.mul(&factor)?
         }
-        UnaryOp::Erf => {
+        FloatUnaryOp::Erf => {
             // 2/sqrt(pi) * exp(-x^2)
             let scale = 2.0 / std::f64::consts::PI.sqrt();
             grad.mul(&arg.sqr()?.neg()?.exp()?)?.mul_scalar(scale)?
         }
-        UnaryOp::Silu => {
+        FloatUnaryOp::Silu => {
             // sig = sigmoid(x); silu = x*sig; d = sig*(1 - silu) + silu
             let sig = arg.sigmoid()?;
             let silu = arg.mul(&sig)?;
             let factor = sig.mul(&silu.neg()?.add_scalar(1.0)?)?.add(&silu)?;
             grad.mul(&factor)?
         }
-        UnaryOp::Gelu => {
+        FloatUnaryOp::Gelu => {
             // matches luma-core's tanh-approx gelu grad
             let c1 = 0.0356774;
             let c2 = 0.797885;
@@ -473,7 +441,7 @@ fn backward_unary<D: Device>(
             let factor = tanh.mul_scalar(0.5)?.add(&dt.mul(&tanh.sqr()?.neg()?.add_scalar(1.0)?)?)?.add_scalar(0.5)?;
             grad.mul(&factor)?
         }
-        UnaryOp::GeluErf => {
+        FloatUnaryOp::GeluErf => {
             // c1 * exp(-x^2/2) * x + erf(x/sqrt2)/2 + 0.5
             let c1 = 0.398942;
             let sqrt2 = std::f64::consts::SQRT_2;
@@ -483,11 +451,54 @@ fn backward_unary<D: Device>(
             let factor = scaled_exp.add(&erf_term)?.add_scalar(0.5)?;
             grad.mul(&factor)?
         }
-        UnaryOp::Floor | UnaryOp::Ceil | UnaryOp::Round => {
+        FloatUnaryOp::Floor | FloatUnaryOp::Ceil | FloatUnaryOp::Round => {
             return Err(crate::Error::BackwardNotSupported("floor/ceil/round"));
         }
     };
     grads.or_insert(arg)?.impl_add_(&contrib)?;
+    Ok(())
+}
+
+fn backward_unary<D: Device>(
+    _node: &Tensor<D, Float>,
+    arg: &Tensor<D, Float>,
+    op: UnaryOp<f64>,
+    grad: &Tensor<D, Float>,
+    grads: &mut GradStore<D>,
+) -> crate::Result<()> {
+    // ---- elementwise ops ----
+    match op {
+        UnaryOp::Neg => {
+            grads.or_insert(arg)?.impl_add_(&grad.neg()?)?;
+        }
+        UnaryOp::Abs => {
+            let g = grad.mul(&arg.sign()?)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
+        UnaryOp::Sign => {} // gradient is zero everywhere
+        UnaryOp::Pow(e) => {
+            let g = grad.mul(&arg.pow(e - 1.0)?)?.mul_scalar(e)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
+        UnaryOp::Affine(mul, _add) => {
+            let g = grad.mul_scalar(mul)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
+        UnaryOp::Clamp(min, max) => {
+            let dtype = arg.dtype();
+            let mut mask = arg.ones_like()?;
+            if let Some(lo) = min {
+                let t_lo = arg.zeros_like()?.add_scalar(lo)?;
+                mask = mask.mul(&arg.gt(&t_lo)?.cast_float(dtype)?)?;
+            }
+            if let Some(hi) = max {
+                let t_hi = arg.zeros_like()?.add_scalar(hi)?;
+                mask = mask.mul(&arg.lt(&t_hi)?.cast_float(dtype)?)?;
+            }
+            let g = grad.mul(&mask)?;
+            grads.or_insert(arg)?.impl_add_(&g)?;
+        }
+    };
     Ok(())
 }
 

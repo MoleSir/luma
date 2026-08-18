@@ -1,0 +1,175 @@
+//! A [`Device`] that records operations into a [`Graph`] instead of computing.
+//!
+//! Because every tensor op in `luma-tensor` is generic over `D: Device`, passing
+//! a [`Trace`] as the device makes a whole module's `forward` emit graph nodes
+//! without running any kernel. Data-movement ops are captured through the
+//! `FloatOps`/`IntOps`/`BoolOps` seams; *view* ops (transpose/reshape/…), which
+//! bypass those seams, are captured through the same seams via `f_view`/`i_view`/
+//! `b_view`.
+
+mod bool;
+mod float;
+mod int;
+mod storage;
+#[cfg(test)]
+mod tests;
+
+pub use storage::{TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
+
+use std::sync::{Arc, Mutex};
+
+use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
+use luma_tensor::{Bool, Device, DType, Error, Float, Int, Layout, Result, Shape, Tensor, ViewOp};
+
+use crate::graph::{Graph, NodeOp, ValueId};
+
+/// A tracing device. Cheap to clone; every clone shares the same underlying graph.
+#[derive(Clone, Default)]
+pub struct Trace {
+    graph: Arc<Mutex<Graph>>,
+}
+
+impl Trace {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Access the recorded graph.
+    pub fn graph(&self) -> Arc<Mutex<Graph>> {
+        self.graph.clone()
+    }
+
+    fn emit(&self, op: NodeOp, inputs: Vec<ValueId>, dtype: DType, shape: Shape) -> Result<ValueId> {
+        Ok(self.graph.lock().unwrap().add_node(op, inputs, dtype, shape))
+    }
+
+    /// Record a view node for `src` under `dst_l`, returning the new value id.
+    fn emit_view(&self, src: ValueId, dst_l: &Layout, view: ViewOp) -> ValueId {
+        let mut g = self.graph.lock().unwrap();
+        let dtype = g.values[src].dtype;
+        g.add_node(map_view(view), vec![src], dtype, dst_l.shape().clone())
+    }
+
+    fn float_leaf(&self, dtype: FloatDType, shape: &Shape) -> TraceFloatStorage {
+        let id = self.graph.lock().unwrap().add_value(dtype.into(), shape.clone());
+        TraceFloatStorage { value: id, dtype, device: self.clone() }
+    }
+
+    fn int_leaf(&self, dtype: IntDType, shape: &Shape) -> TraceIntStorage {
+        let id = self.graph.lock().unwrap().add_value(dtype.into(), shape.clone());
+        TraceIntStorage { value: id, dtype, device: self.clone() }
+    }
+
+    fn bool_leaf(&self, dtype: BoolDType, shape: &Shape) -> TraceBoolStorage {
+        let id = self.graph.lock().unwrap().add_value(dtype.into(), shape.clone());
+        TraceBoolStorage { value: id, dtype, device: self.clone() }
+    }
+}
+
+/// In-place mutation has no meaning in a functional SSA graph.
+fn inplace_unsupported<T>(op: &'static str) -> Result<T> {
+    Err(Error::Msg(format!("trace: in-place op '{op}' has no meaning in a functional graph")))
+}
+
+/// Read-back needs concrete data, which a tracing device never stores.
+fn readback_unsupported<T>(op: &'static str) -> Result<T> {
+    Err(Error::Msg(format!("trace: cannot materialize '{op}' (no data is stored during tracing)")))
+}
+
+fn map_view(view: ViewOp) -> NodeOp {
+    match view {
+        ViewOp::Reshape => NodeOp::Reshape,
+        ViewOp::Transpose(a, b) => NodeOp::Transpose(a, b),
+        ViewOp::Permute(d) => NodeOp::Permute(d),
+        ViewOp::Narrow(d, s, l) => NodeOp::Narrow(d, s, l),
+        ViewOp::Slice(d, s, e, st) => NodeOp::Slice(d, s, e, st),
+        ViewOp::Broadcast => NodeOp::Broadcast,
+        ViewOp::Squeeze => NodeOp::Squeeze,
+        ViewOp::Unsqueeze => NodeOp::Unsqueeze,
+    }
+}
+
+impl Device for Trace {
+    type FloatStorage = TraceFloatStorage;
+    type IntStorage = TraceIntStorage;
+    type BoolStorage = TraceBoolStorage;
+
+    fn name(&self) -> String {
+        "trace".to_string()
+    }
+}
+
+// ---- graph value id accessors (concrete-typed, no `Option`) ----
+
+/// A tensor produced by the [`Trace`] device, exposing its graph value id.
+pub trait Traced {
+    /// The graph value id this traced tensor refers to.
+    fn trace_id(&self) -> usize;
+}
+
+impl Traced for Tensor<Trace, Float> {
+    fn trace_id(&self) -> usize {
+        self.storage().expect("meta tensor has no trace value").read().expect("storage read lock").value
+    }
+}
+
+impl Traced for Tensor<Trace, Int> {
+    fn trace_id(&self) -> usize {
+        self.storage().expect("meta tensor has no trace value").read().expect("storage read lock").value
+    }
+}
+
+impl Traced for Tensor<Trace, Bool> {
+    fn trace_id(&self) -> usize {
+        self.storage().expect("meta tensor has no trace value").read().expect("storage read lock").value
+    }
+}
+
+// ---- shape helpers shared by the three kind impls ----
+
+fn reduce_out_shape(input: &Shape, dims: &[usize], keepdim: bool) -> Shape {
+    let mut out = input.dims().to_vec();
+    if keepdim {
+        for &d in dims {
+            out[d] = 1;
+        }
+    } else {
+        let mut ds = dims.to_vec();
+        ds.sort_unstable_by(|a, b| b.cmp(a));
+        for d in ds {
+            out.remove(d);
+        }
+    }
+    Shape::from(out)
+}
+
+fn arange_len(start: i64, end: i64, step: i64) -> usize {
+    if step == 0 {
+        return 0;
+    }
+    let n = if step > 0 {
+        if end <= start { 0 } else { ((end - start) + step - 1) / step }
+    } else {
+        let s = -step;
+        if end >= start { 0 } else { ((start - end) + s - 1) / s }
+    };
+    n as usize
+}
+
+fn matmul_out_shape(lhs: &Shape, rhs: &Shape) -> Result<Shape> {
+    if lhs.rank() < 2 || rhs.rank() < 2 {
+        return Err(Error::Msg("trace: matmul requires rank >= 2".into()));
+    }
+    let (lhs_batch, lhs_mat) = lhs.dims().split_at(lhs.rank() - 2);
+    let (rhs_batch, rhs_mat) = rhs.dims().split_at(rhs.rank() - 2);
+    let (m, k) = (lhs_mat[0], lhs_mat[1]);
+    let (k2, n) = (rhs_mat[0], rhs_mat[1]);
+    if k != k2 {
+        return Err(Error::Msg(format!("trace: matmul inner dim mismatch: {k} vs {k2}")));
+    }
+    let batch = Shape::from(lhs_batch.to_vec()).broadcast_shape_binary_op(&Shape::from(rhs_batch.to_vec()), "matmul")?;
+    let mut dims = batch.into_dims();
+    dims.push(m);
+    dims.push(n);
+    Ok(Shape::from(dims))
+}

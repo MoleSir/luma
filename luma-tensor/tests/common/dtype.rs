@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+use super::*;
 use luma_tensor::Device;
 use luma_tensor::dtype::{FloatDType, IntDType};
-use super::*;
 
 // ---- u8 ops ----
 

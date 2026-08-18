@@ -1,8 +1,8 @@
-use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
-use crate::builder_arg;
 use crate::Layout;
-use crate::device::cuda::{Cuda, CudaError, CudaResult};
+use crate::builder_arg;
 use crate::device::cuda::kernel;
+use crate::device::cuda::{Cuda, CudaError, CudaResult};
+use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 
 fn cast_kernel_name(src: &str, dst: &str) -> String {
     format!("ucast_{}_to_{}", src, dst)

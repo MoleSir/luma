@@ -1,0 +1,15 @@
+[package]
+name = "luma-nn"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+luma-macros = { workspace = true }
+luma-io = { workspace = true }
+thiserror = { workspace = true }
+thiserrorctx = { workspace = true }

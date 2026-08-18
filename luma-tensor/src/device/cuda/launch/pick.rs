@@ -1,7 +1,7 @@
-use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 use crate::Layout;
-use crate::device::cuda::{Cuda, CudaError, CudaResult};
 use crate::device::cuda::kernel;
+use crate::device::cuda::{Cuda, CudaError, CudaResult};
+use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 
 pub(crate) fn launch_pick<T: DeviceRepr>(
     device: &Cuda,
@@ -26,7 +26,7 @@ pub(crate) fn launch_pick<T: DeviceRepr>(
     let mask_strides = device.memcpy_stod(mask_l.stride())?;
     let t_strides = device.memcpy_stod(true_l.stride())?;
     let f_strides = device.memcpy_stod(false_l.stride())?;
-    
+
     let mask_view = mask.slice(mask_l.start_offset()..);
     let t_view = t.slice(true_l.start_offset()..);
     let f_view = f.slice(false_l.start_offset()..);
@@ -50,15 +50,15 @@ pub(crate) fn launch_pick<T: DeviceRepr>(
 
 #[allow(unused_variables)]
 pub(crate) fn launch_pick_true<T: DeviceRepr, I: DeviceRepr>(
-    device: &Cuda, 
-    val_suffix: &str, 
+    device: &Cuda,
+    val_suffix: &str,
     module: &kernel::Module,
-    mask: &CudaSlice<I>, 
-    mask_l: &Layout, 
+    mask: &CudaSlice<I>,
+    mask_l: &Layout,
     val: T,
-    f: &CudaSlice<T>, 
+    f: &CudaSlice<T>,
     false_l: &Layout,
-) -> CudaResult<CudaSlice<T>> { 
+) -> CudaResult<CudaSlice<T>> {
     let kernel_name = format!("pick_true_{}", val_suffix);
     let dims = mask_l.dims();
     let elem_count = mask_l.shape().element_count();
@@ -70,7 +70,7 @@ pub(crate) fn launch_pick_true<T: DeviceRepr, I: DeviceRepr>(
     let dims = device.memcpy_stod(dims)?;
     let mask_strides = device.memcpy_stod(mask_l.stride())?;
     let f_strides = device.memcpy_stod(false_l.stride())?;
-    
+
     let mask_view = mask.slice(mask_l.start_offset()..);
     let f_view = f.slice(false_l.start_offset()..);
     let output = device.alloc::<T>(elem_count)?;
@@ -92,13 +92,13 @@ pub(crate) fn launch_pick_true<T: DeviceRepr, I: DeviceRepr>(
 
 #[allow(unused_variables)]
 pub(crate) fn launch_pick_false<T: DeviceRepr, I: DeviceRepr>(
-    device: &Cuda, 
-    val_suffix: &str, 
+    device: &Cuda,
+    val_suffix: &str,
     module: &kernel::Module,
-    mask: &CudaSlice<I>, 
+    mask: &CudaSlice<I>,
     mask_l: &Layout,
-    t: &CudaSlice<T>, 
-    true_l: &Layout, 
+    t: &CudaSlice<T>,
+    true_l: &Layout,
     val: T,
 ) -> CudaResult<CudaSlice<T>> {
     let kernel_name = format!("pick_false_{}", val_suffix);
@@ -112,7 +112,7 @@ pub(crate) fn launch_pick_false<T: DeviceRepr, I: DeviceRepr>(
     let dims = device.memcpy_stod(dims)?;
     let mask_strides = device.memcpy_stod(mask_l.stride())?;
     let t_strides = device.memcpy_stod(true_l.stride())?;
-    
+
     let mask_view = mask.slice(mask_l.start_offset()..);
     let t_view = t.slice(true_l.start_offset()..);
     let output = device.alloc::<T>(elem_count)?;

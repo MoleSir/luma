@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use luma_tensor::Device;
 use super::*;
+use luma_tensor::Device;
 
 // ---- unary ----
 
@@ -166,9 +166,33 @@ pub fn test_f64_add_scalar(device: &impl Device) {
 }
 
 #[allow(dead_code)]
+pub fn test_f64_sub_scalar(device: &impl Device) {
+    let a = tensor_f64_dev(&[10.0, 20.0], (2,), device);
+    assert_close(&a.sub_scalar(5.0).unwrap().to_vec().unwrap(), &[5.0, 15.0], 1e-10, 1e-10);
+}
+
+#[allow(dead_code)]
+pub fn test_f64_sub_scalar_lhs(device: &impl Device) {
+    let a = tensor_f64_dev(&[2.0, 3.0], (2,), device);
+    assert_close(&a.sub_scalar_lhs(10.0).unwrap().to_vec().unwrap(), &[8.0, 7.0], 1e-10, 1e-10);
+}
+
+#[allow(dead_code)]
 pub fn test_f64_mul_scalar(device: &impl Device) {
     let a = tensor_f64_dev(&[3.0, 4.0], (2,), device);
     assert_close(&a.mul_scalar(2.0).unwrap().to_vec().unwrap(), &[6.0, 8.0], 1e-10, 1e-10);
+}
+
+#[allow(dead_code)]
+pub fn test_f64_div_scalar(device: &impl Device) {
+    let a = tensor_f64_dev(&[10.0, 20.0], (2,), device);
+    assert_close(&a.div_scalar(2.0).unwrap().to_vec().unwrap(), &[5.0, 10.0], 1e-10, 1e-10);
+}
+
+#[allow(dead_code)]
+pub fn test_f64_div_scalar_lhs(device: &impl Device) {
+    let a = tensor_f64_dev(&[2.0, 4.0], (2,), device);
+    assert_close(&a.div_scalar_lhs(20.0).unwrap().to_vec().unwrap(), &[10.0, 5.0], 1e-10, 1e-10);
 }
 
 // ---- reduce ----

@@ -1,4 +1,4 @@
-use crate::{dtype::Storage, Bool, DTypeKind, Device, Dim, Float, Int, Layout, Shape, Tensor, TensorMeta};
+use crate::{Bool, DTypeKind, Device, Dim, Float, Int, Layout, Shape, Tensor, TensorMeta, dtype::Storage};
 
 pub trait IndexingDTypeKind<D: Device>: DTypeKind<D> + Sized {
     fn index_select_dispatch(
@@ -9,7 +9,13 @@ pub trait IndexingDTypeKind<D: Device>: DTypeKind<D> + Sized {
         dim: usize,
     ) -> crate::Result<(Self::Storage, Shape)>;
 
-    fn gather_dispatch(x: &Self::Storage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> crate::Result<(Self::Storage, Shape)>;
+    fn gather_dispatch(
+        x: &Self::Storage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+    ) -> crate::Result<(Self::Storage, Shape)>;
 
     fn index_add_dispatch(
         init: &Self::Storage,
@@ -43,7 +49,13 @@ impl<D: Device> IndexingDTypeKind<D> for Float {
         D::f_index_select(x, x_l, idx, idx_l, dim)
     }
 
-    fn gather_dispatch(x: &Self::Storage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> crate::Result<(Self::Storage, Shape)> {
+    fn gather_dispatch(
+        x: &Self::Storage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+    ) -> crate::Result<(Self::Storage, Shape)> {
         D::f_gather(x, x_l, idx, idx_l, dim)
     }
 
@@ -83,7 +95,13 @@ impl<D: Device> IndexingDTypeKind<D> for Int {
         D::i_index_select(x, x_l, idx, idx_l, dim)
     }
 
-    fn gather_dispatch(x: &Self::Storage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> crate::Result<(Self::Storage, Shape)> {
+    fn gather_dispatch(
+        x: &Self::Storage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+    ) -> crate::Result<(Self::Storage, Shape)> {
         D::i_gather(x, x_l, idx, idx_l, dim)
     }
 
@@ -112,12 +130,12 @@ impl<D: Device> IndexingDTypeKind<D> for Int {
     }
 }
 
-
 impl<D: Device, K: IndexingDTypeKind<D>> Tensor<D, K> {
     /// Select slices along `dim` at the given 1-D `indices`.
     pub fn index_select<Dm: Dim>(&self, indices: &Tensor<D, Int>, dim: Dm) -> crate::Result<Self> {
         let dim = dim.to_index(self.shape(), "index_select")?;
-        let (storage, shape) = K::index_select_dispatch(&*self.storage_read()?, self.layout(), &*indices.storage_read()?, indices.layout(), dim)?;
+        let (storage, shape) =
+            K::index_select_dispatch(&*self.storage_read()?, self.layout(), &*indices.storage_read()?, indices.layout(), dim)?;
         let meta = K::Meta::on_index_select(self, indices, dim);
         assert_eq!(self.dtype(), storage.dtype());
         Ok(Self::from_storage(storage, shape, meta))
@@ -198,7 +216,9 @@ impl Slice {
         (self.start, end_abs, self.step)
     }
 
-    pub fn len(&self) -> usize { self.clone().count() }
+    pub fn len(&self) -> usize {
+        self.clone().count()
+    }
 }
 
 impl Iterator for Slice {
@@ -253,28 +273,28 @@ impl std::fmt::Display for Slice {
 #[macro_export]
 macro_rules! s {
     ($start:tt : $end:expr) => {
-        $crate::ops::indexer::Slice::new($start as usize, Some($end as isize), 1)
+        $crate::ops::Slice::new($start as usize, Some($end as isize), 1)
     };
     ($start:tt : $end:tt : $step:expr) => {
-        $crate::ops::indexer::Slice::new($start as usize, Some($end as isize), $step as usize)
+        $crate::ops::Slice::new($start as usize, Some($end as isize), $step as usize)
     };
     ($start:tt :) => {
-        $crate::ops::indexer::Slice::new($start as usize, None, 1)
+        $crate::ops::Slice::new($start as usize, None, 1)
     };
     ($start:tt :: $step:expr) => {
-        $crate::ops::indexer::Slice::new($start as usize, None, $step as usize)
+        $crate::ops::Slice::new($start as usize, None, $step as usize)
     };
     (: $end:tt) => {
-        $crate::ops::indexer::Slice::new(0, Some($end as isize), 1)
+        $crate::ops::Slice::new(0, Some($end as isize), 1)
     };
     (: $end:tt : $step:expr) => {
-        $crate::ops::indexer::Slice::new(0, Some($end as isize), $step as usize)
+        $crate::ops::Slice::new(0, Some($end as isize), $step as usize)
     };
     (:: $step:expr) => {
-        $crate::ops::indexer::Slice::new(0, None, $step as usize)
+        $crate::ops::Slice::new(0, None, $step as usize)
     };
     (:) => {
-        $crate::ops::indexer::Slice::new(0, None, 1)
+        $crate::ops::Slice::new(0, None, 1)
     };
 }
 
@@ -296,15 +316,21 @@ pub enum Indexer<D: Device> {
 // From impls: single values + ranges → Indexer
 
 impl<D: Device> From<usize> for Indexer<D> {
-    fn from(index: usize) -> Self { Indexer::Select(index) }
+    fn from(index: usize) -> Self {
+        Indexer::Select(index)
+    }
 }
 
 impl<D: Device> From<crate::D> for Indexer<D> {
-    fn from(index: crate::D) -> Self { Indexer::SelectD(index) }
+    fn from(index: crate::D) -> Self {
+        Indexer::SelectD(index)
+    }
 }
 
 impl<D: Device> From<Slice> for Indexer<D> {
-    fn from(value: Slice) -> Self { Indexer::Slice(value) }
+    fn from(value: Slice) -> Self {
+        Indexer::Slice(value)
+    }
 }
 
 impl<D: Device> std::fmt::Debug for Indexer<D> {
@@ -319,11 +345,15 @@ impl<D: Device> std::fmt::Debug for Indexer<D> {
 }
 
 impl<D: Device> From<Tensor<D, Bool>> for Indexer<D> {
-    fn from(value: Tensor<D, Bool>) -> Self { Indexer::Boolean(value) }
+    fn from(value: Tensor<D, Bool>) -> Self {
+        Indexer::Boolean(value)
+    }
 }
 
 impl<D: Device> From<&Tensor<D, Bool>> for Indexer<D> {
-    fn from(value: &Tensor<D, Bool>) -> Self { Indexer::Boolean(value.clone()) }
+    fn from(value: &Tensor<D, Bool>) -> Self {
+        Indexer::Boolean(value.clone())
+    }
 }
 
 impl<D: Device> From<std::ops::Range<usize>> for Indexer<D> {
@@ -363,9 +393,7 @@ impl<D: Device, K: IndexingDTypeKind<D> + crate::ops::shape::ShapeDTypeKind<D>> 
         let mut current_dim = 0;
         for idx in indexers {
             x = match idx {
-                Indexer::Select(n) => {
-                    x.narrow(current_dim, *n, 1)?.squeeze(current_dim)?
-                }
+                Indexer::Select(n) => x.narrow(current_dim, *n, 1)?.squeeze(current_dim)?,
                 Indexer::SelectD(d) => {
                     let dim_size = x.dim(current_dim)?;
                     let n = d.to_real_index(dim_size, "index")?;
@@ -374,20 +402,12 @@ impl<D: Device, K: IndexingDTypeKind<D> + crate::ops::shape::ShapeDTypeKind<D>> 
                 Indexer::Slice(s) => {
                     let dim_size = x.dim(current_dim)?;
                     let (start, end, step) = s.resolve(dim_size);
-                    let out = if step == 1 {
-                        x.narrow(current_dim, start, end - start)?
-                    } else {
-                        x.slice(current_dim, start, end, step)?
-                    };
+                    let out = if step == 1 { x.narrow(current_dim, start, end - start)? } else { x.slice(current_dim, start, end, step)? };
                     current_dim += 1;
                     out
                 }
                 Indexer::Boolean(mask) => {
-                    let indices: Vec<i64> = mask.to_vec()?.into_iter()
-                        .enumerate()
-                        .filter(|(_, v)| *v)
-                        .map(|(i, _)| i as i64)
-                        .collect();
+                    let indices: Vec<i64> = mask.to_vec()?.into_iter().enumerate().filter(|(_, v)| *v).map(|(i, _)| i as i64).collect();
                     let idx_tensor = Tensor::<D, Int>::from_slice(&indices, indices.len(), ())?;
                     let out = x.index_select(&idx_tensor, current_dim)?;
                     current_dim += 1;
@@ -465,10 +485,6 @@ impl<D: Device, K: crate::ops::shape::ShapeDTypeKind<D>> Tensor<D, K> {
     /// ```
     pub fn get(&self, i: usize) -> crate::Result<Self> {
         let dims = self.dims();
-        if dims.is_empty() {
-            Ok(self.clone())
-        } else {
-            self.narrow(0, i, 1)?.reshape(&dims[1..])
-        }
+        if dims.is_empty() { Ok(self.clone()) } else { self.narrow(0, i, 1)?.reshape(&dims[1..]) }
     }
 }

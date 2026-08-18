@@ -1,8 +1,11 @@
-use crate::{Bool, DTypeKind, Device, Dim, Dims, Error, Float, Int, Layout, Shape, Tensor, TensorMeta, Storage};
+use std::sync::{Arc, RwLock};
+
+use crate::{Bool, DTypeKind, Device, Dim, Dims, Error, Float, Int, Layout, Shape, Storage, Tensor, TensorMeta, ViewOp};
 
 pub trait ShapeDTypeKind<D: Device>: DTypeKind<D> {
     fn contiguous_dispatch(s: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage>;
     fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)>;
+    fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>>;
 }
 
 impl<D: Device> ShapeDTypeKind<D> for Float {
@@ -14,6 +17,10 @@ impl<D: Device> ShapeDTypeKind<D> for Float {
     #[inline]
     fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)> {
         D::f_cat(srcs, dim)
+    }
+
+    fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>> {
+        D::f_view(src, src_l, dst_l, view)
     }
 }
 
@@ -27,6 +34,10 @@ impl<D: Device> ShapeDTypeKind<D> for Int {
     fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)> {
         D::i_cat(srcs, dim)
     }
+
+    fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>> {
+        D::i_view(src, src_l, dst_l, view)
+    }
 }
 
 impl<D: Device> ShapeDTypeKind<D> for Bool {
@@ -39,9 +50,65 @@ impl<D: Device> ShapeDTypeKind<D> for Bool {
     fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)> {
         D::b_cat(srcs, dim)
     }
+
+    fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>> {
+        D::b_view(src, src_l, dst_l, view)
+    }
 }
 
 impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
+    /// Resolve the storage for a view of `self` under `layout`.
+    ///
+    /// Compute devices return `self.0.storage.clone()` (alias); a tracing device
+    /// returns a freshly-built storage so the view is a distinct graph value.
+    fn resolve_view_storage(&self, view: ViewOp, layout: &Layout) -> crate::Result<Option<Arc<RwLock<K::Storage>>>> {
+        let Some(lock) = self.0.storage.as_ref() else {
+            return Ok(None);
+        };
+        let new_storage = {
+            let guard = lock.read().expect("storage read lock");
+            K::view_dispatch(&*guard, self.layout(), layout, view)?
+        };
+        match new_storage {
+            Some(s) => Ok(Some(Arc::new(RwLock::new(s)))),
+            None => Ok(self.0.storage.clone()),
+        }
+    }
+
+    /// Deep-copy the tensor data to independent storage (records `Op::Copy` for `Float`).
+    pub fn copy(&self) -> crate::Result<Self> {
+        let storage = K::contiguous_dispatch(&*self.storage_read()?, self.layout())?;
+        assert_eq!(self.dtype(), storage.dtype());
+        Ok(Self::from_storage(storage, self.shape().clone(), K::Meta::on_copy(self)))
+    }
+
+    /// Copy the data from `src` into `self` **in-place**, preserving [`TensorId`].
+    pub fn copy_(&mut self, src: &Self) -> crate::Result<()> {
+        if self.shape() != src.shape() {
+            return Err(Error::ShapeMismatchBinaryOp { lhs: self.shape().clone(), rhs: src.shape().clone(), op: "copy_" });
+        }
+
+        let src_storage = K::contiguous_dispatch(&*src.storage_read()?, src.layout())?;
+
+        // Requires exclusive TensorImpl access (normal when tensor is reached via
+        // a mutable visitor or held uniquely).
+        let this = std::sync::Arc::get_mut(&mut self.0).expect("copy_: tensor is shared (cloned elsewhere); cannot update layout");
+
+        match &this.storage {
+            Some(lock) => {
+                // Overwrite through the existing RwLock — keeps the same Arc.
+                *lock.write().expect("storage write lock") = src_storage;
+            }
+            None => {
+                // Phantom tensor — create storage for the first time.
+                this.storage = Some(std::sync::Arc::new(std::sync::RwLock::new(src_storage)));
+            }
+        }
+
+        this.layout = Layout::contiguous(src.shape().clone());
+        Ok(())
+    }
+
     pub fn reshape<S: Into<Shape>>(&self, shape: S) -> crate::Result<Self> {
         let shape = shape.into();
         if shape.element_count() != self.element_count() {
@@ -50,7 +117,8 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         let meta = K::Meta::on_reshape(self);
         if self.is_contiguous() {
             let layout = Layout::contiguous_with_offset(shape, self.layout().start_offset());
-            Ok(self.share_storage(layout, meta))
+            let storage = self.resolve_view_storage(ViewOp::Reshape, &layout)?;
+            Ok(self.share_storage(layout, meta, storage))
         } else {
             let storage = K::contiguous_dispatch(&*self.storage_read()?, self.layout())?;
             Ok(Self::from_storage(storage, shape, meta))
@@ -64,7 +132,8 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
             return Ok(self.clone());
         }
         let layout = self.layout().transpose(dim1, dim2)?;
-        Ok(self.share_storage(layout, K::Meta::on_transpose(self, dim1, dim2)))
+        let storage = self.resolve_view_storage(ViewOp::Transpose(dim1, dim2), &layout)?;
+        Ok(self.share_storage(layout, K::Meta::on_transpose(self, dim1, dim2), storage))
     }
 
     pub fn transpose_last(&self) -> crate::Result<Self> {
@@ -74,7 +143,8 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
     pub fn permute<Ds: Dims>(&self, dims: Ds) -> crate::Result<Self> {
         let dims = dims.to_indexes(self.shape(), "permute")?;
         let layout = self.layout().permute(&dims)?;
-        Ok(self.share_storage(layout, K::Meta::on_permute(self, dims)))
+        let storage = self.resolve_view_storage(ViewOp::Permute(dims.clone()), &layout)?;
+        Ok(self.share_storage(layout, K::Meta::on_permute(self, dims), storage))
     }
 
     pub fn narrow<Dm: Dim>(&self, dim: Dm, start: usize, len: usize) -> crate::Result<Self> {
@@ -87,7 +157,8 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
             return Ok(self.clone());
         }
         let layout = self.layout().narrow(dim, start, len)?;
-        Ok(self.share_storage(layout, K::Meta::on_narrow(self, dim, start, len)))
+        let storage = self.resolve_view_storage(ViewOp::Narrow(dim, start, len), &layout)?;
+        Ok(self.share_storage(layout, K::Meta::on_narrow(self, dim, start, len), storage))
     }
 
     /// Slice along `dim` with `start`, `end`, and `step`.
@@ -99,12 +170,14 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         let dim = dim.to_index(self.shape(), "slice")?;
         let layout = self.layout().slice(dim, start, end, step)?;
         let meta = K::Meta::on_slice(self, dim, start, end, step);
-        Ok(self.share_storage(layout, meta))
+        let storage = self.resolve_view_storage(ViewOp::Slice(dim, start, end, step), &layout)?;
+        Ok(self.share_storage(layout, meta, storage))
     }
 
     pub fn broadcast_as<S: Into<Shape>>(&self, shape: S) -> crate::Result<Self> {
         let layout = self.layout().broadcast_as(shape)?;
-        Ok(self.share_storage(layout, K::Meta::on_broadcast(self)))
+        let storage = self.resolve_view_storage(ViewOp::Broadcast, &layout)?;
+        Ok(self.share_storage(layout, K::Meta::on_broadcast(self), storage))
     }
 
     pub fn squeeze<Dm: Dim>(&self, dim: Dm) -> crate::Result<Self> {
@@ -118,7 +191,8 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         new_dims.remove(dim);
         strides.remove(dim);
         let layout = Layout::new(new_dims, strides, self.layout().start_offset());
-        Ok(self.share_storage(layout, K::Meta::on_reshape(self)))
+        let storage = self.resolve_view_storage(ViewOp::Squeeze, &layout)?;
+        Ok(self.share_storage(layout, K::Meta::on_reshape(self), storage))
     }
 
     pub fn unsqueeze<Dm: Dim>(&self, dim: Dm) -> crate::Result<Self> {
@@ -129,7 +203,8 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         let stride = if dim < strides.len() { strides[dim] } else { 1 };
         strides.insert(dim, stride);
         let layout = Layout::new(new_dims, strides, self.layout().start_offset());
-        Ok(self.share_storage(layout, K::Meta::on_reshape(self)))
+        let storage = self.resolve_view_storage(ViewOp::Unsqueeze, &layout)?;
+        Ok(self.share_storage(layout, K::Meta::on_reshape(self), storage))
     }
 
     /// Materialize a contiguous copy (records `Op::Copy` for `Float`).

@@ -1,7 +1,7 @@
-use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
+use super::super::{Cuda, CudaError, CudaResult, kernel};
 use crate::builder_arg;
 use crate::{Layout, ReduceOp, Shape};
-use super::super::{Cuda, CudaError, CudaResult, kernel};
+use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
 
 pub(crate) fn reduce_kernel_name(op: ReduceOp, suffix: &str) -> String {
     let op_str = match op {
@@ -28,6 +28,7 @@ pub(crate) fn launch_reduce<T: DeviceRepr>(
     kernel_name: &str,
     module: &kernel::Module,
     src: &CudaSlice<T>,
+    src_offset: usize,
     dims: &[usize],
     strides: &[usize],
     reduce_dim: usize,
@@ -41,6 +42,7 @@ pub(crate) fn launch_reduce<T: DeviceRepr>(
     let dims = device.memcpy_stod(dims)?;
     let strides = device.memcpy_stod(strides)?;
     let output = device.alloc::<T>(output_block_count)?;
+    let src_view = src.slice(src_offset..);
 
     let mut builder = func.builder();
     builder_arg!(builder, reduce_size);
@@ -49,14 +51,10 @@ pub(crate) fn launch_reduce<T: DeviceRepr>(
     builder.arg(&dims);
     builder.arg(&strides);
     builder_arg!(builder, reduce_dim);
-    builder.arg(src);
+    builder.arg(&src_view);
     builder.arg(&output);
 
-    let config = LaunchConfig {
-        grid_dim: (output_block_count as u32, 1, 1),
-        block_dim: (256, 1, 1),
-        shared_mem_bytes: 0,
-    };
+    let config = LaunchConfig { grid_dim: (output_block_count as u32, 1, 1), block_dim: (256, 1, 1), shared_mem_bytes: 0 };
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(output)
 }
@@ -87,10 +85,16 @@ pub(crate) fn launch_multi_reduce_by_kernel_name<T: DeviceRepr>(
         let output_block_count: usize = cur_dims.iter().product::<usize>() / reduce_size;
 
         let new_out = launch_reduce(
-            device, kernel_name, module,
+            device,
+            kernel_name,
+            module,
             saved.last().unwrap_or(src),
-            &cur_dims, &cur_strides,
-            dim, reduce_size, output_block_count,
+            if saved.is_empty() { layout.start_offset() } else { 0 },
+            &cur_dims,
+            &cur_strides,
+            dim,
+            reduce_size,
+            output_block_count,
         )?;
         saved.push(new_out);
         cur_dims.remove(dim);
@@ -135,19 +139,21 @@ pub(crate) fn launch_arg_reduce<T: DeviceRepr>(
     kernel_name: &str,
     module: &kernel::Module,
     src: &CudaSlice<T>,
+    src_offset: usize,
     dims: &[usize],
     strides: &[usize],
     reduce_dim: usize,
     reduce_size: usize,
     output_block_count: usize,
-) -> CudaResult<CudaSlice<i32>> {
+) -> CudaResult<CudaSlice<u32>> {
     let num_dims = dims.len();
     let func = device.load_function(kernel_name, module)?;
     let reduce_stride = strides[reduce_dim];
 
     let dims_buf = device.memcpy_stod(dims)?;
     let strides_buf = device.memcpy_stod(strides)?;
-    let output = device.alloc::<i32>(output_block_count)?;
+    let output = device.alloc::<u32>(output_block_count)?;
+    let src_view = src.slice(src_offset..);
 
     let mut builder = func.builder();
     builder_arg!(builder, reduce_size);
@@ -156,14 +162,10 @@ pub(crate) fn launch_arg_reduce<T: DeviceRepr>(
     builder.arg(&dims_buf);
     builder.arg(&strides_buf);
     builder_arg!(builder, reduce_dim);
-    builder.arg(src);
+    builder.arg(&src_view);
     builder.arg(&output);
 
-    let config = LaunchConfig {
-        grid_dim: (output_block_count as u32, 1, 1),
-        block_dim: (256, 1, 1),
-        shared_mem_bytes: 0,
-    };
+    let config = LaunchConfig { grid_dim: (output_block_count as u32, 1, 1), block_dim: (256, 1, 1), shared_mem_bytes: 0 };
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(output)
 }

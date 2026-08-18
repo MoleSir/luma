@@ -1,5 +1,5 @@
-use luma_tensor::Device;
 use super::*;
+use luma_tensor::Device;
 
 #[allow(dead_code)]
 pub fn test_cat_dim0_f32(device: &impl Device) {
@@ -146,4 +146,58 @@ pub fn test_chunk_f32(device: &impl Device) {
     assert_eq!(chunks.len(), 2);
     assert_eq!(chunks[0].dims(), &[3]);
     assert_eq!(chunks[1].dims(), &[2]);
+}
+
+// ---- copy_ / phantom ----
+
+#[allow(dead_code)]
+pub fn test_copy_float(device: &impl Device) {
+    let mut t = tensor_f32_dev(&[1.0, 2.0, 3.0, 4.0], (2, 2), device);
+    let id_before = t.id();
+    let src = tensor_f32_dev(&[5.0, 6.0, 7.0, 8.0], (2, 2), device);
+    t.copy_(&src).unwrap();
+    // data from src
+    assert_close(&t.to_vec().unwrap(), &[5.0, 6.0, 7.0, 8.0], 1e-5, 1e-5);
+    // id preserved
+    assert_eq!(t.id(), id_before);
+    // layout is now contiguous
+    assert!(t.is_contiguous());
+}
+
+#[allow(dead_code)]
+pub fn test_copy_shape_mismatch(device: &impl Device) {
+    let mut t = tensor_f32_dev(&[1.0, 2.0, 3.0, 4.0], (2, 2), device);
+    let src = tensor_f32_dev(&[5.0, 6.0], (1, 2), device);
+    assert!(t.copy_(&src).is_err());
+}
+
+#[allow(dead_code)]
+pub fn test_phantom(device: &impl Device) {
+    use luma_tensor::Float;
+    use luma_tensor::dtype::FloatDType;
+    let p = luma_tensor::Tensor::<_, Float>::phantom((2, 3), (device, FloatDType::F32)).unwrap();
+    assert_eq!(p.dims(), &[2, 3]);
+    assert!(p.is_meta()); // no storage allocated
+}
+
+#[allow(dead_code)]
+pub fn test_phantom_then_copy(device: &impl Device) {
+    use luma_tensor::Float;
+    use luma_tensor::dtype::FloatDType;
+    let mut p = luma_tensor::Tensor::<_, Float>::phantom((2, 2), (device, FloatDType::F32)).unwrap();
+    assert!(p.is_meta());
+    let src = tensor_f32_dev(&[9.0, 8.0, 7.0, 6.0], (2, 2), device);
+    p.copy_(&src).unwrap();
+    assert!(!p.is_meta()); // storage allocated by copy_
+    assert_close(&p.to_vec().unwrap(), &[9.0, 8.0, 7.0, 6.0], 1e-5, 1e-5);
+}
+
+#[allow(dead_code)]
+pub fn test_copy_preserves_requires_grad(device: &impl Device) {
+    let mut t = tensor_f32_dev(&[1.0, 2.0, 3.0, 4.0], (2, 2), device);
+    let requires_grad_before = t.requires_grad();
+    let src = tensor_f32_dev(&[5.0, 6.0, 7.0, 8.0], (2, 2), device);
+    t.copy_(&src).unwrap();
+    // copy_ should NOT change requires_grad (it just replaces data)
+    assert_eq!(t.requires_grad(), requires_grad_before);
 }

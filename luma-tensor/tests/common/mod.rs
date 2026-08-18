@@ -5,21 +5,21 @@ use luma_tensor::Device;
 use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
 use luma_tensor::{Bool, Cpu, Int, Shape, Tensor};
 
-pub mod numeric;
-pub mod reduce;
 pub mod boolean;
 pub mod cast;
-pub mod shape;
-pub mod matmul;
-pub mod indexing;
 pub mod construct;
-pub mod display;
-pub mod grad;
-pub mod nn;
-pub mod dtype;
-pub mod f64;
 pub mod cross;
+pub mod display;
+pub mod dtype;
 pub mod error;
+pub mod f64;
+pub mod grad;
+pub mod indexing;
+pub mod matmul;
+pub mod nn;
+pub mod numeric;
+pub mod reduce;
+pub mod shape;
 
 /// Create a Float tensor (f32) from a slice of f64 values.
 pub fn tensor_f32<S: Into<Shape>>(data: &[f64], shape: S) -> Tensor<Cpu> {

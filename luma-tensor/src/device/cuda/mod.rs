@@ -1,13 +1,13 @@
-mod storage;
 mod device;
-#[allow(unused)]
-mod ops;
 mod error;
 mod launch;
-pub use error::*;
-pub use storage::*;
+#[allow(unused)]
+mod ops;
+mod storage;
 pub use device::Cuda;
+pub use error::*;
 use luma_cuda_kernel as kernel;
+pub use storage::*;
 
 // // ---------------------------------------------------------------------------
 // // Cuda: constructors & kernel helpers

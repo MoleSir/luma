@@ -1,7 +1,10 @@
 //! CPU storage: one flat `Vec<T>` per precision, wrapped in an enum so the
 //! concrete precision of a `Float`/`Int` tensor is a runtime choice.
 
-use crate::{dtype::{BoolDType, FloatDType, IntDType}, Bool, DType, Float, Int, Storage};
+use crate::{
+    Bool, DType, Float, Int, Storage,
+    dtype::{BoolDType, FloatDType, IntDType},
+};
 
 use super::Cpu;
 

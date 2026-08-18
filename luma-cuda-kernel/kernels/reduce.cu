@@ -94,10 +94,10 @@ extern "C" __global__ void s##NAME##_##DType( \
     const size_t* strides, \
     const size_t reduce_dim, \
     const TYPE* src, \
-    int32_t* dst \
+    uint32_t* dst \
 ) { \
     __shared__ TYPE     shr_val[BLOCK_SIZE]; \
-    __shared__ int32_t  shr_idx[BLOCK_SIZE]; \
+    __shared__ uint32_t shr_idx[BLOCK_SIZE]; \
     size_t tid = threadIdx.x; \
     size_t bid = blockIdx.x; \
     \
@@ -110,12 +110,12 @@ extern "C" __global__ void s##NAME##_##DType( \
     } \
     \
     TYPE    acc_val = (TYPE)(INIT); \
-    int32_t acc_idx = 0; \
+    uint32_t acc_idx = 0; \
     for (size_t i = tid; i < reduce_size; i += blockDim.x) { \
         TYPE val = src[base + i * reduce_stride]; \
         if (CMP_(acc_val, val)) { \
             acc_val = val; \
-            acc_idx = (int32_t)i; \
+            acc_idx = (uint32_t)i; \
         } \
     } \
     shr_val[tid] = acc_val; \

@@ -1,5 +1,5 @@
-use luma_tensor::Device;
 use super::*;
+use luma_tensor::Device;
 
 #[allow(dead_code)]
 pub fn test_bool_and(device: &impl Device) {

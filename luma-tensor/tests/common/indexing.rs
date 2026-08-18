@@ -1,5 +1,5 @@
-use luma_tensor::Device;
 use super::*;
+use luma_tensor::Device;
 
 #[allow(dead_code)]
 pub fn test_index_select_dim0(device: &impl Device) {
@@ -66,7 +66,7 @@ pub fn test_i_select_row(device: &impl Device) {
 
 #[allow(dead_code)]
 pub fn test_i_select_negative(device: &impl Device) {
-    use luma_tensor::{IndexOp, D};
+    use luma_tensor::{D, IndexOp};
     let t = tensor_f32_dev(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (3, 2), device);
     let row = t.i(D::Minus1).unwrap();
     assert_close(&row.to_vec().unwrap(), &[5.0, 6.0], 1e-5, 1e-5);

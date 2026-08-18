@@ -1,5 +1,5 @@
-use luma_tensor::{Device, Shape, Tensor};
 use super::*;
+use luma_tensor::{Device, Shape, Tensor};
 
 #[allow(dead_code)]
 pub fn test_sum_dim_f32(device: &impl Device) {

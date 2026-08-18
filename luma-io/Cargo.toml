@@ -1,0 +1,15 @@
+[package]
+name = "luma-io"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "Model serialization (safetensors, lpk) for luma"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true, features = ["std"] }
+memmap2 = "0.9"
+thiserror = { workspace = true }

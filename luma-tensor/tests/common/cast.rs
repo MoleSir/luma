@@ -1,6 +1,6 @@
+use super::*;
 use luma_tensor::Device;
 use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
-use super::*;
 
 fn tensor_f64_dev<D: luma_tensor::Device, S: Into<luma_tensor::Shape>>(data: &[f64], shape: S, device: &D) -> luma_tensor::Tensor<D> {
     luma_tensor::Tensor::<D>::from_slice(data, shape, (device, FloatDType::F64)).unwrap()

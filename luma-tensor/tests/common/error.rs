@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use luma_tensor::Device;
 use super::*;
+use luma_tensor::Device;
 
 #[allow(dead_code)]
 pub fn test_binary_shape_mismatch(device: &impl Device) {

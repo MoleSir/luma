@@ -1,19 +1,16 @@
-use cudarc::driver::{CudaSlice, LaunchConfig, PushKernelArg};
-use crate::Layout;
 use super::super::{Cuda, CudaError, CudaResult, kernel};
+use crate::Layout;
+use cudarc::driver::{CudaSlice, LaunchConfig, PushKernelArg};
 
 fn next_pow2(n: u32) -> u32 {
     let mut p: u32 = 1;
-    while p < n { p <<= 1; }
+    while p < n {
+        p <<= 1;
+    }
     p
 }
 
-pub(crate) fn launch_softmax_f32(
-    device: &Cuda,
-    input: &CudaSlice<f32>,
-    layout: &Layout,
-    dim: usize,
-) -> CudaResult<CudaSlice<f32>> {
+pub(crate) fn launch_softmax_f32(device: &Cuda, input: &CudaSlice<f32>, layout: &Layout, dim: usize) -> CudaResult<CudaSlice<f32>> {
     let elem_count = layout.shape().element_count();
     let dims = layout.dims();
     let row_size = dims[dim] as i32;
@@ -30,21 +27,12 @@ pub(crate) fn launch_softmax_f32(
     builder.arg(input);
     builder.arg(&output);
 
-    let config = LaunchConfig {
-        grid_dim: (num_rows as u32, 1, 1),
-        block_dim: (block_dim, 1, 1),
-        shared_mem_bytes: smem,
-    };
+    let config = LaunchConfig { grid_dim: (num_rows as u32, 1, 1), block_dim: (block_dim, 1, 1), shared_mem_bytes: smem };
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(output)
 }
 
-pub(crate) fn launch_softmax_f64(
-    device: &Cuda,
-    input: &CudaSlice<f64>,
-    layout: &Layout,
-    dim: usize,
-) -> CudaResult<CudaSlice<f64>> {
+pub(crate) fn launch_softmax_f64(device: &Cuda, input: &CudaSlice<f64>, layout: &Layout, dim: usize) -> CudaResult<CudaSlice<f64>> {
     let elem_count = layout.shape().element_count();
     let dims = layout.dims();
     let row_size = dims[dim] as i32;
@@ -61,11 +49,7 @@ pub(crate) fn launch_softmax_f64(
     builder.arg(input);
     builder.arg(&output);
 
-    let config = LaunchConfig {
-        grid_dim: (num_rows as u32, 1, 1),
-        block_dim: (block_dim, 1, 1),
-        shared_mem_bytes: smem,
-    };
+    let config = LaunchConfig { grid_dim: (num_rows as u32, 1, 1), block_dim: (block_dim, 1, 1), shared_mem_bytes: smem };
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(output)
 }
@@ -97,11 +81,7 @@ pub(crate) fn launch_rms_norm_f32(
     builder.arg(&eps);
     builder.arg(&output);
 
-    let config = LaunchConfig {
-        grid_dim: (num_rows as u32, 1, 1),
-        block_dim: (block_dim, 1, 1),
-        shared_mem_bytes: smem,
-    };
+    let config = LaunchConfig { grid_dim: (num_rows as u32, 1, 1), block_dim: (block_dim, 1, 1), shared_mem_bytes: smem };
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(output)
 }
@@ -133,11 +113,7 @@ pub(crate) fn launch_rms_norm_f64(
     builder.arg(&eps);
     builder.arg(&output);
 
-    let config = LaunchConfig {
-        grid_dim: (num_rows as u32, 1, 1),
-        block_dim: (block_dim, 1, 1),
-        shared_mem_bytes: smem,
-    };
+    let config = LaunchConfig { grid_dim: (num_rows as u32, 1, 1), block_dim: (block_dim, 1, 1), shared_mem_bytes: smem };
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(output)
 }

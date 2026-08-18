@@ -6,21 +6,22 @@
 //! float — and cast back to the tensor's actual precision when the op runs or
 //! its gradient is computed.
 
+mod arith;
 mod boolean;
-mod construct;
 mod cast;
+pub mod construct;
 mod display;
-pub mod indexer;
+mod indexer;
 mod matmul;
 mod nn;
 mod numeric;
-mod readback;
 mod reduce;
 mod shape;
 
 use construct::ConstructDTypeKind;
 pub use construct::{DEFAULT_FLOAT, DEFAULT_INT};
 use indexer::IndexingDTypeKind;
+pub use indexer::{IndexOp, Indexer, Slice};
 use matmul::MatmulDTypeKind;
 use numeric::NumericDTypeKind;
 use reduce::ReduceDTypeKind;
@@ -38,7 +39,8 @@ pub enum Op<D: Device> {
     Binary(Tensor<D, Float>, Tensor<D, Float>, BinaryOp),
     BinaryScalarRhs(Tensor<D, Float>, f64, BinaryOp),
     BinaryScalarLhs(f64, Tensor<D, Float>, BinaryOp),
-    Unary(Tensor<D, Float>, UnaryOp),
+    FloatUnary(Tensor<D, Float>, FloatUnaryOp),
+    Unary(Tensor<D, Float>, UnaryOp<f64>),
     Reduce(Tensor<D, Float>, ReduceOp, Vec<usize>),
     Matmul(Tensor<D, Float>, Tensor<D, Float>),
     Broadcast(Tensor<D, Float>),
@@ -59,13 +61,24 @@ pub enum Op<D: Device> {
     /// Precision cast within the float kind (e.g. f32 -> f64). Records the input
     /// so the gradient can be cast back — the key capability the old design lacked.
     Cast(Tensor<D, Float>),
-    // ---- elementwise ops shared by Float and Int ----
-    Neg(Tensor<D, Float>),
-    Abs(Tensor<D, Float>),
-    Sign(Tensor<D, Float>),
-    Pow(Tensor<D, Float>, f64),
-    Affine(Tensor<D, Float>, f64, f64),
-    Clamp(Tensor<D, Float>, Option<f64>, Option<f64>),
+}
+
+/// A *view* operation: it shares the source tensor's storage under a new
+/// [`Layout`] without touching device kernels.
+///
+/// Views bypass the `Device` kernel seam entirely (`Tensor::share_storage`), so
+/// tracing devices learn about them through [`Device::on_view`](crate::Device::on_view)
+/// rather than through `FloatOps`/`IntOps`/`BoolOps`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ViewOp {
+    Reshape,
+    Transpose(usize, usize),
+    Permute(Vec<usize>),
+    Narrow(usize, usize, usize),
+    Slice(usize, usize, usize, usize),
+    Broadcast,
+    Squeeze,
+    Unsqueeze,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,7 +101,7 @@ pub enum ReduceOp {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum UnaryOp {
+pub enum FloatUnaryOp {
     Exp,
     Ln,
     Sin,
@@ -109,6 +122,16 @@ pub enum UnaryOp {
     Round,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum UnaryOp<S> {
+    Neg,
+    Abs,
+    Sign,
+    Affine(S, S),
+    Pow(S),
+    Clamp(Option<S>, Option<S>),
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CmpOp {
     Eq,
@@ -119,14 +142,14 @@ pub enum CmpOp {
     Gt,
 }
 
-pub trait FloatDTypeKind<D: Device>: 
-    DTypeKind<D> + 
-    ConstructDTypeKind<D> + 
-    IndexingDTypeKind<D> + 
-    MatmulDTypeKind<D> + 
-    NumericDTypeKind<D> + 
-    ReduceDTypeKind<D> + 
-    ShapeDTypeKind<D> 
+pub trait FloatDTypeKind<D: Device>:
+    DTypeKind<D>
+    + ConstructDTypeKind<D>
+    + IndexingDTypeKind<D>
+    + MatmulDTypeKind<D>
+    + NumericDTypeKind<D>
+    + ReduceDTypeKind<D>
+    + ShapeDTypeKind<D>
 {
 }
 
