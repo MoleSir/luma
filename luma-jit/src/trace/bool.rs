@@ -7,7 +7,7 @@ use luma_tensor::{BoolOps, DType, Layout, Result, Shape, ViewOp};
 
 use super::{Trace, TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
 use super::{readback_unsupported, reduce_out_shape};
-use crate::graph::{NodeOp, ValueId};
+use crate::graph::{NodeOp, Scalar, ValueId};
 
 impl BoolOps<Trace> for Trace {
     fn b_falses(shape: &Shape, device: &Trace, dtype: BoolDType) -> Result<TraceBoolStorage> {
@@ -19,8 +19,8 @@ impl BoolOps<Trace> for Trace {
     fn b_from_bool<'a>(_data: impl Into<Cow<'a, [bool]>>, device: &Trace) -> Result<TraceBoolStorage> {
         Ok(device.bool_leaf(BoolDType::Bool, &Shape::from(())))
     }
-    fn b_from_bytes<'a>(_bytes: impl Into<Cow<'a, [u8]>>, device: &Trace, dtype: BoolDType) -> Result<TraceBoolStorage> {
-        Ok(device.bool_leaf(dtype, &Shape::from(())))
+    fn b_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, shape: &Shape, device: &Trace, dtype: BoolDType) -> Result<TraceBoolStorage> {
+        Ok(device.bool_const(dtype, shape, bytes.into().into_owned()))
     }
 
     fn b_contiguous(x: &TraceBoolStorage, _layout: &Layout) -> Result<TraceBoolStorage> {
@@ -87,16 +87,47 @@ impl BoolOps<Trace> for Trace {
         let out = src.device.emit_view(src.value, dst_l, view);
         Ok(Some(TraceBoolStorage { value: out, dtype: BoolDType::Bool, device: src.device.clone() }))
     }
-    fn b_pick(mask: &TraceBoolStorage, _mask_l: &Layout, on_true: &TraceBoolStorage, true_l: &Layout, on_false: &TraceBoolStorage, _false_l: &Layout) -> Result<TraceBoolStorage> {
-        let id = on_true.device.emit(NodeOp::Pick, vec![mask.value, on_true.value, on_false.value], DType::Bool, true_l.shape().clone())?;
+    fn b_pick(
+        mask: &TraceBoolStorage,
+        _mask_l: &Layout,
+        on_true: &TraceBoolStorage,
+        true_l: &Layout,
+        on_false: &TraceBoolStorage,
+        _false_l: &Layout,
+    ) -> Result<TraceBoolStorage> {
+        let id = on_true
+            .device
+            .emit(NodeOp::Pick, vec![mask.value, on_true.value, on_false.value], DType::Bool, true_l.shape().clone())?;
         Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: on_true.device.clone() })
     }
-    fn b_pick_true(mask: &TraceBoolStorage, _mask_l: &Layout, _value: bool, on_false: &TraceBoolStorage, false_l: &Layout) -> Result<TraceBoolStorage> {
-        let id = on_false.device.emit(NodeOp::Pick, vec![mask.value, on_false.value], DType::Bool, false_l.shape().clone())?;
+    fn b_pick_true(
+        mask: &TraceBoolStorage,
+        _mask_l: &Layout,
+        value: bool,
+        on_false: &TraceBoolStorage,
+        false_l: &Layout,
+    ) -> Result<TraceBoolStorage> {
+        let id = on_false.device.emit(
+            NodeOp::PickTrue(Scalar::Bool(value)),
+            vec![mask.value, on_false.value],
+            DType::Bool,
+            false_l.shape().clone(),
+        )?;
         Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: on_false.device.clone() })
     }
-    fn b_pick_false(mask: &TraceBoolStorage, _mask_l: &Layout, on_true: &TraceBoolStorage, true_l: &Layout, _value: bool) -> Result<TraceBoolStorage> {
-        let id = on_true.device.emit(NodeOp::Pick, vec![mask.value, on_true.value], DType::Bool, true_l.shape().clone())?;
+    fn b_pick_false(
+        mask: &TraceBoolStorage,
+        _mask_l: &Layout,
+        on_true: &TraceBoolStorage,
+        true_l: &Layout,
+        value: bool,
+    ) -> Result<TraceBoolStorage> {
+        let id = on_true.device.emit(
+            NodeOp::PickFalse(Scalar::Bool(value)),
+            vec![mask.value, on_true.value],
+            DType::Bool,
+            true_l.shape().clone(),
+        )?;
         Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: on_true.device.clone() })
     }
     fn b_allclose(_a: &TraceBoolStorage, _a_l: &Layout, _b: &TraceBoolStorage, _b_l: &Layout) -> Result<bool> {

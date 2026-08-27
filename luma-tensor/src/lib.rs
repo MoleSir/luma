@@ -21,11 +21,11 @@ pub use device::cpu::{Cpu, CpuBoolStorage, CpuFloatStorage, CpuIntStorage};
 pub use device::cuda::{Cuda, CudaBoolStorage, CudaFloatStorage, CudaIntStorage};
 pub use device::{BoolOps, Device, FloatOps, IntOps};
 
-pub use dtype::{Bool, DType, DTypeKind, Float, Int, KindTag, Storage};
+pub use dtype::{Bool, DType, DTypeKind, Float, Int, KindTag, Storage, FloatDType, IntDType, BoolDType};
 pub use dynamic::DynTensor;
 pub use error::{Error, Result};
 pub use grad::{FloatMeta, GradStore, NoGradGuard, TensorMeta, is_grad_enabled, set_grad_enabled};
-pub use ops::{BinaryOp, CmpOp, FloatDTypeKind, FloatUnaryOp, Op, ReduceOp, UnaryOp, ViewOp};
+pub use ops::{BinaryOp, CmpOp, FloatUnaryOp, Op, ReduceOp, TransferDTypeKind, UnaryOp, ViewOp};
 pub use ops::{IndexOp, Indexer, Slice};
 pub use scalar::Scalar;
 pub use tensor::{D, Dim, Dims, Layout, Shape, StorageIndices, Tensor, TensorId, TensorImpl};

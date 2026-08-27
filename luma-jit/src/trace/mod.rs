@@ -8,18 +8,18 @@
 //! `b_view`.
 
 mod bool;
+mod entry;
 mod float;
 mod int;
 mod storage;
-#[cfg(test)]
-mod tests;
 
-pub use storage::{TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
+pub use entry::{TraceInput, trace};
+pub use storage::{TraceBoolStorage, TraceFloatStorage, TraceIntStorage, TraceValueId};
 
 use std::sync::{Arc, Mutex};
 
 use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
-use luma_tensor::{Bool, Device, DType, Error, Float, Int, Layout, Result, Shape, Tensor, ViewOp};
+use luma_tensor::{DType, DTypeKind, Device, Error, Layout, Result, Shape, Tensor, ViewOp};
 
 use crate::graph::{Graph, NodeOp, ValueId};
 
@@ -62,6 +62,23 @@ impl Trace {
 
     fn bool_leaf(&self, dtype: BoolDType, shape: &Shape) -> TraceBoolStorage {
         let id = self.graph.lock().unwrap().add_value(dtype.into(), shape.clone());
+        TraceBoolStorage { value: id, dtype, device: self.clone() }
+    }
+
+    /// A constant leaf carrying real data (captured by `Tensor::to_device`
+    /// through `f_from_bytes`/`i_from_bytes`/`b_from_bytes`).
+    fn float_const(&self, dtype: FloatDType, shape: &Shape, data: Vec<u8>) -> TraceFloatStorage {
+        let id = self.graph.lock().unwrap().add_constant(dtype.into(), shape.clone(), data);
+        TraceFloatStorage { value: id, dtype, device: self.clone() }
+    }
+
+    fn int_const(&self, dtype: IntDType, shape: &Shape, data: Vec<u8>) -> TraceIntStorage {
+        let id = self.graph.lock().unwrap().add_constant(dtype.into(), shape.clone(), data);
+        TraceIntStorage { value: id, dtype, device: self.clone() }
+    }
+
+    fn bool_const(&self, dtype: BoolDType, shape: &Shape, data: Vec<u8>) -> TraceBoolStorage {
+        let id = self.graph.lock().unwrap().add_constant(dtype.into(), shape.clone(), data);
         TraceBoolStorage { value: id, dtype, device: self.clone() }
     }
 }
@@ -107,21 +124,13 @@ pub trait Traced {
     fn trace_id(&self) -> usize;
 }
 
-impl Traced for Tensor<Trace, Float> {
+impl<K> Traced for Tensor<Trace, K>
+where
+    K: DTypeKind<Trace>,
+    K::Storage: TraceValueId,
+{
     fn trace_id(&self) -> usize {
-        self.storage().expect("meta tensor has no trace value").read().expect("storage read lock").value
-    }
-}
-
-impl Traced for Tensor<Trace, Int> {
-    fn trace_id(&self) -> usize {
-        self.storage().expect("meta tensor has no trace value").read().expect("storage read lock").value
-    }
-}
-
-impl Traced for Tensor<Trace, Bool> {
-    fn trace_id(&self) -> usize {
-        self.storage().expect("meta tensor has no trace value").read().expect("storage read lock").value
+        self.storage().expect("meta tensor has no trace value").read().expect("storage read lock").value_id()
     }
 }
 

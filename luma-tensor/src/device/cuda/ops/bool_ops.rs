@@ -30,7 +30,7 @@ impl BoolOps<Cuda> for Cuda {
         Ok(CudaBoolStorage { slice, device: device.clone() })
     }
 
-    fn b_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, device: &Cuda, _dtype: BoolDType) -> Result<CudaBoolStorage> {
+    fn b_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _shape: &Shape, device: &Cuda, _dtype: BoolDType) -> Result<CudaBoolStorage> {
         let bytes = bytes.into();
         let slice = device.memcpy_stod(&*bytes)?;
         Ok(CudaBoolStorage { slice, device: device.clone() })

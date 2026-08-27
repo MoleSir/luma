@@ -20,6 +20,7 @@ pub mod nn;
 pub mod numeric;
 pub mod reduce;
 pub mod shape;
+pub mod transfer;
 
 /// Create a Float tensor (f32) from a slice of f64 values.
 pub fn tensor_f32<S: Into<Shape>>(data: &[f64], shape: S) -> Tensor<Cpu> {

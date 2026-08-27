@@ -62,7 +62,12 @@ impl IntOps<Cpu> for Cpu {
         })
     }
 
-    fn i_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _device: &Cpu, dtype: IntDType) -> Result<<Cpu as Device>::IntStorage> {
+    fn i_from_bytes<'a>(
+        bytes: impl Into<Cow<'a, [u8]>>,
+        _shape: &Shape,
+        _device: &Cpu,
+        dtype: IntDType,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         let bytes = bytes.into();
         Ok(match dtype {
             IntDType::I32 => {

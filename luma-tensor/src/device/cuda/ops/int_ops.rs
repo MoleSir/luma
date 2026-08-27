@@ -162,7 +162,7 @@ impl IntOps<Cuda> for Cuda {
         Ok(CudaIntStorage { slice: CudaIntSlice::U8(slice), device: device.clone() })
     }
 
-    fn i_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, device: &Cuda, dtype: IntDType) -> Result<CudaIntStorage> {
+    fn i_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _shape: &Shape, device: &Cuda, dtype: IntDType) -> Result<CudaIntStorage> {
         let bytes = bytes.into();
         match dtype {
             IntDType::I32 => {

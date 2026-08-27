@@ -13,11 +13,26 @@ use luma_tensor::{BinaryOp, CmpOp, DType, FloatUnaryOp, ReduceOp, Shape, UnaryOp
 
 pub type ValueId = usize;
 
+/// Raw little-endian bytes of a constant leaf (canonical logical order, the
+/// form produced by `Tensor::to_bytes` and consumed by `Tensor::from_bytes`).
+///
+/// `Debug` prints only the length — the payload can be a whole weight tensor.
+#[derive(Clone, PartialEq)]
+pub struct ConstData(pub Vec<u8>);
+
+impl fmt::Debug for ConstData {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ConstData(len={})", self.0.len())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Value {
     pub id: ValueId,
     pub dtype: DType,
     pub shape: Shape,
+    /// `Some` on constant leaves; `None` on graph inputs and op outputs.
+    pub data: Option<ConstData>,
 }
 
 /// A scalar attribute carried by an op (float / int / bool), type-erased for the IR.
@@ -78,6 +93,8 @@ pub enum NodeOp {
     Softmax(usize),
     RmsNorm(f64),
     Pick,
+    PickTrue(Scalar),
+    PickFalse(Scalar),
     Arange(i64, i64, i64),
 
     // ---- views ----
@@ -108,10 +125,33 @@ pub struct Graph {
 
 impl Graph {
     /// Add a leaf value (no producing node). Ids are dense and never reused.
+    ///
+    /// Data-less leaves are *graph inputs* (or floating placeholders); see
+    /// [`Graph::add_constant`] for leaves that carry data.
     pub fn add_value(&mut self, dtype: DType, shape: Shape) -> ValueId {
         let id = self.values.len();
-        self.values.push(Value { id, dtype, shape });
+        self.values.push(Value { id, dtype, shape, data: None });
         id
+    }
+
+    /// Add a constant leaf carrying raw little-endian data (as produced by
+    /// `Tensor::to_bytes` / consumed by `Tensor::from_bytes`). Constants are
+    /// leaves with no producing node, distinguished from graph inputs by
+    /// their `data` payload.
+    pub fn add_constant(&mut self, dtype: DType, shape: Shape, data: Vec<u8>) -> ValueId {
+        let id = self.values.len();
+        self.values.push(Value { id, dtype, shape, data: Some(ConstData(data)) });
+        id
+    }
+
+    /// Register a leaf value as a graph input.
+    pub fn mark_input(&mut self, id: ValueId) {
+        self.inputs.push(id);
+    }
+
+    /// Register a value as a graph output.
+    pub fn mark_output(&mut self, id: ValueId) {
+        self.outputs.push(id);
     }
 
     /// Add a node with a single output value; returns the output value id.
@@ -156,6 +196,8 @@ impl fmt::Display for NodeOp {
             NodeOp::Softmax(d) => write!(f, "softmax({d})"),
             NodeOp::RmsNorm(eps) => write!(f, "rms_norm({eps})"),
             NodeOp::Pick => write!(f, "pick"),
+            NodeOp::PickTrue(v) => write!(f, "pick_true({v})"),
+            NodeOp::PickFalse(v) => write!(f, "pick_false({v})"),
             NodeOp::Arange(s, e, st) => write!(f, "arange({s}, {e}, {st})"),
             NodeOp::Reshape => write!(f, "reshape"),
             NodeOp::Transpose(d1, d2) => write!(f, "transpose({d1}, {d2})"),

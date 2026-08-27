@@ -3,9 +3,7 @@
 use std::borrow::Cow;
 
 use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
-use luma_tensor::{
-    BinaryOp, CmpOp, DType, IntOps, Layout, ReduceOp, Result, Shape, UnaryOp, ViewOp,
-};
+use luma_tensor::{BinaryOp, CmpOp, DType, IntOps, Layout, ReduceOp, Result, Shape, UnaryOp, ViewOp};
 
 use super::{Trace, TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
 use super::{arange_len, inplace_unsupported, matmul_out_shape, readback_unsupported, reduce_out_shape};
@@ -33,8 +31,8 @@ impl IntOps<Trace> for Trace {
     fn i_from_u8<'a>(_data: impl Into<Cow<'a, [u8]>>, device: &Trace) -> Result<TraceIntStorage> {
         Ok(device.int_leaf(IntDType::U8, &Shape::from(())))
     }
-    fn i_from_bytes<'a>(_bytes: impl Into<Cow<'a, [u8]>>, device: &Trace, dtype: IntDType) -> Result<TraceIntStorage> {
-        Ok(device.int_leaf(dtype, &Shape::from(())))
+    fn i_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, shape: &Shape, device: &Trace, dtype: IntDType) -> Result<TraceIntStorage> {
+        Ok(device.int_const(dtype, shape, bytes.into().into_owned()))
     }
     fn i_arange(start: i64, end: i64, step: i64, device: &Trace, dtype: IntDType) -> Result<(TraceIntStorage, usize)> {
         let len = arange_len(start, end, step);
@@ -72,14 +70,18 @@ impl IntOps<Trace> for Trace {
         inplace_unsupported("i_binary_")
     }
     fn i_binary_scalar(lhs: &TraceIntStorage, lhs_l: &Layout, rhs: i64, op: BinaryOp) -> Result<TraceIntStorage> {
-        let id = lhs.device.emit(NodeOp::BinaryScalarRhs(Scalar::I64(rhs), op), vec![lhs.value], lhs.dtype.into(), lhs_l.shape().clone())?;
+        let id =
+            lhs.device
+                .emit(NodeOp::BinaryScalarRhs(Scalar::I64(rhs), op), vec![lhs.value], lhs.dtype.into(), lhs_l.shape().clone())?;
         Ok(TraceIntStorage { value: id, dtype: lhs.dtype, device: lhs.device.clone() })
     }
     fn i_binary_scalar_(_dst: &mut TraceIntStorage, _dst_l: &Layout, _rhs: i64, _op: BinaryOp) -> Result<()> {
         inplace_unsupported("i_binary_scalar_")
     }
     fn i_binary_scalar_lhs(scalar: i64, rhs: &TraceIntStorage, rhs_l: &Layout, op: BinaryOp) -> Result<TraceIntStorage> {
-        let id = rhs.device.emit(NodeOp::BinaryScalarLhs(Scalar::I64(scalar), op), vec![rhs.value], rhs.dtype.into(), rhs_l.shape().clone())?;
+        let id =
+            rhs.device
+                .emit(NodeOp::BinaryScalarLhs(Scalar::I64(scalar), op), vec![rhs.value], rhs.dtype.into(), rhs_l.shape().clone())?;
         Ok(TraceIntStorage { value: id, dtype: rhs.dtype, device: rhs.device.clone() })
     }
     fn i_unary(x: &TraceIntStorage, layout: &Layout, op: UnaryOp<i64>) -> Result<TraceIntStorage> {
@@ -112,7 +114,13 @@ impl IntOps<Trace> for Trace {
         let id = x.device.emit(NodeOp::ArgReduce(dim, take_max), vec![x.value], DType::I32, out_shape.clone())?;
         Ok((TraceIntStorage { value: id, dtype: IntDType::I32, device: x.device.clone() }, out_shape))
     }
-    fn i_index_select(x: &TraceIntStorage, x_l: &Layout, idx: &TraceIntStorage, idx_l: &Layout, dim: usize) -> Result<(TraceIntStorage, Shape)> {
+    fn i_index_select(
+        x: &TraceIntStorage,
+        x_l: &Layout,
+        idx: &TraceIntStorage,
+        idx_l: &Layout,
+        dim: usize,
+    ) -> Result<(TraceIntStorage, Shape)> {
         let mut dims = x_l.shape().dims().to_vec();
         dims[dim] = idx_l.element_count();
         let out_shape = Shape::from(dims);
@@ -124,12 +132,32 @@ impl IntOps<Trace> for Trace {
         let id = x.device.emit(NodeOp::Gather(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
         Ok((TraceIntStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
     }
-    fn i_index_add(init: &TraceIntStorage, init_l: &Layout, idx: &TraceIntStorage, _idx_l: &Layout, src: &TraceIntStorage, _src_l: &Layout, dim: usize) -> Result<TraceIntStorage> {
-        let id = init.device.emit(NodeOp::IndexAdd(dim), vec![init.value, idx.value, src.value], init.dtype.into(), init_l.shape().clone())?;
+    fn i_index_add(
+        init: &TraceIntStorage,
+        init_l: &Layout,
+        idx: &TraceIntStorage,
+        _idx_l: &Layout,
+        src: &TraceIntStorage,
+        _src_l: &Layout,
+        dim: usize,
+    ) -> Result<TraceIntStorage> {
+        let id =
+            init.device
+                .emit(NodeOp::IndexAdd(dim), vec![init.value, idx.value, src.value], init.dtype.into(), init_l.shape().clone())?;
         Ok(TraceIntStorage { value: id, dtype: init.dtype, device: init.device.clone() })
     }
-    fn i_scatter_add(init: &TraceIntStorage, init_l: &Layout, idx: &TraceIntStorage, _idx_l: &Layout, src: &TraceIntStorage, _src_l: &Layout, dim: usize) -> Result<TraceIntStorage> {
-        let id = init.device.emit(NodeOp::ScatterAdd(dim), vec![init.value, idx.value, src.value], init.dtype.into(), init_l.shape().clone())?;
+    fn i_scatter_add(
+        init: &TraceIntStorage,
+        init_l: &Layout,
+        idx: &TraceIntStorage,
+        _idx_l: &Layout,
+        src: &TraceIntStorage,
+        _src_l: &Layout,
+        dim: usize,
+    ) -> Result<TraceIntStorage> {
+        let id =
+            init.device
+                .emit(NodeOp::ScatterAdd(dim), vec![init.value, idx.value, src.value], init.dtype.into(), init_l.shape().clone())?;
         Ok(TraceIntStorage { value: id, dtype: init.dtype, device: init.device.clone() })
     }
     fn i_cat(srcs: &[(&TraceIntStorage, &Layout)], dim: usize) -> Result<(TraceIntStorage, Shape)> {
@@ -145,16 +173,50 @@ impl IntOps<Trace> for Trace {
         let out = src.device.emit_view(src.value, dst_l, view);
         Ok(Some(TraceIntStorage { value: out, dtype: src.dtype, device: src.device.clone() }))
     }
-    fn i_pick(mask: &TraceBoolStorage, _mask_l: &Layout, on_true: &TraceIntStorage, true_l: &Layout, on_false: &TraceIntStorage, _false_l: &Layout) -> Result<TraceIntStorage> {
-        let id = on_true.device.emit(NodeOp::Pick, vec![mask.value, on_true.value, on_false.value], on_true.dtype.into(), true_l.shape().clone())?;
+    fn i_pick(
+        mask: &TraceBoolStorage,
+        _mask_l: &Layout,
+        on_true: &TraceIntStorage,
+        true_l: &Layout,
+        on_false: &TraceIntStorage,
+        _false_l: &Layout,
+    ) -> Result<TraceIntStorage> {
+        let id = on_true.device.emit(
+            NodeOp::Pick,
+            vec![mask.value, on_true.value, on_false.value],
+            on_true.dtype.into(),
+            true_l.shape().clone(),
+        )?;
         Ok(TraceIntStorage { value: id, dtype: on_true.dtype, device: on_true.device.clone() })
     }
-    fn i_pick_true(mask: &TraceBoolStorage, _mask_l: &Layout, _value: i64, on_false: &TraceIntStorage, false_l: &Layout) -> Result<TraceIntStorage> {
-        let id = on_false.device.emit(NodeOp::Pick, vec![mask.value, on_false.value], on_false.dtype.into(), false_l.shape().clone())?;
+    fn i_pick_true(
+        mask: &TraceBoolStorage,
+        _mask_l: &Layout,
+        value: i64,
+        on_false: &TraceIntStorage,
+        false_l: &Layout,
+    ) -> Result<TraceIntStorage> {
+        let id = on_false.device.emit(
+            NodeOp::PickTrue(Scalar::I64(value)),
+            vec![mask.value, on_false.value],
+            on_false.dtype.into(),
+            false_l.shape().clone(),
+        )?;
         Ok(TraceIntStorage { value: id, dtype: on_false.dtype, device: on_false.device.clone() })
     }
-    fn i_pick_false(mask: &TraceBoolStorage, _mask_l: &Layout, on_true: &TraceIntStorage, true_l: &Layout, _value: i64) -> Result<TraceIntStorage> {
-        let id = on_true.device.emit(NodeOp::Pick, vec![mask.value, on_true.value], on_true.dtype.into(), true_l.shape().clone())?;
+    fn i_pick_false(
+        mask: &TraceBoolStorage,
+        _mask_l: &Layout,
+        on_true: &TraceIntStorage,
+        true_l: &Layout,
+        value: i64,
+    ) -> Result<TraceIntStorage> {
+        let id = on_true.device.emit(
+            NodeOp::PickFalse(Scalar::I64(value)),
+            vec![mask.value, on_true.value],
+            on_true.dtype.into(),
+            true_l.shape().clone(),
+        )?;
         Ok(TraceIntStorage { value: id, dtype: on_true.dtype, device: on_true.device.clone() })
     }
     fn i_allclose(_a: &TraceIntStorage, _a_l: &Layout, _b: &TraceIntStorage, _b_l: &Layout) -> Result<bool> {

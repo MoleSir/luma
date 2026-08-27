@@ -13,7 +13,8 @@ use super::visitor::{TensorVisitor, TensorVisitorMut};
 ///
 /// Implemented for [`Float`], [`Int`], and [`Bool`] so that [`Buffer`] can
 /// delegate to the correct visitor method without runtime branching.
-trait VisitorDispatch<D: Device>: DTypeKind<D> {
+#[doc(hidden)]
+pub trait VisitorDispatch<D: Device>: DTypeKind<D> {
     fn visit_tensor<V: TensorVisitor<D>>(tensor: &Tensor<D, Self>, visitor: &mut V) -> Result<(), V::Error>;
 
     fn visit_tensor_mut<V: TensorVisitorMut<D>>(tensor: &mut Tensor<D, Self>, visitor: &mut V) -> Result<(), V::Error>;

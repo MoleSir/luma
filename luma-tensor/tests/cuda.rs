@@ -395,3 +395,124 @@ fn cuda_error() {
     common::error::test_f64_to_f32_add(dev);
     common::error::test_reshape_wrong_elements(dev);
 }
+
+#[test]
+fn cuda_to_device() {
+    use common::{assert_close, tensor_bool_dev, tensor_f32, tensor_f32_dev, tensor_f64_dev, tensor_i32};
+    use luma_tensor::Cpu;
+    use luma_tensor::dtype::FloatDType;
+
+    let dev = &*CUDA;
+
+    // Cpu -> Cuda -> Cpu roundtrip (f32), through the public to_device API.
+    let src = tensor_f32(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3));
+    let gpu = src.to_device(dev).unwrap();
+    assert_eq!(gpu.dtype(), src.dtype());
+    assert_eq!(gpu.dims(), &[2, 3]);
+    let back = gpu.to_device(&Cpu).unwrap();
+    assert_close(&back.to_vec().unwrap(), &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 1e-5, 1e-5);
+
+    // f64 roundtrip — dtype must be preserved on both sides.
+    let src64 = tensor_f64_dev(&[1.5, 2.5, 3.5], (3,), &Cpu);
+    let gpu64 = src64.to_device(dev).unwrap();
+    assert_eq!(gpu64.dtype(), FloatDType::F64);
+    let back64 = gpu64.to_device(&Cpu).unwrap();
+    assert_close(&back64.to_vec().unwrap(), &[1.5, 2.5, 3.5], 1e-5, 1e-5);
+
+    // Int roundtrip.
+    let srci = tensor_i32(&[1, 2, 3, 4], (4,));
+    let gpui = srci.to_device(dev).unwrap();
+    let backi = gpui.to_device(&Cpu).unwrap();
+    assert_eq!(backi.to_vec().unwrap(), vec![1, 2, 3, 4]);
+
+    // Bool roundtrip (stored as u8 on device — the bytes path bridges this).
+    let srcb = tensor_bool_dev(&[true, false, true, true], (4,), &Cpu);
+    let gpub = srcb.to_device(dev).unwrap();
+    let backb = gpub.to_device(&Cpu).unwrap();
+    assert_eq!(backb.to_vec().unwrap(), vec![true, false, true, true]);
+
+    // Non-contiguous cpu tensor -> cuda: result is contiguous, values in
+    // logical order.
+    let nc = tensor_f32(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3)).transpose(0usize, 1usize).unwrap();
+    assert!(!nc.is_contiguous());
+    let gpun = nc.to_device(dev).unwrap();
+    assert!(gpun.is_contiguous());
+    assert_close(&gpun.to_vec().unwrap(), &[1.0, 4.0, 2.0, 5.0, 3.0, 6.0], 1e-5, 1e-5);
+
+    // requires_grad preserved across the transfer, graph severed.
+    let gr = tensor_f32_dev(&[1.0, 2.0], (2,), &Cpu);
+    gr.set_requires_grad(true);
+    let grg = gr.to_device(dev).unwrap();
+    assert!(grg.requires_grad());
+    assert!(grg.op().is_none());
+
+    // Same-device fast path: same handle, and a fresh handle to the same
+    // ordinal must also hit the no-op path (Cuda::same_device override).
+    let same = gpun.to_device(dev).unwrap();
+    assert_eq!(same.id(), gpun.id());
+    let dev2 = Cuda::new(0).expect("cuda device 0 (second handle)");
+    let same2 = gpun.to_device(&dev2).unwrap();
+    assert_eq!(same2.id(), gpun.id(), "same ordinal must be a no-op");
+
+    // .cuda() / .cpu() sugar.
+    let sug = src.cuda(0).unwrap();
+    let sugback = sug.cpu().unwrap();
+    assert_close(&sugback.to_vec().unwrap(), &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 1e-5, 1e-5);
+
+    // Identity tests (common delegation) run on Cuda too.
+    common::transfer::test_to_device_identity_f32(dev);
+    common::transfer::test_to_device_identity_int(dev);
+    common::transfer::test_to_device_identity_bool(dev);
+    common::transfer::test_to_device_identity_requires_grad(dev);
+}
+
+#[test]
+fn cuda_to_device_severs_graph_and_grad_flows() {
+    use common::{assert_close, tensor_f32};
+    use luma_tensor::Cpu;
+
+    let dev = &*CUDA;
+
+    // CPU non-leaf → GPU: the op is severed (result is a fresh leaf), but the
+    // trainability flag is preserved and gradients still flow on the GPU.
+    let x = tensor_f32(&[2.0, 3.0], (2,));
+    x.set_requires_grad(true);
+    let y = x.mul(&x).unwrap();
+    assert!(y.op().is_some());
+
+    let yg = y.to_device(dev).unwrap();
+    assert!(yg.requires_grad());
+    assert!(yg.op().is_none(), "cross-device transfer severs the graph");
+    assert!(yg.is_leaf());
+
+    let z = yg.mul(&yg).unwrap();
+    let grads = z.backward().unwrap();
+    let gy = grads.get_by_id(yg.id()).unwrap();
+    assert_close(&gy.to_vec().unwrap(), &[8.0, 18.0], 1e-5, 1e-5);
+
+    // GPU non-leaf → CPU: the same severing in the other direction.
+    let y2 = yg.mul(&yg).unwrap();
+    assert!(y2.op().is_some());
+    let back = y2.to_device(&Cpu).unwrap();
+    assert!(back.op().is_none());
+    assert!(back.is_leaf());
+    assert!(back.requires_grad());
+}
+
+#[test]
+fn cuda_cross_ordinal_transfer() {
+    use common::{assert_close, tensor_f32};
+
+    let dev0 = &*CUDA; // ordinal 0
+    let Ok(dev1) = Cuda::new(1) else {
+        eprintln!("skipping: a second CUDA device (ordinal 1) is not available");
+        return;
+    };
+
+    // Cuda(0) → Cuda(1): different ordinals share the `Cuda` type, so this
+    // bypasses the no-op fast path and goes through the host copy.
+    let src = tensor_f32(&[1.0, 2.0, 3.0, 4.0], (2, 2)).to_device(dev0).unwrap();
+    let dst = src.to_device(&dev1).unwrap();
+    assert_ne!(dst.id(), src.id(), "cross-ordinal transfer must copy");
+    assert_close(&dst.to_vec().unwrap(), &[1.0, 2.0, 3.0, 4.0], 1e-5, 1e-5);
+}

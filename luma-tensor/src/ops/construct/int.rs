@@ -46,15 +46,15 @@ impl<D: Device> Tensor<D, Int> {
         let storage = match options.dtype {
             IntDType::I32 => {
                 let v: Vec<i32> = data.iter().map(|&x| x as i32).collect();
-                D::i_from_bytes(bytemuck::cast_slice(&v), &options.device, IntDType::I32)?
+                D::i_from_bytes(bytemuck::cast_slice(&v), &shape, &options.device, IntDType::I32)?
             }
             IntDType::U32 => {
                 let v: Vec<u32> = data.iter().map(|&x| x as u32).collect();
-                D::i_from_bytes(bytemuck::cast_slice(&v), &options.device, IntDType::U32)?
+                D::i_from_bytes(bytemuck::cast_slice(&v), &shape, &options.device, IntDType::U32)?
             }
             IntDType::U8 => {
                 let v: Vec<u8> = data.iter().map(|&x| x as u8).collect();
-                D::i_from_bytes(&v, &options.device, IntDType::U8)?
+                D::i_from_bytes(&v, &shape, &options.device, IntDType::U8)?
             }
         };
         Ok(Self::from_storage(storage, shape, ()))

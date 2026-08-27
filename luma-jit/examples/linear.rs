@@ -1,8 +1,8 @@
 //! Trace a `Linear + ReLU` forward pass into a graph without running any kernel.
 //!
-//! Run with: `cargo run -p luma-ir --example linear`
+//! Run with: `cargo run -p luma-jit --example linear`
 
-use luma_ir::{Trace, Traced};
+use luma_jit::{Trace, Traced};
 use luma_nn::functional::linear;
 use luma_tensor::dtype::FloatDType;
 use luma_tensor::{Float, Tensor};

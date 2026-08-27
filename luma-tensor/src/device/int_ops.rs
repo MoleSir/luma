@@ -19,7 +19,7 @@ pub trait IntOps<D: super::Device> {
 
     fn i_from_u8<'a>(data: impl Into<Cow<'a, [u8]>>, device: &D) -> Result<D::IntStorage>;
 
-    fn i_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, device: &D, dtype: IntDType) -> Result<D::IntStorage>;
+    fn i_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, shape: &Shape, device: &D, dtype: IntDType) -> Result<D::IntStorage>;
 
     fn i_arange(start: i64, end: i64, step: i64, device: &D, dtype: IntDType) -> Result<(D::IntStorage, usize)>;
 

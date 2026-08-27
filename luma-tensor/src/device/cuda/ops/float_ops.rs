@@ -119,7 +119,7 @@ impl FloatOps<Cuda> for Cuda {
         Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F32(slice) })
     }
 
-    fn f_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, device: &Cuda, dtype: FloatDType) -> Result<CudaFloatStorage> {
+    fn f_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _shape: &Shape, device: &Cuda, dtype: FloatDType) -> Result<CudaFloatStorage> {
         let bytes = bytes.into();
         match dtype {
             FloatDType::F32 => {

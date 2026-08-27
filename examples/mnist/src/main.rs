@@ -1,9 +1,9 @@
 use anyhow::Context;
-use luma_dataset::vision::{MnistBatcher, MnistDataLoader, MnistDataset};
-use luma_nn::{Linear, Module};
-use luma_optim::{Optimizer, SGD};
-use luma_tensor::{dtype::FloatDType, no_grad, Cpu, Device, Tensor};
-use luma_nn::functional as F;
+use luma::dataset::vision::{MnistBatcher, MnistDataLoader, MnistDataset};
+use luma::nn::{Linear, Module};
+use luma::nn::functional as F;
+use luma::optim::{Optimizer, SGD};
+use luma::{FloatDType, no_grad, Cpu, Device, Tensor};
 
 fn main() {
     let device = Cpu;

@@ -17,17 +17,17 @@ mod nn;
 mod numeric;
 mod reduce;
 mod shape;
+mod transfer;
 
-use construct::ConstructDTypeKind;
 pub use construct::{DEFAULT_FLOAT, DEFAULT_INT};
-use indexer::IndexingDTypeKind;
+pub use indexer::IndexingDTypeKind;
 pub use indexer::{IndexOp, Indexer, Slice};
-use matmul::MatmulDTypeKind;
-use numeric::NumericDTypeKind;
-use reduce::ReduceDTypeKind;
+pub use numeric::NumericDTypeKind;
+pub use reduce::ReduceDTypeKind;
 pub use shape::ShapeDTypeKind;
+pub use transfer::TransferDTypeKind;
 
-use crate::{Bool, DTypeKind, Device, Float, Int, Tensor};
+use crate::{Bool, Device, Float, Int, Tensor};
 
 /// A node in the (implicit) computation graph: the operation that produced a
 /// `Float` tensor, holding `Arc` references to its inputs. Only `Float` tensors
@@ -141,16 +141,3 @@ pub enum CmpOp {
     Lt,
     Gt,
 }
-
-pub trait FloatDTypeKind<D: Device>:
-    DTypeKind<D>
-    + ConstructDTypeKind<D>
-    + IndexingDTypeKind<D>
-    + MatmulDTypeKind<D>
-    + NumericDTypeKind<D>
-    + ReduceDTypeKind<D>
-    + ShapeDTypeKind<D>
-{
-}
-
-impl<D: Device> FloatDTypeKind<D> for Float {}

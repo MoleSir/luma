@@ -4,9 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-luma-tensor = { path = "../../luma-tensor" }
-luma-dataset = { path = "../../luma-dataset" }
-luma-nn = { path = "../../luma-nn" }
-luma-io = { path = "../../luma-io" }
-luma-optim = { path = "../../luma-optim" }
+luma = { path = "../../luma", features = ["nn"] }
 anyhow = "1.0"

@@ -50,7 +50,12 @@ impl FloatOps<Cpu> for Cpu {
         })
     }
 
-    fn f_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _device: &Cpu, dtype: FloatDType) -> Result<<Cpu as Device>::FloatStorage> {
+    fn f_from_bytes<'a>(
+        bytes: impl Into<Cow<'a, [u8]>>,
+        _shape: &Shape,
+        _device: &Cpu,
+        dtype: FloatDType,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
         let bytes = bytes.into();
         Ok(match dtype {
             FloatDType::F32 => {

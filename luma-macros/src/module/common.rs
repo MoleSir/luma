@@ -45,3 +45,18 @@ pub fn validate_and_extract_device_generic(generics: &syn::Generics) -> syn::Res
 
     Ok(Some(&type_param.ident))
 }
+
+/// Whether a field/variant-payload type is `PhantomData` (any path, e.g.
+/// `PhantomData<D>`, `std::marker::PhantomData<D>`).
+///
+/// `PhantomData` is a device-erasable marker: when cloning a module for
+/// `to_device` it must be reset to `Default::default()` instead of cloned,
+/// since the target module expects `PhantomData<D2>` rather than
+/// `PhantomData<D>`.
+pub fn is_phantom_data(ty: &syn::Type) -> bool {
+    match ty {
+        syn::Type::Path(type_path) => type_path.path.segments.last().map(|seg| seg.ident == "PhantomData").unwrap_or(false),
+        syn::Type::Group(group) => is_phantom_data(&group.elem),
+        _ => false,
+    }
+}

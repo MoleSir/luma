@@ -1,12 +1,16 @@
 mod buffer;
 mod containers;
+mod forward;
 mod module;
 mod param;
+mod to_device;
 mod visitor;
 
 pub use buffer::*;
+pub use forward::*;
 pub use module::*;
 pub use param::*;
+pub use to_device::*;
 pub use visitor::*;
 
 // ============================================================================================ //

@@ -140,13 +140,13 @@ impl<D: Device, K: ConstructDTypeKind<D>> Tensor<D, K> {
 /// Each impl forwards to the corresponding method on the device ops trait
 /// (`FloatOps::f_from_bytes` / `f_to_bytes`, etc.).
 pub trait BytesDTypeKind<D: Device>: DTypeKind<D> {
-    fn from_bytes_dispatch(bytes: &[u8], device: &D, dtype: Self::DType) -> crate::Result<Self::Storage>;
+    fn from_bytes_dispatch(bytes: &[u8], shape: &Shape, device: &D, dtype: Self::DType) -> crate::Result<Self::Storage>;
     fn to_bytes_dispatch<'a>(storage: &'a Self::Storage, layout: &Layout) -> crate::Result<Cow<'a, [u8]>>;
 }
 
 impl<D: Device> BytesDTypeKind<D> for Float {
-    fn from_bytes_dispatch(bytes: &[u8], device: &D, dtype: FloatDType) -> crate::Result<Self::Storage> {
-        D::f_from_bytes(bytes, device, dtype)
+    fn from_bytes_dispatch(bytes: &[u8], shape: &Shape, device: &D, dtype: FloatDType) -> crate::Result<Self::Storage> {
+        D::f_from_bytes(bytes, shape, device, dtype)
     }
 
     fn to_bytes_dispatch<'a>(storage: &'a Self::Storage, layout: &Layout) -> crate::Result<Cow<'a, [u8]>> {
@@ -155,8 +155,8 @@ impl<D: Device> BytesDTypeKind<D> for Float {
 }
 
 impl<D: Device> BytesDTypeKind<D> for Int {
-    fn from_bytes_dispatch(bytes: &[u8], device: &D, dtype: IntDType) -> crate::Result<Self::Storage> {
-        D::i_from_bytes(bytes, device, dtype)
+    fn from_bytes_dispatch(bytes: &[u8], shape: &Shape, device: &D, dtype: IntDType) -> crate::Result<Self::Storage> {
+        D::i_from_bytes(bytes, shape, device, dtype)
     }
 
     fn to_bytes_dispatch<'a>(storage: &'a Self::Storage, layout: &Layout) -> crate::Result<Cow<'a, [u8]>> {
@@ -165,8 +165,8 @@ impl<D: Device> BytesDTypeKind<D> for Int {
 }
 
 impl<D: Device> BytesDTypeKind<D> for Bool {
-    fn from_bytes_dispatch(bytes: &[u8], device: &D, _dtype: BoolDType) -> crate::Result<Self::Storage> {
-        D::b_from_bytes(bytes, device, BoolDType::Bool)
+    fn from_bytes_dispatch(bytes: &[u8], shape: &Shape, device: &D, _dtype: BoolDType) -> crate::Result<Self::Storage> {
+        D::b_from_bytes(bytes, shape, device, BoolDType::Bool)
     }
 
     fn to_bytes_dispatch<'a>(storage: &'a Self::Storage, layout: &Layout) -> crate::Result<Cow<'a, [u8]>> {
@@ -185,7 +185,7 @@ impl<D: Device, K: BytesDTypeKind<D>> Tensor<D, K> {
     ) -> crate::Result<Self> {
         let options: TensorCreationOptions<D, K> = options.into();
         let shape = shape.into();
-        let storage = K::from_bytes_dispatch(&bytes.into(), &options.device, options.dtype)?;
+        let storage = K::from_bytes_dispatch(&bytes.into(), &shape, &options.device, options.dtype)?;
         Ok(Self::from_storage(storage, shape, K::Meta::default()))
     }
 

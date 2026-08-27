@@ -6,11 +6,23 @@ use luma_tensor::{Bool, Float, Int, Storage};
 use super::Trace;
 use crate::graph::ValueId;
 
+/// Access to the graph value id behind a traced storage — the kind-erased
+/// view used by [`Traced`](super::Traced).
+pub trait TraceValueId {
+    fn value_id(&self) -> ValueId;
+}
+
 #[derive(Clone)]
 pub struct TraceFloatStorage {
     pub(crate) value: ValueId,
     pub(crate) dtype: FloatDType,
     pub(crate) device: Trace,
+}
+
+impl TraceValueId for TraceFloatStorage {
+    fn value_id(&self) -> ValueId {
+        self.value
+    }
 }
 
 impl Storage<Trace, Float> for TraceFloatStorage {
@@ -29,6 +41,12 @@ pub struct TraceIntStorage {
     pub(crate) device: Trace,
 }
 
+impl TraceValueId for TraceIntStorage {
+    fn value_id(&self) -> ValueId {
+        self.value
+    }
+}
+
 impl Storage<Trace, Int> for TraceIntStorage {
     fn dtype(&self) -> IntDType {
         self.dtype
@@ -43,6 +61,12 @@ pub struct TraceBoolStorage {
     pub(crate) value: ValueId,
     pub(crate) dtype: BoolDType,
     pub(crate) device: Trace,
+}
+
+impl TraceValueId for TraceBoolStorage {
+    fn value_id(&self) -> ValueId {
+        self.value
+    }
 }
 
 impl Storage<Trace, Bool> for TraceBoolStorage {

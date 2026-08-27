@@ -6,6 +6,7 @@ use super::common;
 
 pub fn generate_struct(ast: &syn::DeriveInput) -> TokenStream {
     let luma = utils::get_luma_nn_path();
+    let tensor = utils::get_luma_tensor_path();
     let name = &ast.ident;
 
     // ---- validate device generic -------------------------------------------
@@ -17,7 +18,27 @@ pub fn generate_struct(ast: &syn::DeriveInput) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     let (impl_generics_tokens, device_type) = match validated_device.as_ref() {
         Some(user_device_ident) => (quote! { #impl_generics }, quote! { #user_device_ident }),
-        None => (quote! { <D: luma_tensor::Device> }, quote! { D }),
+        None => (quote! { <D: #tensor::Device> }, quote! { D }),
+    };
+
+    // ---- generics for the `ToDevice<D2>` impl --------------------------------
+    // The struct's own device generic plus the target device `D2`.
+    let (to_device_impl_generics, target_type) = match validated_device.as_ref() {
+        Some(_) => {
+            let mut gens = ast.generics.clone();
+            gens.params.push(syn::parse2(quote! { D2: #tensor::Device }).unwrap());
+            let (impl_gens, _, _) = gens.split_for_impl();
+            let impl_gens = quote::ToTokens::to_token_stream(&impl_gens);
+            (impl_gens, quote! { #name::<D2> })
+        }
+        // No generics on the struct: `D`/`D2` exist only in the impl, and the
+        // target type is the non-generic struct itself.
+        None => {
+            let gens: syn::Generics = syn::parse2(quote! { <D: #tensor::Device, D2: #tensor::Device> }).unwrap();
+            let (impl_gens, _, _) = gens.split_for_impl();
+            let impl_gens = quote::ToTokens::to_token_stream(&impl_gens);
+            (impl_gens, quote! { #name })
+        }
     };
 
     // ---- parse module-level attributes -------------------------------------
@@ -93,10 +114,16 @@ pub fn generate_struct(ast: &syn::DeriveInput) -> TokenStream {
     let mut buffer_mut_body = quote! {};
     let mut module_body = quote! {};
     let mut module_mut_body = quote! {};
+    // Field initializers for the `ToDevice` impl: sub-modules/params/buffers are
+    // recursively transferred, `#[module(skip)]` config fields are cloned
+    // (`PhantomData` is reset to `Default` — its type parameter changes with D).
+    let mut to_device_fields = quote! {};
 
     match &ast.data {
         syn::Data::Struct(struct_data) => {
             for field in struct_data.fields.iter() {
+                let field_name = field.ident.clone().unwrap();
+
                 // check #[module(skip)]
                 let should_skip = field.attrs.iter().any(|attr| {
                     if !attr.path().is_ident("module") {
@@ -113,11 +140,16 @@ pub fn generate_struct(ast: &syn::DeriveInput) -> TokenStream {
                 });
 
                 if should_skip {
+                    if common::is_phantom_data(&field.ty) {
+                        to_device_fields.extend(quote! { #field_name: ::core::default::Default::default(), });
+                    } else {
+                        to_device_fields.extend(quote! { #field_name: ::core::clone::Clone::clone(&self.#field_name), });
+                    }
                     continue;
                 }
 
-                let field_name = field.ident.clone().unwrap();
                 let name_str = field_name.to_string();
+                to_device_fields.extend(quote! { #field_name: #luma::ToDevice::to_device(&self.#field_name, device)?, });
 
                 // -- param --
                 let code = quote! {
@@ -263,6 +295,16 @@ pub fn generate_struct(ast: &syn::DeriveInput) -> TokenStream {
             #extra_display_fn
             #set_train_fn
             #reset_fn
+        }
+
+        impl #to_device_impl_generics #luma::ToDevice<D2> for #name #ty_generics #where_clause {
+            type Output = #target_type;
+
+            fn to_device(&self, device: &D2) -> #luma::NnResult<Self::Output> {
+                Ok(#target_type {
+                    #to_device_fields
+                })
+            }
         }
 
         impl #impl_generics_tokens std::fmt::Display for #name #ty_generics #where_clause {

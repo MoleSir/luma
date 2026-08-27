@@ -14,7 +14,7 @@ pub trait FloatOps<D: super::Device> {
 
     fn f_from_f32<'a>(data: impl Into<Cow<'a, [f32]>>, device: &D) -> Result<D::FloatStorage>;
 
-    fn f_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, device: &D, dtype: FloatDType) -> Result<D::FloatStorage>;
+    fn f_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, shape: &Shape, device: &D, dtype: FloatDType) -> Result<D::FloatStorage>;
     fn f_rand_uniform(shape: &Shape, lo: f64, hi: f64, device: &D, dtype: FloatDType) -> Result<D::FloatStorage>;
     fn f_rand_normal(shape: &Shape, mean: f64, std: f64, device: &D, dtype: FloatDType) -> Result<D::FloatStorage>;
 

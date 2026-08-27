@@ -19,4 +19,13 @@ pub trait Device: 'static + Clone + Send + Sync + Default + FloatOps<Self> + Int
     type BoolStorage: Storage<Self, Bool>;
 
     fn name(&self) -> String;
+
+    /// Whether two handles refer to the same underlying device.
+    ///
+    /// Defaults to `true` — correct for stateless devices like [`Cpu`].
+    /// Devices with distinct instances (e.g. [`Cuda`](crate::Cuda) with
+    /// multiple ordinals) must override this.
+    fn same_device(&self, _other: &Self) -> bool {
+        true
+    }
 }

@@ -121,6 +121,10 @@ impl Device for Cuda {
     fn name(&self) -> String {
         format!("cuda:{}", self.0.ordinal)
     }
+
+    fn same_device(&self, other: &Self) -> bool {
+        self.0.ordinal == other.0.ordinal
+    }
 }
 
 impl Default for Cuda {

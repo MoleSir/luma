@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "luma",
     "luma-tensor",
     "luma-cuda-kernel",
     "luma-nn",
@@ -7,7 +8,7 @@ members = [
     "luma-dataset",
     "luma-macros",
     "luma-io",
-    "luma-ir",
+    "luma-jit",
 ]
 
 [workspace.package]
@@ -26,7 +27,7 @@ luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.0.1" 
 luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.0.1" }
 luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.0.1" }
 luma-io = { path = "./luma-io", package = "luma-io", version = "0.0.1" }
-luma-ir = { path = "./luma-ir", package = "luma-ir", version = "0.0.1" }
+luma-jit = { path = "./luma-jit", package = "luma-jit", version = "0.0.1" }
 
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }

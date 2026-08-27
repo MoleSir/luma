@@ -7,6 +7,10 @@ description = { workspace = true }
 keywords = { workspace = true }
 license = { workspace = true }
 
+[features]
+# Forwards to luma-tensor so nn tests (and users) can transfer modules to Cuda.
+cuda = ["luma-tensor/cuda"]
+
 [dependencies]
 luma-tensor = { workspace = true }
 luma-macros = { workspace = true }

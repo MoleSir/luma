@@ -20,8 +20,6 @@ pub trait Storage<D: Device, K: DTypeKind<D>>: Send + Sync + 'static {
     fn device(&self) -> &D;
 }
 
-pub trait DTypeT: Send + Sync + Clone + Copy + 'static + PartialEq + Eq + Debug + Default {}
-
 /// Runtime element type. The tensor *kind* (`Float`/`Int`/`Bool`) is a compile-time
 /// generic; the concrete precision inside a kind is this enum, decided at runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -176,7 +174,3 @@ impl Into<DType> for BoolDType {
         }
     }
 }
-
-// impl DTypeT for FloatDType {}
-// impl DTypeT for IntDType {}
-// impl DTypeT for BoolDType {}

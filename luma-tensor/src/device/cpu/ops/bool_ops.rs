@@ -25,7 +25,12 @@ impl BoolOps<Cpu> for Cpu {
         })
     }
 
-    fn b_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _device: &Cpu, _dtype: BoolDType) -> Result<<Cpu as Device>::BoolStorage> {
+    fn b_from_bytes<'a>(
+        bytes: impl Into<Cow<'a, [u8]>>,
+        _shape: &Shape,
+        _device: &Cpu,
+        _dtype: BoolDType,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
         let bytes = bytes.into();
         Ok(CpuBoolStorage(bytes.iter().map(|&x| x != 0).collect()))
     }

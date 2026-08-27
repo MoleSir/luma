@@ -1,0 +1,18 @@
+[package]
+name = "luma-jit"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "Trace, compile, and execute luma modules as portable graphs (TorchScript/ONNX-style graph capture)"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[features]
+default = []
+# Forwards to luma-tensor/luma-nn so integration tests (and users) can trace and
+# execute graphs on a Cuda device.
+cuda = ["luma-tensor/cuda", "luma-nn/cuda"]
+
+[dependencies]
+luma-tensor = { workspace = true }
+luma-nn = { workspace = true }

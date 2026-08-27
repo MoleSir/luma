@@ -6,6 +6,7 @@ use super::common;
 
 pub fn generate_enum(ast: &syn::DeriveInput) -> TokenStream {
     let luma = utils::get_luma_nn_path();
+    let tensor = utils::get_luma_tensor_path();
     let name = &ast.ident;
 
     // ---- validate device generic -------------------------------------------
@@ -17,7 +18,27 @@ pub fn generate_enum(ast: &syn::DeriveInput) -> TokenStream {
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
     let (impl_generics_tokens, device_type) = match validated_device.as_ref() {
         Some(user_device_ident) => (quote! { #impl_generics }, quote! { #user_device_ident }),
-        None => (quote! { <D: luma_tensor::Device> }, quote! { D }),
+        None => (quote! { <D: #tensor::Device> }, quote! { D }),
+    };
+
+    // ---- generics for the `ToDevice<D2>` impl --------------------------------
+    // The enum's own device generic plus the target device `D2`.
+    let (to_device_impl_generics, target_type) = match validated_device.as_ref() {
+        Some(_) => {
+            let mut gens = ast.generics.clone();
+            gens.params.push(syn::parse2(quote! { D2: #tensor::Device }).unwrap());
+            let (impl_gens, _, _) = gens.split_for_impl();
+            let impl_gens = quote::ToTokens::to_token_stream(&impl_gens);
+            (impl_gens, quote! { #name::<D2> })
+        }
+        // No generics on the enum: `D`/`D2` exist only in the impl, and the
+        // target type is the non-generic enum itself.
+        None => {
+            let gens: syn::Generics = syn::parse2(quote! { <D: #tensor::Device, D2: #tensor::Device> }).unwrap();
+            let (impl_gens, _, _) = gens.split_for_impl();
+            let impl_gens = quote::ToTokens::to_token_stream(&impl_gens);
+            (impl_gens, quote! { #name })
+        }
     };
 
     // ---- parse module-level attributes -------------------------------------
@@ -83,6 +104,8 @@ pub fn generate_enum(ast: &syn::DeriveInput) -> TokenStream {
     let mut buffer_mut_arms = quote! {};
     let mut module_arms = quote! {};
     let mut module_mut_arms = quote! {};
+    // Match arms for the `ToDevice` impl (see sstruct.rs for the field rules).
+    let mut to_device_arms = quote! {};
 
     if let syn::Data::Enum(enum_data) = &ast.data {
         for variant in enum_data.variants.iter() {
@@ -114,6 +137,21 @@ pub fn generate_enum(ast: &syn::DeriveInput) -> TokenStream {
                 state_mut_arms.extend(empty_arm.clone());
                 module_arms.extend(empty_arm.clone());
                 module_mut_arms.extend(empty_arm.clone());
+                // Skipped variant: the payload is config, not a module — clone
+                // it (or reset a `PhantomData` payload, whose type parameter
+                // changes with the device).
+                let payload_ty = variant.fields.iter().next().map(|f| &f.ty);
+                if payload_ty.map(common::is_phantom_data).unwrap_or(false) {
+                    to_device_arms.extend(quote! {
+                        Self::#variant_ident(inner) =>
+                            Ok(#target_type::#variant_ident(::core::default::Default::default())),
+                    });
+                } else {
+                    to_device_arms.extend(quote! {
+                        Self::#variant_ident(inner) =>
+                            Ok(#target_type::#variant_ident(::core::clone::Clone::clone(inner))),
+                    });
+                }
                 continue;
             }
 
@@ -193,6 +231,11 @@ pub fn generate_enum(ast: &syn::DeriveInput) -> TokenStream {
                     visitor.exit_submodule(#variant_name_str, inner)?;
                 }
             });
+
+            to_device_arms.extend(quote! {
+                Self::#variant_ident(inner) =>
+                    Ok(#target_type::#variant_ident(#luma::ToDevice::to_device(inner, device)?)),
+            });
         }
     }
 
@@ -271,6 +314,14 @@ pub fn generate_enum(ast: &syn::DeriveInput) -> TokenStream {
             #extra_display_fn
             #set_train_fn
             #reset_fn
+        }
+
+        impl #to_device_impl_generics #luma::ToDevice<D2> for #name #ty_generics #where_clause {
+            type Output = #target_type;
+
+            fn to_device(&self, device: &D2) -> #luma::NnResult<Self::Output> {
+                match self { #to_device_arms }
+            }
         }
 
         impl #impl_generics_tokens std::fmt::Display for #name #ty_generics #where_clause {

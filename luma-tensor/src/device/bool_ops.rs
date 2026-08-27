@@ -11,7 +11,7 @@ pub trait BoolOps<D: super::Device> {
     fn b_trues(shape: &Shape, device: &D, dtype: BoolDType) -> Result<D::BoolStorage>;
     fn b_from_bool<'a>(data: impl Into<Cow<'a, [bool]>>, device: &D) -> Result<D::BoolStorage>;
 
-    fn b_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, device: &D, dtype: BoolDType) -> Result<D::BoolStorage>;
+    fn b_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, shape: &Shape, device: &D, dtype: BoolDType) -> Result<D::BoolStorage>;
 
     // materialization / read-back
     fn b_contiguous(x: &D::BoolStorage, layout: &Layout) -> Result<D::BoolStorage>;
