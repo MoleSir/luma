@@ -15,10 +15,10 @@ pub fn get_luma_nn_path() -> proc_macro2::TokenStream {
             let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
             quote! { #ident }
         }
-        Err(_) => match crate_name("luma") {
-            Ok(FoundCrate::Name(name)) => {
-                let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
-                quote! { #ident::nn }
+        Err(_) => match crate_name("luma-kit") {
+            Ok(FoundCrate::Name(_name)) => {
+                // let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
+                quote! { luma::nn }
             }
             _ => {
                 quote! { luma_nn }
@@ -42,10 +42,10 @@ pub fn get_luma_tensor_path() -> proc_macro2::TokenStream {
             let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
             quote! { #ident }
         }
-        Err(_) => match crate_name("luma") {
-            Ok(FoundCrate::Name(name)) => {
-                let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
-                quote! { #ident }
+        Err(_) => match crate_name("luma-kit") {
+            Ok(FoundCrate::Name(_name)) => {
+                // let ident = syn::Ident::new(&name, proc_macro2::Span::call_site());
+                quote! { luma }
             }
             _ => {
                 quote! { luma_tensor }

@@ -4,5 +4,5 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-luma = { path = "../../luma", features = ["nn"] }
+luma-kit = { path = "../../luma", features = ["nn"] }
 anyhow = "1.0"

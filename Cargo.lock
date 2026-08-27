@@ -895,18 +895,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
-name = "luma"
-version = "0.1.0"
-dependencies = [
- "luma-dataset",
- "luma-io",
- "luma-jit",
- "luma-nn",
- "luma-optim",
- "luma-tensor",
-]
-
-[[package]]
 name = "luma-cuda-kernel"
 version = "0.1.0"
 dependencies = [
@@ -944,6 +932,18 @@ name = "luma-jit"
 version = "0.1.0"
 dependencies = [
  "luma-nn",
+ "luma-tensor",
+]
+
+[[package]]
+name = "luma-kit"
+version = "0.1.0"
+dependencies = [
+ "luma-dataset",
+ "luma-io",
+ "luma-jit",
+ "luma-nn",
+ "luma-optim",
  "luma-tensor",
 ]
 
