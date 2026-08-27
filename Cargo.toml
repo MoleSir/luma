@@ -12,7 +12,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 repository = "https://github.com/MoleSir/luma.git"
 description = "A tiny ML framework"
@@ -20,14 +20,14 @@ keywords = ["machine-learning", "auto-grad"]
 license = "MIT"
 
 [workspace.dependencies]
-luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.0.1" }
-luma-cuda-kernel = { path = "./luma-cuda-kernel", package = "luma-cuda-kernel", version = "0.0.1" }
-luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.0.1" }
-luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.0.1" }
-luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.0.1" }
-luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.0.1" }
-luma-io = { path = "./luma-io", package = "luma-io", version = "0.0.1" }
-luma-jit = { path = "./luma-jit", package = "luma-jit", version = "0.0.1" }
+luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.1.0" }
+luma-cuda-kernel = { path = "./luma-cuda-kernel", package = "luma-cuda-kernel", version = "0.1.0" }
+luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.1.0" }
+luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.1.0" }
+luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.1.0" }
+luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.1.0" }
+luma-io = { path = "./luma-io", package = "luma-io", version = "0.1.0" }
+luma-jit = { path = "./luma-jit", package = "luma-jit", version = "0.1.0" }
 
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }

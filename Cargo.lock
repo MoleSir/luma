@@ -896,7 +896,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "luma"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "luma-dataset",
  "luma-io",
@@ -908,14 +908,14 @@ dependencies = [
 
 [[package]]
 name = "luma-cuda-kernel"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "bindgen_cuda",
 ]
 
 [[package]]
 name = "luma-dataset"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "dirs",
  "flate2",
@@ -930,7 +930,7 @@ dependencies = [
 
 [[package]]
 name = "luma-io"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "luma-tensor",
  "memmap2",
@@ -941,7 +941,7 @@ dependencies = [
 
 [[package]]
 name = "luma-jit"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "luma-nn",
  "luma-tensor",
@@ -949,7 +949,7 @@ dependencies = [
 
 [[package]]
 name = "luma-macros"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -959,7 +959,7 @@ dependencies = [
 
 [[package]]
 name = "luma-nn"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "luma-io",
  "luma-macros",
@@ -970,7 +970,7 @@ dependencies = [
 
 [[package]]
 name = "luma-optim"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "luma-io",
  "luma-tensor",
@@ -980,7 +980,7 @@ dependencies = [
 
 [[package]]
 name = "luma-tensor"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "bytemuck",
  "cudarc",
