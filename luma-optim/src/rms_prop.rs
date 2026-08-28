@@ -83,7 +83,7 @@ impl<D: Device> Optimizer for RMSProp<D> {
 
                 // 3. update param
                 let denom = square_avg.sqrt()?.add_scalar(eps)?;
-                param.sub_(&g.div(&denom)?.mul_scalar(lr)?)?
+                param.sub_(&g.div(&denom)?.mul_scalar(lr)?)?;
             }
         }
 

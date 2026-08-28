@@ -9,6 +9,7 @@ members = [
     "luma-macros",
     "luma-io",
     "luma-jit",
+    "luma-ml",
 ]
 
 [workspace.package]
@@ -28,6 +29,7 @@ luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0
 luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.1.0" }
 luma-io = { path = "./luma-io", package = "luma-io", version = "0.1.0" }
 luma-jit = { path = "./luma-jit", package = "luma-jit", version = "0.1.0" }
+luma-ml = { path = "./luma-ml", package = "luma-ml", version = "0.1.0" }
 
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
@@ -50,3 +52,4 @@ reqwest = "0.12"
 indicatif = "0.18"
 flate2 = "1.1"
 memmap2 = "0.9.9"
+derive_builder = "0.20"

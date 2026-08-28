@@ -1,19 +1,17 @@
 [package]
-name = "luma-nn"
+name = "luma-ml"
 version = { workspace = true }
 edition = { workspace = true }
 repository = { workspace = true }
-description = "neural network"
+description = "machine learning"
 keywords = { workspace = true }
 license = { workspace = true }
 
 [features]
-# Forwards to luma-tensor so nn tests (and users) can transfer modules to Cuda.
 cuda = ["luma-tensor/cuda"]
 
 [dependencies]
 luma-tensor = { workspace = true }
-luma-macros = { workspace = true }
-luma-io = { workspace = true }
 thiserror = { workspace = true }
 thiserrorctx = { workspace = true }
+derive_builder = { workspace = true }

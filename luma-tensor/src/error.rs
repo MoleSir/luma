@@ -63,6 +63,9 @@ pub enum Error {
     #[error("device mismatch in {op}, lhs: {lhs:?}, rhs: {rhs:?}")]
     DeviceMismatchBinaryOp { lhs: String, rhs: String, op: &'static str },
 
+    #[error("device mismatch, {lhs:?} and {rhs:?}")]
+    DeviceMismatch { lhs: String, rhs: String },
+
     #[error("shape mismatch in cat for dim {dim}, shape for arg1: {first_shape:?} shape for arg {n}: {nth_shape:?}")]
     ShapeMismatchCat { dim: usize, first_shape: Shape, n: usize, nth_shape: Shape },
 

@@ -172,6 +172,12 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     }
 }
 
+impl<D: Device, K1: DTypeKind<D>> Tensor<D, K1> {
+    pub fn same_device<K2: DTypeKind<D>>(&self, other: &Tensor<D, K2>) -> bool {
+        self.device().same_device(other.device())
+    }
+}
+
 impl<D: Device, K: DTypeKind<D>> Clone for Tensor<D, K> {
     fn clone(&self) -> Self {
         Self(self.0.clone())
