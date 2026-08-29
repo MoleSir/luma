@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use luma_tensor::{ops::{IndexingDTypeKind, ShapeDTypeKind}, Bool, DTypeKind, Device, IndexOp, Tensor};
+use luma_tensor::{ops::BaseOpsDTypeKind, Bool, Device, IndexOp, Tensor};
 
 /// X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
 pub fn train_test_split<Dev, K1, K2>(
@@ -7,8 +7,8 @@ pub fn train_test_split<Dev, K1, K2>(
 ) -> luma_tensor::Result<(Tensor<Dev, K1>, Tensor<Dev, K1>, Tensor<Dev, K2>, Tensor<Dev, K2>)> 
 where
     Dev: Device,
-    K1: DTypeKind<Dev> + IndexingDTypeKind<Dev> + ShapeDTypeKind<Dev>,
-    K2: DTypeKind<Dev> + IndexingDTypeKind<Dev> + ShapeDTypeKind<Dev>,
+    K1: BaseOpsDTypeKind<Dev>,
+    K2: BaseOpsDTypeKind<Dev>,
 {
     if test_ratio < 0.0 || test_ratio >= 1.0 {
         luma_tensor::bail!("invalid test_ratio {test_ratio}");

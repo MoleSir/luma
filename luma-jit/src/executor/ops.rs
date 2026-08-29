@@ -1,6 +1,6 @@
 //! Typed op helpers: forward a `Step` against concrete tensors.
 
-use luma_tensor::ops::{NumericDTypeKind, ShapeDTypeKind};
+use luma_tensor::ops::{BaseOpsDTypeKind, NumOpsDTypeKind};
 use luma_tensor::{BinaryOp, Bool, CmpOp, Device, Float, FloatUnaryOp, Int, ReduceOp, Result, Tensor, UnaryOp};
 
 use super::step::ViewStep;
@@ -11,7 +11,7 @@ use super::step::ViewStep;
 
 pub(crate) fn binary_result<D: Device, K>(x: &Tensor<D, K>, y: &Tensor<D, K>, op: BinaryOp) -> Result<Tensor<D, K>>
 where
-    K: NumericDTypeKind<D> + ShapeDTypeKind<D>,
+    K: NumOpsDTypeKind<D>
 {
     match op {
         BinaryOp::Add => x.add(y),
@@ -25,7 +25,7 @@ where
 
 pub(crate) fn cmp_result<D: Device, K>(x: &Tensor<D, K>, y: &Tensor<D, K>, op: CmpOp) -> Result<Tensor<D, Bool>>
 where
-    K: NumericDTypeKind<D> + ShapeDTypeKind<D>,
+    K: NumOpsDTypeKind<D>
 {
     match op {
         CmpOp::Eq => x.eq(y),
@@ -39,7 +39,7 @@ where
 
 pub(crate) fn unary_result<D: Device, K>(x: &Tensor<D, K>, op: UnaryOp<K::Scalar>) -> Result<Tensor<D, K>>
 where
-    K: NumericDTypeKind<D> + ShapeDTypeKind<D>,
+    K: NumOpsDTypeKind<D>
 {
     match op {
         UnaryOp::Neg => x.neg(),
@@ -120,7 +120,7 @@ pub(crate) fn i_reduce<D: Device>(x: &Tensor<D, Int>, op: ReduceOp, dims: &[usiz
     Ok(t)
 }
 
-pub(crate) fn apply_view<D: Device, K: ShapeDTypeKind<D>>(t: &Tensor<D, K>, v: &ViewStep) -> Result<Tensor<D, K>> {
+pub(crate) fn apply_view<D: Device, K: BaseOpsDTypeKind<D>>(t: &Tensor<D, K>, v: &ViewStep) -> Result<Tensor<D, K>> {
     match v {
         ViewStep::Reshape(s) => t.reshape(s.clone()),
         ViewStep::Transpose(a, b) => t.transpose(*a, *b),

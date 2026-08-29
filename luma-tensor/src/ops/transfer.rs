@@ -60,7 +60,7 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     ///   unchanged, result contiguous. For `Float` tensors the autograd graph
     ///   is severed (the result is a leaf) but `requires_grad` is preserved.
     /// - Meta tensors (no storage) error with [`Error::MetaTensor`](crate::Error::MetaTensor).
-    pub fn to_device<D2: Device>(&self, device: &D2) -> crate::Result<Tensor<D2, K>>
+    pub fn transfer<D2: Device>(&self, device: &D2) -> crate::Result<Tensor<D2, K>>
     where
         K: TransferDTypeKind<D, D2>,
     {
@@ -85,7 +85,7 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     where
         K: TransferDTypeKind<D, Cpu>,
     {
-        self.to_device(&Cpu)
+        self.transfer(&Cpu)
     }
 
     /// Convenience for `to_device(&Cuda::new(ordinal))`.
