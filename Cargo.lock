@@ -1035,6 +1035,8 @@ version = "0.1.0"
 dependencies = [
  "derive_builder",
  "luma-tensor",
+ "rand",
+ "rand_distr",
  "thiserror 2.0.19",
  "thiserrorctx",
 ]

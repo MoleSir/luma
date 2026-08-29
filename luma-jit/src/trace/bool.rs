@@ -38,6 +38,21 @@ impl BoolOps<Trace> for Trace {
         let id = x.device.emit(NodeOp::Cast(to.into()), vec![x.value], to.into(), layout.shape().clone())?;
         Ok(TraceBoolStorage { value: id, dtype: to, device: x.device.clone() })
     }
+
+    fn b_index_select(x: &TraceBoolStorage, x_l: &Layout, idx: &TraceIntStorage, idx_l: &Layout, dim: usize) -> Result<(TraceBoolStorage, Shape)> {
+        let mut dims = x_l.shape().dims().to_vec();
+        dims[dim] = idx_l.element_count();
+        let out_shape = Shape::from(dims);
+        let id = x.device.emit(NodeOp::IndexSelect(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
+        Ok((TraceBoolStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+    }
+
+    fn b_gather(x: &TraceBoolStorage, _x_l: &Layout, idx: &TraceIntStorage, idx_l: &Layout, dim: usize) -> Result<(TraceBoolStorage, Shape)> {
+        let out_shape = idx_l.shape().clone();
+        let id = x.device.emit(NodeOp::Gather(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
+        Ok((TraceBoolStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+    }
+
     fn b_to_vec(_x: &TraceBoolStorage, _layout: &Layout) -> Result<Vec<bool>> {
         readback_unsupported("to_vec")
     }

@@ -4,13 +4,13 @@
 //! Indices arrive as `&[usize]` (the caller reads the int storage into usize;
 //! `usize::MAX` is the padding sentinel matching luma-core's `I::max_value()`).
 
-use super::element::CpuNum;
+use super::element::{CpuDType, CpuNum};
 use crate::{Error, Layout, Result};
 
 pub const PAD: usize = usize::MAX;
 
 /// `dst[.., i, ..] = src[.., ids[i], ..]` along `dim`.
-pub fn index_select<T: CpuNum>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Layout, dim: usize) -> Result<(Vec<T>, Vec<usize>)> {
+pub fn index_select<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Layout, dim: usize) -> Result<(Vec<T>, Vec<usize>)> {
     if !src_l.is_contiguous() {
         return Err(Error::RequiresContiguous { op: "index-select" });
     }
@@ -48,7 +48,7 @@ pub fn index_select<T: CpuNum>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: 
 }
 
 /// `dst[i,j,k] = src[i, ids[i,j,k], k]` along `dim`.
-pub fn gather<T: CpuNum>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Layout, dim: usize) -> Result<(Vec<T>, Vec<usize>)> {
+pub fn gather<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Layout, dim: usize) -> Result<(Vec<T>, Vec<usize>)> {
     if !src_l.is_contiguous() || !ids_l.is_contiguous() {
         return Err(Error::RequiresContiguous { op: "gather" });
     }

@@ -19,6 +19,9 @@ pub trait BoolOps<D: super::Device> {
     fn b_cast_int(x: &D::BoolStorage, layout: &Layout, to: IntDType) -> Result<D::IntStorage>;
     fn b_cast_bool(x: &D::BoolStorage, layout: &Layout, to: BoolDType) -> Result<D::BoolStorage>;
 
+    fn b_index_select(x: &D::BoolStorage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> Result<(D::BoolStorage, Shape)>;
+    fn b_gather(x: &D::BoolStorage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> Result<(D::BoolStorage, Shape)>;
+
     /// Read all elements into a `Vec<bool>` in logical (layout) order.
     fn b_to_vec(x: &D::BoolStorage, layout: &Layout) -> Result<Vec<bool>>;
 

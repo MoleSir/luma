@@ -15,3 +15,5 @@ luma-tensor = { workspace = true }
 thiserror = { workspace = true }
 thiserrorctx = { workspace = true }
 derive_builder = { workspace = true }
+rand = { workspace = true }
+rand_distr = { workspace = true }

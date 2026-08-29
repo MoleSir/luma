@@ -7,12 +7,19 @@
 use std::iter::{Product, Sum};
 
 /// Numeric element shared by float and int kinds.
-pub trait CpuNum:
+pub trait CpuDType:
     Copy
     + PartialOrd
     + Send
     + Sync
     + 'static
+{
+    const ZERO: Self;
+    const ONE: Self;
+}
+
+pub trait CpuNum:
+    CpuDType
     + std::ops::Add<Output = Self>
     + std::ops::Sub<Output = Self>
     + std::ops::Mul<Output = Self>
@@ -20,9 +27,6 @@ pub trait CpuNum:
     + Sum
     + Product
 {
-    const ZERO: Self;
-    const ONE: Self;
-
     fn from_f64(v: f64) -> Self;
     fn to_f64(self) -> f64;
     fn from_usize(v: usize) -> Self;
@@ -94,9 +98,12 @@ pub trait CpuInt: CpuNum + Ord + Eq {
 // ---- f32 / f64 ----
 macro_rules! impl_cpu_float {
     ($t:ty, $erf:path) => {
-        impl CpuNum for $t {
+        impl CpuDType for $t {
             const ZERO: Self = 0.0;
             const ONE: Self = 1.0;
+        }
+
+        impl CpuNum for $t {
             fn from_f64(v: f64) -> Self {
                 v as $t
             }
@@ -163,9 +170,12 @@ impl_cpu_float!(f64, libm::erf);
 // ---- i32 / u32 / u8 ----
 macro_rules! impl_cpu_int {
     ($t:ty) => {
-        impl CpuNum for $t {
+        impl CpuDType for $t {
             const ZERO: Self = 0;
             const ONE: Self = 1;
+        }
+
+        impl CpuNum for $t {
             fn from_f64(v: f64) -> Self {
                 v as $t
             }
@@ -204,3 +214,8 @@ macro_rules! impl_cpu_int {
 impl_cpu_int!(i32);
 impl_cpu_int!(u32);
 impl_cpu_int!(u8);
+
+impl CpuDType for bool {
+    const ZERO: Self = false;
+    const ONE: Self = true;
+}

@@ -78,6 +78,45 @@ impl BoolOps<Cuda> for Cuda {
         Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
     }
 
+    fn b_index_select(x: &CudaBoolStorage, x_l: &Layout, idx: &CudaIntStorage, idx_l: &Layout, dim: usize) -> Result<(CudaBoolStorage, Shape)> {
+        if !x_l.is_contiguous() || !idx_l.is_contiguous() {
+            return Err(crate::Error::RequiresContiguous { op: "index_select" });
+        }
+        x.device.same_ordinal(&idx.device, "index_select")?;
+        let mut out_dims = x_l.dims().to_vec();
+        out_dims[dim] = idx_l.dims()[0];
+        let out_shape = Shape::from(out_dims);
+
+        match &idx.slice {
+            CudaIntSlice::I32(ids) => {
+                let out = launch::launch_index_select(&x.device, "i32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
+                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+            }
+            CudaIntSlice::U32(ids) => {
+                let out = launch::launch_index_select(&x.device, "u32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
+                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+            }
+        }
+    }
+
+    fn b_gather(x: &CudaBoolStorage, x_l: &Layout, idx: &CudaIntStorage, idx_l: &Layout, dim: usize) -> Result<(CudaBoolStorage, Shape)> {
+        if !x_l.is_contiguous() || !idx_l.is_contiguous() {
+            return Err(crate::Error::RequiresContiguous { op: "gather" });
+        }
+        x.device.same_ordinal(&idx.device, "gather")?;
+        let out_shape = Shape::from(idx_l.dims().to_vec());
+        match &idx.slice {
+            CudaIntSlice::I32(ids) => {
+                let out = launch::launch_gather(&x.device, "i32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
+                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+            }
+            CudaIntSlice::U32(ids) => {
+                let out = launch::launch_gather(&x.device, "u32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
+                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+            }
+        }
+    }
+
     fn b_to_vec(x: &CudaBoolStorage, layout: &Layout) -> Result<Vec<bool>> {
         let raw = x.device.memcpy_dtov(&x.slice)?;
         Ok(layout.storage_indices().map(|i| raw[i] != 0).collect())

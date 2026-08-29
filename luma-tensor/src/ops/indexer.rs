@@ -16,7 +16,9 @@ pub trait IndexingDTypeKind<D: Device>: DTypeKind<D> + Sized {
         idx_l: &Layout,
         dim: usize,
     ) -> crate::Result<(Self::Storage, Shape)>;
+}
 
+pub trait IndexingAddDTypeKind<D: Device>: IndexingDTypeKind<D> + Sized {
     fn index_add_dispatch(
         init: &Self::Storage,
         init_l: &Layout,
@@ -58,7 +60,9 @@ impl<D: Device> IndexingDTypeKind<D> for Float {
     ) -> crate::Result<(Self::Storage, Shape)> {
         D::f_gather(x, x_l, idx, idx_l, dim)
     }
+}
 
+impl<D: Device> IndexingAddDTypeKind<D> for Float {
     fn index_add_dispatch(
         init: &Self::Storage,
         init_l: &Layout,
@@ -104,7 +108,9 @@ impl<D: Device> IndexingDTypeKind<D> for Int {
     ) -> crate::Result<(Self::Storage, Shape)> {
         D::i_gather(x, x_l, idx, idx_l, dim)
     }
+}
 
+impl<D: Device> IndexingAddDTypeKind<D> for Int {
     fn index_add_dispatch(
         init: &Self::Storage,
         init_l: &Layout,
@@ -130,6 +136,28 @@ impl<D: Device> IndexingDTypeKind<D> for Int {
     }
 }
 
+impl<D: Device> IndexingDTypeKind<D> for Bool {
+    fn index_select_dispatch(
+        x: &Self::Storage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+    ) -> crate::Result<(Self::Storage, Shape)> {
+        D::b_index_select(x, x_l, idx, idx_l, dim)
+    }
+
+    fn gather_dispatch(
+        x: &Self::Storage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+    ) -> crate::Result<(Self::Storage, Shape)> {
+        D::b_gather(x, x_l, idx, idx_l, dim)
+    }
+}
+
 impl<D: Device, K: IndexingDTypeKind<D>> Tensor<D, K> {
     /// Select slices along `dim` at the given 1-D `indices`.
     pub fn index_select<Dm: Dim>(&self, indices: &Tensor<D, Int>, dim: Dm) -> crate::Result<Self> {
@@ -149,7 +177,9 @@ impl<D: Device, K: IndexingDTypeKind<D>> Tensor<D, K> {
         assert_eq!(self.dtype(), storage.dtype());
         Ok(Self::from_storage(storage, shape, meta))
     }
+}
 
+impl<D: Device, K: IndexingAddDTypeKind<D>> Tensor<D, K> {
     /// `out = self; out[.., idx[i], ..] += src[.., i, ..]`.
     pub fn index_add<Dm: Dim>(&self, indices: &Tensor<D, Int>, src: &Tensor<D, K>, dim: Dm) -> crate::Result<Self> {
         let dim = dim.to_index(self.shape(), "index_add")?;

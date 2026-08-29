@@ -5,6 +5,8 @@ use std::borrow::Cow;
 
 use super::kernels::{elementwise as ew, reduce, shape as shape_k};
 use super::{Cpu, CpuBoolStorage, CpuFloatStorage, CpuIntStorage};
+use crate::device::cpu::int_ids_as_usize;
+use crate::device::cpu::kernels::indexing;
 use crate::dtype::{BoolDType, FloatDType, IntDType};
 use crate::{BoolOps, Device, Error, Layout, Result, Shape};
 
@@ -58,6 +60,18 @@ impl BoolOps<Cpu> for Cpu {
 
     fn b_cast_bool(x: &CpuBoolStorage, layout: &Layout, _to: BoolDType) -> Result<CpuBoolStorage> {
         Ok(CpuBoolStorage(layout.storage_indices().map(|i| x.0[i]).collect()))
+    }
+
+    fn b_index_select(x: &CpuBoolStorage, x_l: &Layout, idx: &CpuIntStorage, idx_l: &Layout, dim: usize) -> Result<(CpuBoolStorage, Shape)> {
+        let ids = int_ids_as_usize(idx, idx_l);
+        let (v, dims) = indexing::index_select(&x.0, x_l, &ids, idx_l, dim)?;
+        Ok((CpuBoolStorage(v), Shape::from(dims)))
+    }
+
+    fn b_gather(x: &CpuBoolStorage, x_l: &Layout, idx: &CpuIntStorage, idx_l: &Layout, dim: usize) -> Result<(CpuBoolStorage, Shape)> {
+        let ids = int_ids_as_usize(idx, idx_l);
+        let (v, dims) = indexing::gather(&x.0, x_l, &ids, idx_l, dim)?;
+        Ok((CpuBoolStorage(v), Shape::from(dims)))
     }
 
     fn b_to_vec(x: &<Cpu as Device>::BoolStorage, layout: &Layout) -> Result<Vec<bool>> {

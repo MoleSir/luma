@@ -2,25 +2,27 @@ use luma_tensor::{no_grad, Device, Tensor};
 
 use crate::{core::{PredictFit, PredictModel}, error::MlResult, utils, PredictFitWithWeight};
 
-pub enum LinearRegression {
-    GradientDescent { n_iter: usize, learning_rate: f64, },
-    NormalEquations,
+pub struct RidgeRegression {
+    pub n_iter: usize, 
+    pub learning_rate: f64,
+    pub alpha: f64,
 }
 
-pub struct LinearRegressionModel<Dev: Device> {
+pub struct RidgeRegressionModel<Dev: Device> {
     pub weights: Tensor<Dev>,
     pub bias: f64,
+    pub alpha: f64,
 }
 
-impl Default for LinearRegression {
+impl Default for RidgeRegression {
     fn default() -> Self {
-        LinearRegression::GradientDescent { n_iter: 1000, learning_rate: 0.01 }
+        RidgeRegression { n_iter: 1000, learning_rate: 0.01, alpha: 0.1 }
     }
 }
 
-impl<Dev: Device> PredictFit<Tensor<Dev>> for LinearRegression {
+impl<Dev: Device> PredictFit<Tensor<Dev>> for RidgeRegression {
     type Output = Tensor<Dev>;
-    type Model = LinearRegressionModel<Dev>;
+    type Model = RidgeRegressionModel<Dev>;
 
     /// fit a linear regression model
     /// $$
@@ -34,25 +36,19 @@ impl<Dev: Device> PredictFit<Tensor<Dev>> for LinearRegression {
     /// ## Return
     /// - linear gression model
     fn fit(&self, x: &Tensor<Dev>, y: &Tensor<Dev>) -> MlResult<Self::Model> {
-        match self {
-            Self::GradientDescent { n_iter, learning_rate } => Self::fit_gd(x, y, None, *n_iter, *learning_rate),
-            Self::NormalEquations => Self::fit_ne(x, y),
-        }
+        self.fit_with(x, y, None)
     }
 }
 
-impl<Dev: Device> PredictFitWithWeight<Tensor<Dev>> for LinearRegression {
+impl<Dev: Device> PredictFitWithWeight<Tensor<Dev>> for RidgeRegression {
     type Weight = Tensor<Dev>;
 
     fn fit_with_weight(&self, x: &Tensor<Dev>, y: &Self::Output, weight: &Self::Weight) -> MlResult<Self::Model> {
-        match self {
-            Self::GradientDescent { n_iter, learning_rate } => Self::fit_gd(x, y, Some(weight), *n_iter, *learning_rate),
-            Self::NormalEquations => Self::fit_ne(x, y),
-        }
+        self.fit_with(x, y, Some(weight))
     }
 }
 
-impl<Dev: Device> PredictModel for LinearRegressionModel<Dev> {
+impl<Dev: Device> PredictModel for RidgeRegressionModel<Dev> {
     type Input = Tensor<Dev>;
     type Output = Tensor<Dev>;
 
@@ -69,16 +65,11 @@ impl<Dev: Device> PredictModel for LinearRegressionModel<Dev> {
     }
 }
 
-impl LinearRegression {
-    #[allow(unused)]
-    fn fit_ne<Dev: Device>(x: &Tensor<Dev>, y: &Tensor<Dev>) -> MlResult<LinearRegressionModel<Dev>> {
-        unimplemented!("fit with Normal Equations")
-    }
-
+impl RidgeRegression {
     /// - `x`: (n_samples, n_features)
     /// - `y`: (n_samples),
     /// - `sample_weight`: Option<(n_samples)>,    
-    fn fit_gd<Dev: Device>(x: &Tensor<Dev>, y: &Tensor<Dev>, sample_weight: Option<&Tensor<Dev>>, n_iter: usize, learning_rate: f64) -> MlResult<LinearRegressionModel<Dev>> {
+    fn fit_with<Dev: Device>(&self, x: &Tensor<Dev>, y: &Tensor<Dev>, sample_weight: Option<&Tensor<Dev>>) -> MlResult<RidgeRegressionModel<Dev>> {
         let device = x.device();
         let dtype = x.dtype();
 
@@ -97,7 +88,16 @@ impl LinearRegression {
         };
         let weight_sum = sample_weight.sum_all()?.to_scalar()?;
 
-        for _ in 0..n_iter {
+        /*
+            y_pred = w0 * x0 + w1 * x1 + ... + b
+            loss = (y_pred - y)^2 + \alpha \sum |w|
+
+            dloss/dy_pred = 2 * (y_pred - y) + \alpha \sum |w|
+
+            dloss/dwi =  2 * (y_pred - y) * xi + \alpha * w.sign()
+            dloss/db = 2 * (y_pred - y)
+        */
+        for _ in 0..self.n_iter {
             // (n_samples, n_features) @ (n_features, 1) => (n_samples, 1)
             let y_pred = x.matmul(&weights)?.add_(bias)?;
 
@@ -108,13 +108,16 @@ impl LinearRegression {
             let w_grad = x_t.matmul(&dloss)?.div_(weight_sum)?;
             let b_grad = dloss.sum_all()?.div_(weight_sum)?.to_scalar()?;
 
-            w_grad.mul_(learning_rate)?;
-            let b_grad = learning_rate * b_grad;
+            let l2_grad = &weights * (2.0 * self.alpha); 
+            w_grad.add_(l2_grad)?;
+
+            w_grad.mul_(self.learning_rate)?;
+            let b_grad = self.learning_rate * b_grad;
             weights.sub_(w_grad)?;
             bias -= b_grad;
         }
 
-        Ok(LinearRegressionModel { weights, bias })
+        Ok(RidgeRegressionModel { weights, bias, alpha: self.alpha  })
     }
 }
 
@@ -122,7 +125,7 @@ impl LinearRegression {
 mod tests {
     use luma_tensor::{Cpu, Tensor};
 
-    use crate::{datasets::{make_regression, RegressionOption}, linear::LinearRegression, core::PredictFit};
+    use crate::{datasets::{make_regression, RegressionOption}, linear::RidgeRegression, core::PredictFit};
 
     #[test]
     fn test_gd_1d() {
@@ -134,7 +137,7 @@ mod tests {
         let x_train = x_train.unsqueeze(1).unwrap();
         let y_train = y_train + 0.1 * Tensor::randn(0.0, 1.0, (N_SAMPLES,), &Cpu).unwrap();
 
-        let trainer = LinearRegression::default();
+        let trainer = RidgeRegression::default();
         let model = trainer.fit(&x_train, &y_train).unwrap();
         println!("{}", model.weights);
         println!("{}", model.bias);
@@ -149,7 +152,7 @@ mod tests {
         let y_train = train_data.y;
         let weight_bias = train_data.coef;
 
-        let trainer = LinearRegression::default();
+        let trainer = RidgeRegression::default();
         let model = trainer.fit(&x_train, &y_train).unwrap();
         println!("{}", weight_bias);
         println!("{}", model.weights);
