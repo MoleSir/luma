@@ -1,12 +1,13 @@
 //! Execute a traced [`Graph`] on a concrete device.
 //!
 //! [`Graph::compile`] is a one-time, per-device step that:
-//! 1. **infers the kind** (`Float`/`Int`/`Bool`) of every value (constants and
+//! 1. **verifies** the graph's structural invariants ([`verify`](crate::opt::verify::verify));
+//! 2. **infers the kind** (`Float`/`Int`/`Bool`) of every value (constants and
 //!    inputs from their dtype, op outputs from their semantics) — rejecting
 //!    malformed graphs, e.g. a `Bool` fed into `Matmul`;
-//! 2. **materialises constants once** (`DynTensor::from_bytes`) and allocates
+//! 3. **materialises constants once** (`DynTensor::from_bytes`) and allocates
 //!    one slot per value, partitioned into three typed arrays;
-//! 3. **lowers** each node into a type-specialised [`Step`], so [`GraphExecutor::run`]
+//! 4. **lowers** each node into a type-specialised [`Step`], so [`GraphExecutor::run`]
 //!    contains no kind dispatch.
 //!
 //! `run` validates the inputs against the recorded shapes/dtypes, stores them
@@ -25,9 +26,10 @@ use ops::{apply_view, binary_result, cmp_result, f_reduce, float_unary_result, i
 use step::{Slot, Step};
 
 use luma_tensor::dtype::{BoolDType, DType};
-use luma_tensor::{BinaryOp, Bool, CmpOp, Device, DynTensor, Error, Float, Int, KindTag, Result, Shape, Tensor};
+use luma_tensor::{BinaryOp, Bool, CmpOp, Device, DynTensor, Float, Int, KindTag, Shape, Tensor};
 
 use crate::graph::Graph;
+use crate::{ExecuteError, JitResult};
 
 // ============================================================================
 //    GraphExecutor
@@ -49,7 +51,8 @@ pub struct GraphExecutor<D: Device> {
 impl<D: Device> GraphExecutor<D> {
     /// Compile a graph: kind inference + validation, slot allocation, one-time
     /// constant materialisation, and lowering into typed steps.
-    pub fn compile(graph: &Graph, device: &D) -> Result<Self> {
+    pub fn compile(graph: &Graph, device: &D) -> JitResult<Self> {
+        crate::opt::verify::verify(graph)?;
         let kinds = infer_kinds(graph)?;
 
         // Allocate one slot per value, dense within its kind array.
@@ -113,18 +116,21 @@ impl<D: Device> GraphExecutor<D> {
 
     /// Run the graph against concrete inputs (one per recorded graph input,
     /// in order) and return the graph outputs.
-    pub fn run(&mut self, inputs: &[DynTensor<D>]) -> Result<Vec<DynTensor<D>>> {
+    pub fn run(&mut self, inputs: &[DynTensor<D>]) -> JitResult<Vec<DynTensor<D>>> {
         if inputs.len() != self.inputs.len() {
-            return Err(Error::Msg(format!("executor: expected {} inputs, got {}", self.inputs.len(), inputs.len())));
+            return Err(ExecuteError::InputCountMismatch { expected: self.inputs.len(), got: inputs.len() }.into());
         }
 
-        for ((slot, dtype, shape), t) in self.inputs.iter().zip(inputs) {
+        for (idx, ((slot, dtype, shape), t)) in self.inputs.iter().zip(inputs).enumerate() {
             if t.dtype() != *dtype || t.dims() != shape.dims() {
-                return Err(Error::Msg(format!(
-                    "executor: input mismatch — graph expects {dtype:?} {shape:?}, got {:?} {:?}",
-                    t.dtype(),
-                    t.shape()
-                )));
+                return Err(ExecuteError::InputMismatch {
+                    idx,
+                    expected_dtype: *dtype,
+                    expected_shape: shape.clone(),
+                    got_dtype: t.dtype(),
+                    got_shape: t.shape().clone(),
+                }
+                .into());
             }
             match slot {
                 Slot::F(i) => self.floats[*i] = Some(t.as_float().expect("dtype checked").clone()),
@@ -148,7 +154,7 @@ impl<D: Device> GraphExecutor<D> {
             .collect())
     }
 
-    fn exec_step(&mut self, step: &Step) -> Result<()> {
+    fn exec_step(&mut self, step: &Step) -> JitResult<()> {
         match step {
             Step::BinaryF(op, a, b, o) => {
                 let r = binary_result(self.floats[a.f()].as_ref().unwrap(), self.floats[b.f()].as_ref().unwrap(), *op)?;
@@ -468,7 +474,7 @@ impl Graph {
     /// A one-time, per-device step: kind inference (with validation),
     /// constant materialisation, and lowering into a type-specialised plan.
     /// Run the result with [`GraphExecutor::run`].
-    pub fn compile<D: Device>(&self, device: &D) -> Result<GraphExecutor<D>> {
+    pub fn compile<D: Device>(&self, device: &D) -> JitResult<GraphExecutor<D>> {
         GraphExecutor::compile(self, device)
     }
 }

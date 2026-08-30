@@ -2,48 +2,46 @@
 
 use std::collections::HashSet;
 
-use luma_tensor::{Error, KindTag, Result};
+use luma_tensor::KindTag;
 
 use crate::graph::{Graph, Node, NodeOp, Scalar, ValueId};
+use crate::{ExecuteError, JitResult};
 
 // ============================================================================
 //    Kind inference — validate the graph and assign a kind to every value
 // ============================================================================
 
-fn expect_kind(got: KindTag, expected: KindTag, what: &str) -> Result<()> {
+fn expect_kind(got: KindTag, expected: KindTag, what: &'static str) -> JitResult<()> {
     if got != expected {
-        return Err(Error::Msg(format!("executor: {what}: expected {expected:?}, got {got:?}")));
+        return Err(ExecuteError::KindMismatch { what, expected, got }.into());
     }
     Ok(())
 }
 
-fn scalar_matches(s: &Scalar, kind: KindTag) -> Result<()> {
+fn scalar_matches(s: &Scalar, kind: KindTag) -> JitResult<()> {
     let ok = match (s, kind) {
         (Scalar::F64(_), KindTag::Float) | (Scalar::I64(_), KindTag::Int) | (Scalar::Bool(_), KindTag::Bool) => true,
         _ => false,
     };
-    if ok { Ok(()) } else { Err(Error::Msg(format!("executor: scalar {s} does not match operand kind {kind:?}"))) }
+    if ok { Ok(()) } else { Err(ExecuteError::ScalarKindMismatch { scalar: *s, kind }.into()) }
 }
 
-fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
-    let input = |i: usize| -> Result<KindTag> {
-        let id = *node
-            .inputs
-            .get(i)
-            .ok_or_else(|| Error::Msg(format!("executor: {:?} expects more than {} inputs", node.op, node.inputs.len())))?;
-        kinds.get(id).copied().ok_or_else(|| Error::Msg(format!("executor: unknown value {id}")))
+fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> JitResult<KindTag> {
+    let input = |i: usize| -> JitResult<KindTag> {
+        let id = *node.inputs.get(i).ok_or_else(|| ExecuteError::ExpectMoreInputs { op: node.op.to_string(), got: node.inputs.len() })?;
+        Ok(kinds.get(id).copied().ok_or_else(|| ExecuteError::UnknownValue(id))?)
     };
-    let same_pair = || -> Result<KindTag> {
+    let same_pair = || -> JitResult<KindTag> {
         let a = input(0)?;
         let b = input(1)?;
         if a != b || a == KindTag::Bool {
-            return Err(Error::Msg(format!("executor: {:?} needs two operands of the same numeric kind, got {a:?}/{b:?}", node.op)));
+            return Err(ExecuteError::PairKindMismatch { op: node.op.to_string(), a, b }.into());
         }
         Ok(a)
     };
 
     Ok(match &node.op {
-        NodeOp::Constant => return Err(Error::Msg("executor: unexpected Constant node (constants are data-carrying leaves)".to_string())),
+        NodeOp::Constant => return Err(ExecuteError::UnexpectedConstantNode.into()),
         NodeOp::Binary(_) => same_pair()?,
         NodeOp::BinaryScalarRhs(s, _) => {
             let a = input(0)?;
@@ -89,7 +87,7 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
         NodeOp::Reduce(_, _) => {
             let a = input(0)?;
             if a == KindTag::Bool {
-                return Err(Error::Msg("executor: Reduce on Bool (use ReduceAll/ReduceAny)".to_string()));
+                return Err(ExecuteError::UnsupportedOp("Reduce on Bool (use ReduceAll/ReduceAny)".to_string()).into());
             }
             a
         }
@@ -100,7 +98,7 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
         NodeOp::ArgReduce(_, _) => {
             let a = input(0)?;
             if a == KindTag::Bool {
-                return Err(Error::Msg("executor: ArgReduce on Bool".to_string()));
+                return Err(ExecuteError::UnsupportedOp("ArgReduce on Bool".to_string()).into());
             }
             KindTag::Int
         }
@@ -109,7 +107,7 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
             let a = input(0)?;
             expect_kind(input(1)?, KindTag::Int, "index tensor")?;
             if a == KindTag::Bool {
-                return Err(Error::Msg("executor: index op on Bool".to_string()));
+                return Err(ExecuteError::UnsupportedOp("index op on Bool".to_string()).into());
             }
             a
         }
@@ -118,15 +116,16 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
             expect_kind(input(1)?, KindTag::Int, "index tensor")?;
             let b = input(2)?;
             if a != b || a == KindTag::Bool {
-                return Err(Error::Msg(format!("executor: {:?} needs matching numeric operands, got {a:?}/{b:?}", node.op)));
+                return Err(ExecuteError::PairKindMismatch { op: node.op.to_string(), a, b }.into());
             }
             a
         }
         NodeOp::Cat(_) => {
             let first = input(0)?;
             for i in 1..node.inputs.len() {
-                if input(i)? != first {
-                    return Err(Error::Msg("executor: Cat inputs must share one kind".to_string()));
+                let other = input(i)?;
+                if other != first {
+                    return Err(ExecuteError::CatKindMismatch { expected: first, got: other }.into());
                 }
             }
             first
@@ -138,14 +137,12 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
         NodeOp::Pick => {
             expect_kind(input(0)?, KindTag::Bool, "Pick mask")?;
             if node.inputs.len() != 3 {
-                return Err(Error::Msg(
-                    "executor: scalar Pick is not yet supported — the IR does not record the scalar operand".to_string(),
-                ));
+                return Err(ExecuteError::PickScalarUnsupported.into());
             }
             let a = input(1)?;
             let b = input(2)?;
             if a != b {
-                return Err(Error::Msg(format!("executor: Pick branches must share one kind, got {a:?}/{b:?}")));
+                return Err(ExecuteError::BranchKindMismatch { a, b }.into());
             }
             a
         }
@@ -167,7 +164,7 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
     })
 }
 
-pub(crate) fn infer_kinds(graph: &Graph) -> Result<Vec<KindTag>> {
+pub(crate) fn infer_kinds(graph: &Graph) -> JitResult<Vec<KindTag>> {
     let mut kinds = vec![KindTag::Float; graph.values.len()];
     let mut producer: Vec<Option<&Node>> = vec![None; graph.values.len()];
     for node in &graph.nodes {
@@ -186,8 +183,7 @@ pub(crate) fn infer_kinds(graph: &Graph) -> Result<Vec<KindTag>> {
             kinds[v.id] = v.dtype.kind();
             continue;
         }
-        let node = producer[v.id]
-            .ok_or_else(|| Error::Msg(format!("executor: dangling value {} — no constant, input, or producing node", v.id)))?;
+        let node = producer[v.id].ok_or_else(|| ExecuteError::DanglingValue(v.id))?;
         kinds[v.id] = infer_node_kind(node, &kinds)?;
     }
     Ok(kinds)

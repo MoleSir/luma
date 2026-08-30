@@ -6,9 +6,13 @@
 //! device and runs it. This is the Rust analogue of `torch.jit.trace` and the
 //! first step toward TorchScript/ONNX export and graph-level optimization.
 
+mod error;
 pub mod executor;
 pub mod graph;
+pub mod opt;
 pub mod trace;
+
+pub use error::*;
 
 pub use executor::GraphExecutor;
 pub use graph::{ConstData, Graph, Node, NodeOp, Scalar, Value, ValueId};

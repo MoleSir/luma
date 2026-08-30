@@ -19,7 +19,7 @@ pub use storage::{TraceBoolStorage, TraceFloatStorage, TraceIntStorage, TraceVal
 use std::sync::{Arc, Mutex};
 
 use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
-use luma_tensor::{DType, DTypeKind, Device, Error, Layout, Result, Shape, Tensor, ViewOp};
+use luma_tensor::{DType, DTypeKind, Device, Layout, Result, Shape, Tensor, ViewOp};
 
 use crate::graph::{Graph, NodeOp, ValueId};
 
@@ -85,12 +85,12 @@ impl Trace {
 
 /// In-place mutation has no meaning in a functional SSA graph.
 fn inplace_unsupported<T>(op: &'static str) -> Result<T> {
-    Err(Error::Msg(format!("trace: in-place op '{op}' has no meaning in a functional graph")))
+    Err(crate::error::TraceError::InplaceUnsupported(op).into())
 }
 
 /// Read-back needs concrete data, which a tracing device never stores.
 fn readback_unsupported<T>(op: &'static str) -> Result<T> {
-    Err(Error::Msg(format!("trace: cannot materialize '{op}' (no data is stored during tracing)")))
+    Err(crate::error::TraceError::ReadbackUnsupported(op).into())
 }
 
 fn map_view(view: ViewOp) -> NodeOp {

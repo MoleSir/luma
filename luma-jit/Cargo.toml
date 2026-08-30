@@ -16,3 +16,5 @@ cuda = ["luma-tensor/cuda", "luma-nn/cuda"]
 [dependencies]
 luma-tensor = { workspace = true }
 luma-nn = { workspace = true }
+thiserror = { workspace = true }
+thiserrorctx = { workspace = true }

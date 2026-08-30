@@ -1,8 +1,9 @@
 //! Lowering: nodes become type-specialised steps.
 
-use luma_tensor::{Error, KindTag, ReduceOp, Result, Shape};
+use luma_tensor::{KindTag, ReduceOp, Shape};
 
 use crate::graph::{Graph, Node, NodeOp, Scalar, ValueId};
+use crate::{ExecuteError, JitResult};
 
 use super::step::{Slot, Step, ViewStep};
 
@@ -10,18 +11,15 @@ use super::step::{Slot, Step, ViewStep};
 //    Lowering — nodes become type-specialised steps
 // ============================================================================
 
-fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> Result<Step> {
-    let slot = |i: usize| -> Result<Slot> {
-        let id = *node
-            .inputs
-            .get(i)
-            .ok_or_else(|| Error::Msg(format!("executor: {:?} expects more than {} inputs", node.op, node.inputs.len())))?;
-        slots.get(id).copied().ok_or_else(|| Error::Msg(format!("executor: unknown value {id}")))
+fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> JitResult<Step> {
+    let slot = |i: usize| -> JitResult<Slot> {
+        let id = *node.inputs.get(i).ok_or_else(|| ExecuteError::ExpectMoreInputs { op: node.op.to_string(), got: node.inputs.len() })?;
+        Ok(slots.get(id).copied().ok_or_else(|| ExecuteError::UnknownValue(id))?)
     };
-    let out = slots.get(node.outputs[0]).copied().ok_or_else(|| Error::Msg(format!("executor: node with no output: {:?}", node.op)))?;
+    let out = slots.get(node.outputs[0]).copied().ok_or_else(|| ExecuteError::NodeWithoutOutput(node.op.to_string()))?;
 
     let num = |id: ValueId| kinds[id];
-    let in_num = |i: usize| -> Result<KindTag> {
+    let in_num = |i: usize| -> JitResult<KindTag> {
         let id = *node.inputs.get(i).expect("infer validated input count");
         Ok(num(id))
     };
@@ -29,7 +27,7 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
     let out_shape = || -> &Shape { &graph.values[node.outputs[0]].shape };
 
     Ok(match &node.op {
-        NodeOp::Constant => return Err(Error::Msg("executor: unexpected Constant node (constants are data-carrying leaves)".to_string())),
+        NodeOp::Constant => return Err(ExecuteError::UnexpectedConstantNode.into()),
         NodeOp::Binary(op) => match in_num(0)? {
             KindTag::Float => Step::BinaryF(*op, slot(0)?, slot(1)?, out),
             KindTag::Int => Step::BinaryI(*op, slot(0)?, slot(1)?, out),
@@ -73,7 +71,9 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
                 KindTag::Float => Step::ReduceF(*op, dims.clone(), keepdim, slot(0)?, out),
                 KindTag::Int => {
                     if *op == ReduceOp::Mean {
-                        return Err(Error::Msg("executor: int mean is not yet supported (public API is float-only)".to_string()));
+                        return Err(
+                            ExecuteError::UnsupportedOp("int mean is not yet supported (public API is float-only)".to_string()).into()
+                        );
                     }
                     Step::ReduceI(*op, dims.clone(), keepdim, slot(0)?, out)
                 }
@@ -81,7 +81,10 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
             }
         }
         NodeOp::ReduceAll(_) | NodeOp::ReduceAny(_) => {
-            return Err(Error::Msg("executor: ReduceAll/ReduceAny are not yet supported (no public dim-wise bool reduction)".to_string()));
+            return Err(ExecuteError::UnsupportedOp(
+                "ReduceAll/ReduceAny are not yet supported (no public dim-wise bool reduction)".to_string(),
+            )
+            .into());
         }
         NodeOp::ArgReduce(dim, take_max) => {
             let keepdim = out_shape().rank() == in_shape(0).rank();
@@ -117,7 +120,7 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
             KindTag::Bool => unreachable!("kind inference validated"),
         },
         NodeOp::Cat(dim) => {
-            let inputs: Vec<Slot> = (0..node.inputs.len()).map(slot).collect::<Result<_>>()?;
+            let inputs: Vec<Slot> = (0..node.inputs.len()).map(slot).collect::<JitResult<_>>()?;
             match in_num(0)? {
                 KindTag::Float => Step::CatF(*dim, inputs, out),
                 KindTag::Int => Step::CatI(*dim, inputs, out),
@@ -155,6 +158,6 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
     })
 }
 
-pub(crate) fn lower_steps(graph: &Graph, kinds: &[KindTag], slots: &[Slot]) -> Result<Vec<Step>> {
+pub(crate) fn lower_steps(graph: &Graph, kinds: &[KindTag], slots: &[Slot]) -> JitResult<Vec<Step>> {
     graph.nodes.iter().map(|node| lower_node(node, kinds, slots, graph)).collect()
 }
