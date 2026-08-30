@@ -17,27 +17,27 @@ macro_rules! _int_select {
         match (&$idx.slice, &$x.slice) {
             (CudaIntSlice::I32(ids), CudaIntSlice::I32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "i32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() })
+                Ok(CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::I32(ids), CudaIntSlice::U32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "u32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() })
+                Ok(CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::I32(ids), CudaIntSlice::U8(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "u8", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() })
+                Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaIntSlice::I32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "i32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() })
+                Ok(CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaIntSlice::U32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "u32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() })
+                Ok(CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaIntSlice::U8(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "u8", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() })
+                Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() })
             }
             _ => Err(crate::Error::DTypeMismatch { lhs: $x.slice.dtype(), rhs: $idx.slice.dtype(), op: $op }),
         }
@@ -632,7 +632,13 @@ impl IntOps<Cuda> for Cuda {
         }
     }
 
-    fn i_matmul(_lhs: &CudaIntStorage, _lhs_l: &Layout, _rhs: &CudaIntStorage, _rhs_l: &Layout, _out_shape: &Shape) -> Result<CudaIntStorage> {
+    fn i_matmul(
+        _lhs: &CudaIntStorage,
+        _lhs_l: &Layout,
+        _rhs: &CudaIntStorage,
+        _rhs_l: &Layout,
+        _out_shape: &Shape,
+    ) -> Result<CudaIntStorage> {
         Err(CudaError::UnsupportIntMatmul)?
     }
 
@@ -822,7 +828,7 @@ impl IntOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_i32", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
+                    Ok(CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
                 }
                 CudaIntSlice::U32(_) => {
                     let mut out = device.alloc::<u32>(out_shape.element_count())?;
@@ -832,7 +838,7 @@ impl IntOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_u32", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
+                    Ok(CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
                 }
                 CudaIntSlice::U8(_) => {
                     let mut out = device.alloc::<u8>(out_shape.element_count())?;
@@ -842,7 +848,7 @@ impl IntOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_u8", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
+                    Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
                 }
             }
         } else {
@@ -880,7 +886,7 @@ impl IntOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
+                    Ok(CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
                 }
                 CudaIntSlice::U32(_) => {
                     let mut out = device.alloc::<u32>(out_shape.element_count())?;
@@ -911,7 +917,7 @@ impl IntOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
+                    Ok(CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
                 }
                 CudaIntSlice::U8(_) => {
                     let mut out = device.alloc::<u8>(out_shape.element_count())?;
@@ -942,7 +948,7 @@ impl IntOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
+                    Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
                 }
             }
         }

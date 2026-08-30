@@ -7,13 +7,7 @@
 use std::iter::{Product, Sum};
 
 /// Numeric element shared by float and int kinds.
-pub trait CpuDType:
-    Copy
-    + PartialOrd
-    + Send
-    + Sync
-    + 'static
-{
+pub trait CpuDType: Copy + PartialOrd + Send + Sync + 'static {
     const ZERO: Self;
     const ONE: Self;
 }

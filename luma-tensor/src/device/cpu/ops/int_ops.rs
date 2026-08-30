@@ -559,11 +559,7 @@ impl IntOps<Cpu> for Cpu {
         }
     }
 
-    fn i_cat(
-        srcs: &[(&<Cpu as Device>::IntStorage, &Layout)],
-        dim: usize,
-        out_shape: &Shape,
-    ) -> Result<<Cpu as Device>::IntStorage> {
+    fn i_cat(srcs: &[(&<Cpu as Device>::IntStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<<Cpu as Device>::IntStorage> {
         if srcs.is_empty() {
             return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
         }

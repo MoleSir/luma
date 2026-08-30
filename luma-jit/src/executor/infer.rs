@@ -162,8 +162,8 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> Result<KindTag> {
         | NodeOp::Narrow(..)
         | NodeOp::Slice(..)
         | NodeOp::Broadcast
-        | NodeOp::Squeeze
-        | NodeOp::Unsqueeze => input(0)?,
+        | NodeOp::Squeeze(_)
+        | NodeOp::Unsqueeze(_) => input(0)?,
     })
 }
 

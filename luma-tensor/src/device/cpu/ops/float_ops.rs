@@ -516,11 +516,7 @@ impl FloatOps<Cpu> for Cpu {
         dispatch_float2!(init, src, "scatter-add", |a, b| indexing::scatter_add(a, init_l, &ids, idx_l, b, dim)?)
     }
 
-    fn f_cat(
-        srcs: &[(&<Cpu as Device>::FloatStorage, &Layout)],
-        dim: usize,
-        out_shape: &Shape,
-    ) -> Result<<Cpu as Device>::FloatStorage> {
+    fn f_cat(srcs: &[(&<Cpu as Device>::FloatStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<<Cpu as Device>::FloatStorage> {
         if srcs.is_empty() {
             return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
         }

@@ -634,7 +634,13 @@ impl FloatOps<Cuda> for Cuda {
         Ok(CudaIntStorage { slice: CudaIntSlice::U32(indices), device: x.device.clone() })
     }
 
-    fn f_matmul(lhs: &CudaFloatStorage, lhs_l: &Layout, rhs: &CudaFloatStorage, rhs_l: &Layout, _out_shape: &Shape) -> Result<CudaFloatStorage> {
+    fn f_matmul(
+        lhs: &CudaFloatStorage,
+        lhs_l: &Layout,
+        rhs: &CudaFloatStorage,
+        rhs_l: &Layout,
+        _out_shape: &Shape,
+    ) -> Result<CudaFloatStorage> {
         lhs.device.same_ordinal(&rhs.device, "matmul")?;
         let lhs_dims = lhs_l.dims();
         let rhs_dims = rhs_l.dims();

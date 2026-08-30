@@ -10,46 +10,6 @@ use super::step::{Slot, Step, ViewStep};
 //    Lowering — nodes become type-specialised steps
 // ============================================================================
 
-/// The single removed size-1 dim of a squeeze, derived from the recorded shapes.
-fn infer_squeeze_dim(in_shape: &Shape, out_shape: &Shape) -> Result<usize> {
-    if in_shape.rank() != out_shape.rank() + 1 {
-        return Err(Error::Msg(format!("executor: squeeze shape mismatch {in_shape:?} -> {out_shape:?}")));
-    }
-    let cands: Vec<usize> = (0..in_shape.rank())
-        .filter(|&d| {
-            in_shape.dims()[d] == 1 && {
-                let mut ds = in_shape.dims().to_vec();
-                ds.remove(d);
-                ds == out_shape.dims()
-            }
-        })
-        .collect();
-    if cands.len() != 1 {
-        return Err(Error::Msg(format!("executor: ambiguous squeeze dim (candidates {cands:?}) for {in_shape:?} -> {out_shape:?}")));
-    }
-    Ok(cands[0])
-}
-
-/// The single added size-1 dim of an unsqueeze, derived from the recorded shapes.
-fn infer_unsqueeze_dim(in_shape: &Shape, out_shape: &Shape) -> Result<usize> {
-    if out_shape.rank() != in_shape.rank() + 1 {
-        return Err(Error::Msg(format!("executor: unsqueeze shape mismatch {in_shape:?} -> {out_shape:?}")));
-    }
-    let cands: Vec<usize> = (0..out_shape.rank())
-        .filter(|&d| {
-            out_shape.dims()[d] == 1 && {
-                let mut ds = out_shape.dims().to_vec();
-                ds.remove(d);
-                ds == in_shape.dims()
-            }
-        })
-        .collect();
-    if cands.len() != 1 {
-        return Err(Error::Msg(format!("executor: ambiguous unsqueeze dim (candidates {cands:?}) for {in_shape:?} -> {out_shape:?}")));
-    }
-    Ok(cands[0])
-}
-
 fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> Result<Step> {
     let slot = |i: usize| -> Result<Slot> {
         let id = *node
@@ -190,14 +150,8 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
         NodeOp::Narrow(d, s, l) => Step::View(ViewStep::Narrow(*d, *s, *l), slot(0)?, out),
         NodeOp::Slice(d, s, e, st) => Step::View(ViewStep::Slice(*d, *s, *e, *st), slot(0)?, out),
         NodeOp::Broadcast => Step::View(ViewStep::Broadcast(out_shape().clone()), slot(0)?, out),
-        NodeOp::Squeeze => {
-            let dim = infer_squeeze_dim(in_shape(0), out_shape())?;
-            Step::View(ViewStep::Squeeze(dim), slot(0)?, out)
-        }
-        NodeOp::Unsqueeze => {
-            let dim = infer_unsqueeze_dim(in_shape(0), out_shape())?;
-            Step::View(ViewStep::Unsqueeze(dim), slot(0)?, out)
-        }
+        NodeOp::Squeeze(dim) => Step::View(ViewStep::Squeeze(*dim), slot(0)?, out),
+        NodeOp::Unsqueeze(dim) => Step::View(ViewStep::Unsqueeze(*dim), slot(0)?, out),
     })
 }
 

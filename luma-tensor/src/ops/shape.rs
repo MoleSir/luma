@@ -192,7 +192,7 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         new_dims.remove(dim);
         strides.remove(dim);
         let layout = Layout::new(new_dims, strides, self.layout().start_offset());
-        let storage = self.resolve_view_storage(ViewOp::Squeeze, &layout)?;
+        let storage = self.resolve_view_storage(ViewOp::Squeeze(dim), &layout)?;
         Ok(self.share_storage(layout, K::Meta::on_reshape(self), storage))
     }
 
@@ -204,7 +204,7 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         let stride = if dim < strides.len() { strides[dim] } else { 1 };
         strides.insert(dim, stride);
         let layout = Layout::new(new_dims, strides, self.layout().start_offset());
-        let storage = self.resolve_view_storage(ViewOp::Unsqueeze, &layout)?;
+        let storage = self.resolve_view_storage(ViewOp::Unsqueeze(dim), &layout)?;
         Ok(self.share_storage(layout, K::Meta::on_reshape(self), storage))
     }
 

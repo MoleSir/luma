@@ -170,11 +170,7 @@ impl BoolOps<Cpu> for Cpu {
         Ok(l.storage_indices().filter(|&i| x.0[i]).count())
     }
 
-    fn b_cat(
-        srcs: &[(&<Cpu as Device>::BoolStorage, &Layout)],
-        dim: usize,
-        out_shape: &Shape,
-    ) -> Result<<Cpu as Device>::BoolStorage> {
+    fn b_cat(srcs: &[(&<Cpu as Device>::BoolStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<<Cpu as Device>::BoolStorage> {
         if srcs.is_empty() {
             return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
         }

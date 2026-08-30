@@ -101,8 +101,8 @@ fn map_view(view: ViewOp) -> NodeOp {
         ViewOp::Narrow(d, s, l) => NodeOp::Narrow(d, s, l),
         ViewOp::Slice(d, s, e, st) => NodeOp::Slice(d, s, e, st),
         ViewOp::Broadcast => NodeOp::Broadcast,
-        ViewOp::Squeeze => NodeOp::Squeeze,
-        ViewOp::Unsqueeze => NodeOp::Unsqueeze,
+        ViewOp::Squeeze(d) => NodeOp::Squeeze(d),
+        ViewOp::Unsqueeze(d) => NodeOp::Unsqueeze(d),
     }
 }
 

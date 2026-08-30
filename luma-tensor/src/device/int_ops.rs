@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
-use crate::{ReduceOp, Result};
 use crate::dtype::{BoolDType, FloatDType, IntDType};
 use crate::tensor::{Layout, Shape};
+use crate::{ReduceOp, Result};
 
 /// Operations on `Int`-kind tensors. No autograd. Scalars are `i64` (wide enough
 /// for all int precisions).

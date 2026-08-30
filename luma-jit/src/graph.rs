@@ -104,8 +104,8 @@ pub enum NodeOp {
     Narrow(usize, usize, usize),
     Slice(usize, usize, usize, usize),
     Broadcast,
-    Squeeze,
-    Unsqueeze,
+    Squeeze(usize),
+    Unsqueeze(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -205,8 +205,8 @@ impl fmt::Display for NodeOp {
             NodeOp::Narrow(d, s, l) => write!(f, "narrow({d}, {s}, {l})"),
             NodeOp::Slice(d, s, e, st) => write!(f, "slice({d}, {s}..{e}:{st})"),
             NodeOp::Broadcast => write!(f, "broadcast"),
-            NodeOp::Squeeze => write!(f, "squeeze"),
-            NodeOp::Unsqueeze => write!(f, "unsqueeze"),
+            NodeOp::Squeeze(d) => write!(f, "squeeze({d})"),
+            NodeOp::Unsqueeze(d) => write!(f, "unsqueeze({d})"),
         }
     }
 }

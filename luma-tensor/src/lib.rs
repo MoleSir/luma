@@ -21,7 +21,7 @@ pub use device::cpu::{Cpu, CpuBoolStorage, CpuFloatStorage, CpuIntStorage};
 pub use device::cuda::{Cuda, CudaBoolStorage, CudaFloatStorage, CudaIntStorage};
 pub use device::{BoolOps, Device, FloatOps, IntOps};
 
-pub use dtype::{Bool, DType, DTypeKind, Float, Int, KindTag, Storage, FloatDType, IntDType, BoolDType};
+pub use dtype::{Bool, BoolDType, DType, DTypeKind, Float, FloatDType, Int, IntDType, KindTag, Storage};
 pub use dynamic::DynTensor;
 pub use error::{Error, Result};
 pub use grad::{FloatMeta, GradStore, NoGradGuard, TensorMeta, is_grad_enabled, set_grad_enabled};

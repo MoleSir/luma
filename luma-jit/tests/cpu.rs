@@ -163,6 +163,8 @@ fn cpu_shape() {
     common::shape::test_slice(&Cpu);
     common::shape::test_squeeze(&Cpu);
     common::shape::test_unsqueeze(&Cpu);
+    common::shape::test_squeeze_ambiguous_dim(&Cpu);
+    common::shape::test_unsqueeze_ambiguous_dim(&Cpu);
     common::shape::test_broadcast_as(&Cpu);
 }
 

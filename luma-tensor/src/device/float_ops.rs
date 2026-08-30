@@ -77,7 +77,8 @@ pub trait FloatOps<D: super::Device> {
 
     // matmul (batched); `out_shape` computed by the tensor layer
     // (`ops::shape_infer::matmul_out_shape`).
-    fn f_matmul(lhs: &D::FloatStorage, lhs_l: &Layout, rhs: &D::FloatStorage, rhs_l: &Layout, out_shape: &Shape) -> Result<D::FloatStorage>;
+    fn f_matmul(lhs: &D::FloatStorage, lhs_l: &Layout, rhs: &D::FloatStorage, rhs_l: &Layout, out_shape: &Shape)
+    -> Result<D::FloatStorage>;
     fn f_add_matmul_(
         dst: &mut D::FloatStorage,
         dst_l: &Layout,

@@ -137,6 +137,8 @@ fn cuda_shape() {
     common::shape::test_slice(&*CUDA);
     common::shape::test_squeeze(&*CUDA);
     common::shape::test_unsqueeze(&*CUDA);
+    common::shape::test_squeeze_ambiguous_dim(&*CUDA);
+    common::shape::test_unsqueeze_ambiguous_dim(&*CUDA);
     common::shape::test_broadcast_as(&*CUDA);
 }
 
