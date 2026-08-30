@@ -138,6 +138,11 @@ mod tests {
         let model = trainer.fit(&x_train, &y_train).unwrap();
         println!("{}", model.weights);
         println!("{}", model.bias);
+
+        // 噪声 0.1 + 50 样本，GD 1000 轮应收敛到真实参数附近
+        let weights = model.weights.to_vec().unwrap();
+        assert!((weights[0] - W).abs() < 0.3, "w = {}", weights[0]);
+        assert!((model.bias - B).abs() < 0.5, "b = {}", model.bias);
     }
 
     #[test]

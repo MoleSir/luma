@@ -29,3 +29,46 @@ where
 
     Ok((n_samples, n_features))
 }
+
+#[cfg(test)]
+mod tests {
+    use luma_tensor::{Cpu, Tensor};
+
+    use super::validate_xy_shapes;
+
+    #[test]
+    fn test_validate_ok() {
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
+
+        let (n_samples, n_features) = validate_xy_shapes(&x, &y, None).unwrap();
+        assert_eq!((n_samples, n_features), (10, 2));
+    }
+
+    #[test]
+    fn test_validate_sample_mismatch() {
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (9,), &Cpu).unwrap();
+
+        let err = validate_xy_shapes(&x, &y, None).unwrap_err();
+        assert!(matches!(err, crate::MlError::SampleSizeMismatch { .. }));
+    }
+
+    #[test]
+    fn test_validate_sample_weight_mismatch() {
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
+        let w = Tensor::<Cpu>::rand(0.0, 1.0, (8,), &Cpu).unwrap();
+
+        let err = validate_xy_shapes(&x, &y, Some(&w)).unwrap_err();
+        assert!(matches!(err, crate::MlError::SampleSizeMismatch { .. }));
+    }
+
+    #[test]
+    fn test_validate_x_not_2d() {
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
+
+        assert!(validate_xy_shapes(&x, &y, None).is_err());
+    }
+}

@@ -4,3 +4,5 @@ mod local;
 pub use local::*;
 mod split;
 pub use split::*;
+mod fetch;
+pub use fetch::*;

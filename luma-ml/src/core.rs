@@ -24,14 +24,13 @@ pub trait PredictModel {
     fn predict(&self, x: &Self::Input) -> MlResult<Self::Output>;
 }
 
-pub trait TransformFit {
-    type Input;
+pub trait TransformFit<Input> {
     type Output;
-    type Model: TransformModel<Input = Self::Input, Output = Self::Output>;
+    type Model: TransformModel<Input = Input, Output = Self::Output>;
 
-    fn fit(&self, x: &Self::Input) -> MlResult<Self::Model>;
+    fn fit(&self, x: &Input) -> MlResult<Self::Model>;
 
-    fn fit_transform(&self, x: &Self::Input) -> MlResult<Self::Output> {
+    fn fit_transform(&self, x: &Input) -> MlResult<Self::Output> {
         let model = self.fit(x)?;
         let x_trans = model.transform(x)?;
         Ok(x_trans)
