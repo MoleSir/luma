@@ -53,6 +53,18 @@ impl fmt::Display for Scalar {
     }
 }
 
+impl Scalar {
+    /// `0` in either numeric form (float or int).
+    pub fn is_zero(&self) -> bool {
+        matches!(self, Scalar::F64(0.0) | Scalar::I64(0))
+    }
+
+    /// `1` in either numeric form (float or int).
+    pub fn is_one(&self) -> bool {
+        matches!(self, Scalar::F64(1.0) | Scalar::I64(1))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum NodeOp {
     // ---- leaves (constant / graph input) ----
@@ -161,8 +173,26 @@ impl Graph {
         out
     }
 
+    /// Insert a node at position `idx` (its output value id is still appended
+    /// at the end). Rewriting rules that *create* nodes must place them before
+    /// their consumers — the executor runs nodes in array order, so appending
+    /// would make a mid-graph consumer read an empty slot.
+    pub fn insert_node(&mut self, idx: usize, op: NodeOp, inputs: Vec<ValueId>, dtype: DType, shape: Shape) -> ValueId {
+        let out = self.add_value(dtype, shape);
+        self.nodes.insert(idx, Node { op, inputs, outputs: vec![out] });
+        out
+    }
+
     pub fn value(&self, id: ValueId) -> &Value {
         &self.values[id]
+    }
+
+    /// Run the front-end optimization pipeline in place
+    /// (simplify → fold → simplify → cse → dce → verify).
+    pub fn optimize(&mut self) -> crate::JitResult<()> {
+        let g = std::mem::take(self);
+        *self = crate::opt::optimize(g)?;
+        Ok(())
     }
 }
 
