@@ -1,3 +1,4 @@
+use super::shape_infer::reduce_out_shape;
 use crate::{DTypeKind, Device, Dim, Dims, Float, Int, Layout, ReduceOp, Shape, Tensor, TensorMeta};
 
 pub trait ReduceDTypeKind<D: Device>: DTypeKind<D> {
@@ -7,9 +8,16 @@ pub trait ReduceDTypeKind<D: Device>: DTypeKind<D> {
         dim: usize,
         keepdim: bool,
         take_max: bool,
-    ) -> crate::Result<(D::IntStorage, Shape)>;
-    fn reduce_dispatch(x: &Self::Storage, l: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp)
-    -> crate::Result<(Self::Storage, Shape)>;
+        out_shape: &Shape,
+    ) -> crate::Result<D::IntStorage>;
+    fn reduce_dispatch(
+        x: &Self::Storage,
+        l: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+        op: ReduceOp,
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage>;
 }
 
 impl<D: Device> ReduceDTypeKind<D> for Float {
@@ -19,8 +27,9 @@ impl<D: Device> ReduceDTypeKind<D> for Float {
         dim: usize,
         keepdim: bool,
         take_max: bool,
-    ) -> crate::Result<(D::IntStorage, crate::Shape)> {
-        D::f_arg_reduce(x, layout, dim, keepdim, take_max)
+        out_shape: &Shape,
+    ) -> crate::Result<D::IntStorage> {
+        D::f_arg_reduce(x, layout, dim, keepdim, take_max, out_shape)
     }
 
     fn reduce_dispatch(
@@ -29,8 +38,9 @@ impl<D: Device> ReduceDTypeKind<D> for Float {
         dims: &[usize],
         keepdim: bool,
         op: ReduceOp,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::f_reduce(x, l, dims, keepdim, op)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::f_reduce(x, l, dims, keepdim, op, out_shape)
     }
 }
 
@@ -41,8 +51,9 @@ impl<D: Device> ReduceDTypeKind<D> for Int {
         dim: usize,
         keepdim: bool,
         take_max: bool,
-    ) -> crate::Result<(D::IntStorage, crate::Shape)> {
-        D::i_arg_reduce(x, layout, dim, keepdim, take_max)
+        out_shape: &Shape,
+    ) -> crate::Result<D::IntStorage> {
+        D::i_arg_reduce(x, layout, dim, keepdim, take_max, out_shape)
     }
 
     fn reduce_dispatch(
@@ -51,8 +62,9 @@ impl<D: Device> ReduceDTypeKind<D> for Int {
         dims: &[usize],
         keepdim: bool,
         op: ReduceOp,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::i_reduce(x, l, dims, keepdim, op)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::i_reduce(x, l, dims, keepdim, op, out_shape)
     }
 }
 
@@ -79,8 +91,9 @@ impl<D: Device, K: ReduceDTypeKind<D>> Tensor<D, K> {
 
     fn arg_reduce_dispatch<Dm: Dim>(&self, dim: Dm, keepdim: bool, take_max: bool) -> crate::Result<Tensor<D, Int>> {
         let d = dim.to_index(self.shape(), "argmin/argmax")?;
-        let (storage, shape) = K::arg_reduce_dispatch(&*self.storage_read()?, self.layout(), d, keepdim, take_max)?;
-        Ok(Tensor::<D, Int>::from_storage(storage, shape, ()))
+        let out_shape = reduce_out_shape(self.shape(), &[d], keepdim);
+        let storage = K::arg_reduce_dispatch(&*self.storage_read()?, self.layout(), d, keepdim, take_max, &out_shape)?;
+        Ok(Tensor::<D, Int>::from_storage(storage, out_shape, ()))
     }
 }
 
@@ -148,16 +161,18 @@ impl<D: Device> Tensor<D, Float> {
     }
 
     fn f_reduce(&self, dims: &[usize], keepdim: bool, op: ReduceOp) -> crate::Result<Self> {
-        let (s, shape) = D::f_reduce(&*self.storage_read()?, self.layout(), dims, keepdim, op)?;
+        let out_shape = reduce_out_shape(self.shape(), dims, keepdim);
+        let s = D::f_reduce(&*self.storage_read()?, self.layout(), dims, keepdim, op, &out_shape)?;
         let meta = <Float as DTypeKind<D>>::Meta::on_reduce(self, dims, op);
-        Ok(Self::from_storage(s, shape, meta))
+        Ok(Self::from_storage(s, out_shape, meta))
     }
 }
 
 impl<D: Device, K: ReduceDTypeKind<D>> Tensor<D, K> {
     fn reduce_impl(&self, dims: &[usize], keepdim: bool, op: ReduceOp) -> crate::Result<Self> {
-        let (s, shape) = K::reduce_dispatch(&*self.storage_read()?, self.layout(), dims, keepdim, op)?;
-        Ok(Self::from_storage(s, shape, K::Meta::on_reduce(self, dims, op)))
+        let out_shape = reduce_out_shape(self.shape(), dims, keepdim);
+        let s = K::reduce_dispatch(&*self.storage_read()?, self.layout(), dims, keepdim, op, &out_shape)?;
+        Ok(Self::from_storage(s, out_shape, K::Meta::on_reduce(self, dims, op)))
     }
 }
 

@@ -136,22 +136,6 @@ where
 
 // ---- shape helpers shared by the three kind impls ----
 
-fn reduce_out_shape(input: &Shape, dims: &[usize], keepdim: bool) -> Shape {
-    let mut out = input.dims().to_vec();
-    if keepdim {
-        for &d in dims {
-            out[d] = 1;
-        }
-    } else {
-        let mut ds = dims.to_vec();
-        ds.sort_unstable_by(|a, b| b.cmp(a));
-        for d in ds {
-            out.remove(d);
-        }
-    }
-    Shape::from(out)
-}
-
 fn arange_len(start: i64, end: i64, step: i64) -> usize {
     if step == 0 {
         return 0;
@@ -163,22 +147,4 @@ fn arange_len(start: i64, end: i64, step: i64) -> usize {
         if end >= start { 0 } else { ((start - end) + s - 1) / s }
     };
     n as usize
-}
-
-fn matmul_out_shape(lhs: &Shape, rhs: &Shape) -> Result<Shape> {
-    if lhs.rank() < 2 || rhs.rank() < 2 {
-        return Err(Error::Msg("trace: matmul requires rank >= 2".into()));
-    }
-    let (lhs_batch, lhs_mat) = lhs.dims().split_at(lhs.rank() - 2);
-    let (rhs_batch, rhs_mat) = rhs.dims().split_at(rhs.rank() - 2);
-    let (m, k) = (lhs_mat[0], lhs_mat[1]);
-    let (k2, n) = (rhs_mat[0], rhs_mat[1]);
-    if k != k2 {
-        return Err(Error::Msg(format!("trace: matmul inner dim mismatch: {k} vs {k2}")));
-    }
-    let batch = Shape::from(lhs_batch.to_vec()).broadcast_shape_binary_op(&Shape::from(rhs_batch.to_vec()), "matmul")?;
-    let mut dims = batch.into_dims();
-    dims.push(m);
-    dims.push(n);
-    Ok(Shape::from(dims))
 }

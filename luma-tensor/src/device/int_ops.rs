@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::Result;
+use crate::{ReduceOp, Result};
 use crate::dtype::{BoolDType, FloatDType, IntDType};
 use crate::tensor::{Layout, Shape};
 
@@ -52,24 +52,53 @@ pub trait IntOps<D: super::Device> {
 
     fn i_unary_(dst: &mut D::IntStorage, dst_l: &Layout, op: crate::UnaryOp<i64>) -> Result<()>;
 
-    // matmul (batched); out shape computed by the caller / this fn
-    fn i_matmul(lhs: &D::IntStorage, lhs_l: &Layout, rhs: &D::IntStorage, rhs_l: &Layout) -> Result<(D::IntStorage, Shape)>;
+    // matmul (batched); `out_shape` computed by the tensor layer
+    // (`ops::shape_infer::matmul_out_shape`).
+    fn i_matmul(lhs: &D::IntStorage, lhs_l: &Layout, rhs: &D::IntStorage, rhs_l: &Layout, out_shape: &Shape) -> Result<D::IntStorage>;
 
     // comparison -> bool
     fn i_cmp(lhs: &D::IntStorage, lhs_l: &Layout, rhs: &D::IntStorage, rhs_l: &Layout, op: crate::CmpOp) -> Result<D::BoolStorage>;
 
     fn i_cmp_scalar(lhs: &D::IntStorage, lhs_l: &Layout, rhs: i64, op: crate::CmpOp) -> Result<D::BoolStorage>;
 
-    // reduction
-    fn i_reduce(x: &D::IntStorage, layout: &Layout, dims: &[usize], keepdim: bool, op: crate::ReduceOp) -> Result<(D::IntStorage, Shape)>;
+    // reduction (`out_shape` computed by the tensor layer)
+    fn i_reduce(
+        x: &D::IntStorage,
+        layout: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+        op: ReduceOp,
+        out_shape: &Shape,
+    ) -> Result<D::IntStorage>;
 
     /// argmin/argmax return int-kind indices.
-    fn i_arg_reduce(x: &D::IntStorage, layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> Result<(D::IntStorage, Shape)>;
+    fn i_arg_reduce(
+        x: &D::IntStorage,
+        layout: &Layout,
+        dim: usize,
+        keepdim: bool,
+        take_max: bool,
+        out_shape: &Shape,
+    ) -> Result<D::IntStorage>;
 
-    // indexing
-    fn i_index_select(x: &D::IntStorage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> Result<(D::IntStorage, Shape)>;
+    // indexing (`out_shape` computed by the tensor layer)
+    fn i_index_select(
+        x: &D::IntStorage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<D::IntStorage>;
 
-    fn i_gather(x: &D::IntStorage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> Result<(D::IntStorage, Shape)>;
+    fn i_gather(
+        x: &D::IntStorage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<D::IntStorage>;
 
     fn i_index_add(
         init: &D::IntStorage,
@@ -91,8 +120,8 @@ pub trait IntOps<D: super::Device> {
         dim: usize,
     ) -> Result<D::IntStorage>;
 
-    // shape
-    fn i_cat(srcs: &[(&D::IntStorage, &Layout)], dim: usize) -> Result<(D::IntStorage, Shape)>;
+    // shape (`out_shape` computed by the tensor layer)
+    fn i_cat(srcs: &[(&D::IntStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<D::IntStorage>;
 
     /// Produce the storage for a view of `src` under `dst_l`. See [`FloatOps::f_view`].
     fn i_view(_src: &D::IntStorage, _src_l: &Layout, _dst_l: &Layout, _view: crate::ViewOp) -> Result<Option<D::IntStorage>> {

@@ -17,6 +17,7 @@ mod nn;
 mod numeric;
 mod reduce;
 mod shape;
+mod shape_infer;
 mod transfer;
 mod to;
 

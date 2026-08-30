@@ -55,18 +55,29 @@ pub trait FloatOps<D: super::Device> {
     fn f_float_unary(x: &D::FloatStorage, layout: &Layout, op: crate::FloatUnaryOp) -> Result<D::FloatStorage>;
     fn f_float_unary_(dst: &mut D::FloatStorage, dst_l: &Layout, op: crate::FloatUnaryOp) -> Result<()>;
 
-    // reduction: returns (storage, resulting shape)
+    // reduction: `out_shape` is computed by the tensor layer (see
+    // `ops::shape_infer::reduce_out_shape`) and passed in; the kernel must
+    // produce a buffer of exactly `out_shape.element_count()` elements.
     fn f_reduce(
         x: &D::FloatStorage,
         layout: &Layout,
         dims: &[usize],
         keepdim: bool,
         op: crate::ReduceOp,
-    ) -> Result<(D::FloatStorage, Shape)>;
-    fn f_arg_reduce(x: &D::FloatStorage, layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> Result<(D::IntStorage, Shape)>;
+        out_shape: &Shape,
+    ) -> Result<D::FloatStorage>;
+    fn f_arg_reduce(
+        x: &D::FloatStorage,
+        layout: &Layout,
+        dim: usize,
+        keepdim: bool,
+        take_max: bool,
+        out_shape: &Shape,
+    ) -> Result<D::IntStorage>;
 
-    // matmul (batched); out shape computed by the caller / this fn
-    fn f_matmul(lhs: &D::FloatStorage, lhs_l: &Layout, rhs: &D::FloatStorage, rhs_l: &Layout) -> Result<(D::FloatStorage, Shape)>;
+    // matmul (batched); `out_shape` computed by the tensor layer
+    // (`ops::shape_infer::matmul_out_shape`).
+    fn f_matmul(lhs: &D::FloatStorage, lhs_l: &Layout, rhs: &D::FloatStorage, rhs_l: &Layout, out_shape: &Shape) -> Result<D::FloatStorage>;
     fn f_add_matmul_(
         dst: &mut D::FloatStorage,
         dst_l: &Layout,
@@ -76,16 +87,24 @@ pub trait FloatOps<D: super::Device> {
         rhs_l: &Layout,
     ) -> Result<()>;
 
-    // indexing
+    // indexing (`out_shape` computed by the tensor layer)
     fn f_index_select(
         x: &D::FloatStorage,
         x_l: &Layout,
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> Result<(D::FloatStorage, Shape)>;
+        out_shape: &Shape,
+    ) -> Result<D::FloatStorage>;
 
-    fn f_gather(x: &D::FloatStorage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> Result<(D::FloatStorage, Shape)>;
+    fn f_gather(
+        x: &D::FloatStorage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<D::FloatStorage>;
 
     fn f_index_add(
         init: &D::FloatStorage,
@@ -107,8 +126,8 @@ pub trait FloatOps<D: super::Device> {
         dim: usize,
     ) -> Result<D::FloatStorage>;
 
-    // shape ops that need data movement
-    fn f_cat(srcs: &[(&D::FloatStorage, &Layout)], dim: usize) -> Result<(D::FloatStorage, Shape)>;
+    // shape ops that need data movement (`out_shape` computed by the tensor layer)
+    fn f_cat(srcs: &[(&D::FloatStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<D::FloatStorage>;
 
     // views (alias on compute devices; a fresh SSA value on tracing devices)
     fn f_view(_src: &D::FloatStorage, _src_l: &Layout, _dst_l: &Layout, _view: crate::ViewOp) -> Result<Option<D::FloatStorage>> {

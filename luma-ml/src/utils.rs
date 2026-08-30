@@ -1,14 +1,18 @@
+use crate::error::{MlError, MlResult};
 use luma_tensor::{DTypeKind, Device, Float, Tensor};
 use thiserrorctx::Context;
-use crate::error::{MlError, MlResult};
 
 /// 检查输入 x y 是否满足样本/标签对的格式：
 /// - `x`: (n_samples, n_features)
 /// - `y`: (n_samples)
-pub fn validate_xy_shapes<Dev, K1, K2>(x: &Tensor<Dev, K1>, y: &Tensor<Dev, K2>, sample_weight: Option<&Tensor<Dev, Float>>) -> MlResult<(usize, usize)> 
-where 
-    Dev: Device, 
-    K1: DTypeKind<Dev>, 
+pub fn validate_xy_shapes<Dev, K1, K2>(
+    x: &Tensor<Dev, K1>,
+    y: &Tensor<Dev, K2>,
+    sample_weight: Option<&Tensor<Dev, Float>>,
+) -> MlResult<(usize, usize)>
+where
+    Dev: Device,
+    K1: DTypeKind<Dev>,
     K2: DTypeKind<Dev>,
 {
     if !x.same_device(y) {

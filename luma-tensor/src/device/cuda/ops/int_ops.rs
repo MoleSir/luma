@@ -13,31 +13,31 @@ use cudarc::driver::CudaSlice;
 // ---- indexing dispatch helpers ----
 
 macro_rules! _int_select {
-    ($x:ident, $x_l:ident, $idx:ident, $idx_l:ident, $dim:ident, $launch_fn:ident, $op:literal, $out_shape:expr) => {
+    ($x:ident, $x_l:ident, $idx:ident, $idx_l:ident, $dim:ident, $launch_fn:ident, $op:literal, $_out_shape:expr) => {
         match (&$idx.slice, &$x.slice) {
             (CudaIntSlice::I32(ids), CudaIntSlice::I32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "i32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() }, $out_shape))
+                Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::I32(ids), CudaIntSlice::U32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "u32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() }, $out_shape))
+                Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::I32(ids), CudaIntSlice::U8(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "u8", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() }, $out_shape))
+                Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaIntSlice::I32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "i32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() }, $out_shape))
+                Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaIntSlice::U32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "u32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() }, $out_shape))
+                Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaIntSlice::U8(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "u8", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() }, $out_shape))
+                Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: $x.device.clone() })
             }
             _ => Err(crate::Error::DTypeMismatch { lhs: $x.slice.dtype(), rhs: $idx.slice.dtype(), op: $op }),
         }
@@ -632,7 +632,7 @@ impl IntOps<Cuda> for Cuda {
         }
     }
 
-    fn i_matmul(lhs: &CudaIntStorage, lhs_l: &Layout, rhs: &CudaIntStorage, rhs_l: &Layout) -> Result<(CudaIntStorage, Shape)> {
+    fn i_matmul(_lhs: &CudaIntStorage, _lhs_l: &Layout, _rhs: &CudaIntStorage, _rhs_l: &Layout, _out_shape: &Shape) -> Result<CudaIntStorage> {
         Err(CudaError::UnsupportIntMatmul)?
     }
 
@@ -672,7 +672,14 @@ impl IntOps<Cuda> for Cuda {
         }
     }
 
-    fn i_reduce(x: &CudaIntStorage, layout: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp) -> Result<(CudaIntStorage, Shape)> {
+    fn i_reduce(
+        x: &CudaIntStorage,
+        layout: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+        op: ReduceOp,
+        out_shape: &Shape,
+    ) -> Result<CudaIntStorage> {
         if matches!(op, ReduceOp::Mean) {
             return Err(crate::Error::Msg("Mean reduce not supported for int types".into()));
         }
@@ -680,20 +687,30 @@ impl IntOps<Cuda> for Cuda {
         match &x.slice {
             CudaIntSlice::I32(data) => {
                 let (out, shape) = launch::launch_multi_reduce::<i32>(device, op, "i32", &kernel::REDUCE, data, layout, dims, keepdim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() }, shape))
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda i_reduce shape must match the layer");
+                Ok(CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
             }
             CudaIntSlice::U32(data) => {
                 let (out, shape) = launch::launch_multi_reduce::<u32>(device, op, "u32", &kernel::REDUCE, data, layout, dims, keepdim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() }, shape))
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda i_reduce shape must match the layer");
+                Ok(CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
             }
             CudaIntSlice::U8(data) => {
                 let (out, shape) = launch::launch_multi_reduce::<u8>(device, op, "u8", &kernel::REDUCE, data, layout, dims, keepdim)?;
-                Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() }, shape))
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda i_reduce shape must match the layer");
+                Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
             }
         }
     }
 
-    fn i_arg_reduce(x: &CudaIntStorage, layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> Result<(CudaIntStorage, Shape)> {
+    fn i_arg_reduce(
+        x: &CudaIntStorage,
+        layout: &Layout,
+        dim: usize,
+        _keepdim: bool,
+        take_max: bool,
+        _out_shape: &Shape,
+    ) -> Result<CudaIntStorage> {
         let dims = layout.dims().to_vec();
         let strides = layout.stride().to_vec();
         let reduce_size = dims[dim];
@@ -718,17 +735,8 @@ impl IntOps<Cuda> for Cuda {
             output_block_count,
         )?;
 
-        let mut out_dims = dims;
-        if keepdim {
-            out_dims[dim] = 1;
-        } else {
-            out_dims.remove(dim);
-        }
-        if out_dims.is_empty() {
-            out_dims = vec![1];
-        }
-
-        Ok((CudaIntStorage { slice: CudaIntSlice::U32(indices), device: x.device.clone() }, Shape::from(out_dims)))
+        // 输出形状由层提供（rank-0 时不再补 `[1]`，与 Cpu/Trace 一致）
+        Ok(CudaIntStorage { slice: CudaIntSlice::U32(indices), device: x.device.clone() })
     }
 
     fn i_index_select(
@@ -737,24 +745,28 @@ impl IntOps<Cuda> for Cuda {
         idx: &CudaIntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> Result<(CudaIntStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<CudaIntStorage> {
         if !x_l.is_contiguous() || !idx_l.is_contiguous() {
             return Err(crate::Error::RequiresContiguous { op: "index_select" });
         }
         x.device.same_ordinal(&idx.device, "index_select")?;
-        let mut out_dims = x_l.dims().to_vec();
-        out_dims[dim] = idx_l.dims()[0];
-        let out_shape = Shape::from(out_dims);
-        _int_select!(x, x_l, idx, idx_l, dim, launch_index_select, "index_select", out_shape)
+        _int_select!(x, x_l, idx, idx_l, dim, launch_index_select, "index_select", out_shape.clone())
     }
 
-    fn i_gather(x: &CudaIntStorage, x_l: &Layout, idx: &CudaIntStorage, idx_l: &Layout, dim: usize) -> Result<(CudaIntStorage, Shape)> {
+    fn i_gather(
+        x: &CudaIntStorage,
+        x_l: &Layout,
+        idx: &CudaIntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<CudaIntStorage> {
         if !x_l.is_contiguous() || !idx_l.is_contiguous() {
             return Err(crate::Error::RequiresContiguous { op: "gather" });
         }
         x.device.same_ordinal(&idx.device, "gather")?;
-        let out_shape = Shape::from(idx_l.dims().to_vec());
-        _int_select!(x, x_l, idx, idx_l, dim, launch_gather, "gather", out_shape)
+        _int_select!(x, x_l, idx, idx_l, dim, launch_gather, "gather", out_shape.clone())
     }
 
     fn i_index_add(
@@ -791,9 +803,10 @@ impl IntOps<Cuda> for Cuda {
         _int_add!(init, init_l, idx, idx_l, src, src_l, dim, launch_scatter_add, "scatter_add")
     }
 
-    fn i_cat(srcs: &[(&CudaIntStorage, &Layout)], dim: usize) -> Result<(CudaIntStorage, Shape)> {
+    fn i_cat(srcs: &[(&CudaIntStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<CudaIntStorage> {
         let layouts: Vec<&Layout> = srcs.iter().map(|(_, l)| *l).collect();
-        let out_shape = super::cat_compute_shape(&layouts, dim)?;
+        let internal_shape = super::cat_compute_shape(&layouts, dim)?;
+        debug_assert_eq!(internal_shape.dims(), out_shape.dims(), "cuda i_cat shape must match the layer");
         let device = &srcs[0].0.device;
         for (storage, _) in srcs {
             storage.device.same_ordinal(device, "cat")?;
@@ -809,7 +822,7 @@ impl IntOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_i32", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() }, out_shape))
+                    Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
                 }
                 CudaIntSlice::U32(_) => {
                     let mut out = device.alloc::<u32>(out_shape.element_count())?;
@@ -819,7 +832,7 @@ impl IntOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_u32", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() }, out_shape))
+                    Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
                 }
                 CudaIntSlice::U8(_) => {
                     let mut out = device.alloc::<u8>(out_shape.element_count())?;
@@ -829,7 +842,7 @@ impl IntOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_u8", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() }, out_shape))
+                    Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
                 }
             }
         } else {
@@ -867,7 +880,7 @@ impl IntOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() }, out_shape))
+                    Ok((CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
                 }
                 CudaIntSlice::U32(_) => {
                     let mut out = device.alloc::<u32>(out_shape.element_count())?;
@@ -898,7 +911,7 @@ impl IntOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() }, out_shape))
+                    Ok((CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
                 }
                 CudaIntSlice::U8(_) => {
                     let mut out = device.alloc::<u8>(out_shape.element_count())?;
@@ -929,7 +942,7 @@ impl IntOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() }, out_shape))
+                    Ok((CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
                 }
             }
         }

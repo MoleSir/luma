@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use luma_tensor::{Device, Int, Tensor};
+use std::path::PathBuf;
 use thiserrorctx::Context;
 
 use crate::error::MlResult;
@@ -35,9 +35,8 @@ pub fn load_iris<Dev: Device>(device: &Dev) -> MlResult<IrisDataset<Dev>> {
         }
         let mut tokens = line.split(',');
         for _ in 0..IRIS_N_FEATURES {
-            let v: f64 = tokens
-                .next().expect("invalid iris data: no enough features!")
-                .parse::<f64>().expect("invalid iris data: not number");
+            let v: f64 =
+                tokens.next().expect("invalid iris data: no enough features!").parse::<f64>().expect("invalid iris data: not number");
             x.push(v);
         }
         let label = tokens.next().expect("invalid iris data: no label!");
@@ -50,7 +49,7 @@ pub fn load_iris<Dev: Device>(device: &Dev) -> MlResult<IrisDataset<Dev>> {
     let x = Tensor::from_vec_f64(x, (IRIS_N_SAMPLES, IRIS_N_FEATURES), device)?;
     let y = Tensor::<Dev, Int>::new(y, device)?;
 
-    Ok( IrisDataset { data: x, target: y } )
+    Ok(IrisDataset { data: x, target: y })
 }
 
 fn str_to_label(s: &str) -> u32 {
@@ -58,7 +57,7 @@ fn str_to_label(s: &str) -> u32 {
         "Iris-setosa" => 0,
         "Iris-versicolor" => 1,
         "Iris-virginica" => 2,
-        _ => unreachable!("un support iris label")
+        _ => unreachable!("un support iris label"),
     }
 }
 
@@ -124,11 +123,7 @@ pub fn load_diabetes<Dev: Device>(device: &Dev) -> MlResult<DiabetesDataset<Dev>
     let x = Tensor::from_vec_f64(x, (DIABETES_N_SAMPLES, DIABETES_N_FEATURES), device)?;
     let y = Tensor::from_vec_f64(y, (DIABETES_N_SAMPLES,), device)?; // Y 此时是一维的浮点 Tensor
 
-    Ok(DiabetesDataset {
-        headers,
-        data: x,
-        target: y,
-    })
+    Ok(DiabetesDataset { headers, data: x, target: y })
 }
 
 // ==================================================================================== //
@@ -139,9 +134,9 @@ pub fn load_diabetes<Dev: Device>(device: &Dev) -> MlResult<DiabetesDataset<Dev>
 mod tests {
     use luma_tensor::Cpu;
 
+    use super::load_iris;
     use crate::datasets::local::{IRIS_N_FEATURES, IRIS_N_SAMPLES};
     use crate::datasets::{DIABETES_N_FEATURES, DIABETES_N_SAMPLES, load_diabetes};
-    use super::load_iris;
 
     #[test]
     fn test_load_iris() {
@@ -160,5 +155,4 @@ mod tests {
         assert_eq!(x.dims(), [DIABETES_N_SAMPLES, DIABETES_N_FEATURES]);
         assert_eq!(y.dims(), [DIABETES_N_SAMPLES,]);
     }
-
 }

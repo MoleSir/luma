@@ -1,9 +1,14 @@
-use luma_tensor::{no_grad, Device, Tensor};
+use luma_tensor::{Device, Tensor, no_grad};
 
-use crate::{core::{PredictFit, PredictModel}, error::MlResult, utils, PredictFitWithWeight};
+use crate::{
+    PredictFitWithWeight,
+    core::{PredictFit, PredictModel},
+    error::MlResult,
+    utils,
+};
 
 pub struct RidgeRegression {
-    pub n_iter: usize, 
+    pub n_iter: usize,
     pub learning_rate: f64,
     pub alpha: f64,
 }
@@ -28,11 +33,11 @@ impl<Dev: Device> PredictFit<Tensor<Dev>> for RidgeRegression {
     /// $$
     /// y = w x + b
     /// $$
-    /// 
+    ///
     /// ## Args
-    /// - `x`: (n_samples, n_features) 
+    /// - `x`: (n_samples, n_features)
     /// - `y`: (n_samples,)
-    /// 
+    ///
     /// ## Return
     /// - linear gression model
     fn fit(&self, x: &Tensor<Dev>, y: &Tensor<Dev>) -> MlResult<Self::Model> {
@@ -54,7 +59,7 @@ impl<Dev: Device> PredictModel for RidgeRegressionModel<Dev> {
 
     /// ## Args:
     /// - `x`: (n_samples, n_features)
-    /// 
+    ///
     /// ## Return
     /// - `y`: (n_samples, )
     fn predict(&self, x: &Tensor<Dev>) -> MlResult<Tensor<Dev>> {
@@ -69,12 +74,17 @@ impl RidgeRegression {
     /// - `x`: (n_samples, n_features)
     /// - `y`: (n_samples),
     /// - `sample_weight`: Option<(n_samples)>,    
-    fn fit_with<Dev: Device>(&self, x: &Tensor<Dev>, y: &Tensor<Dev>, sample_weight: Option<&Tensor<Dev>>) -> MlResult<RidgeRegressionModel<Dev>> {
+    fn fit_with<Dev: Device>(
+        &self,
+        x: &Tensor<Dev>,
+        y: &Tensor<Dev>,
+        sample_weight: Option<&Tensor<Dev>>,
+    ) -> MlResult<RidgeRegressionModel<Dev>> {
         let device = x.device();
         let dtype = x.dtype();
 
         let (n_samples, n_features) = utils::validate_xy_shapes(x, y, sample_weight)?;
-        
+
         let weights = Tensor::zeros((n_features, 1), (device, dtype))?;
         let mut bias = 0.0;
 
@@ -108,7 +118,7 @@ impl RidgeRegression {
             let w_grad = x_t.matmul(&dloss)?.div_(weight_sum)?;
             let b_grad = dloss.sum_all()?.div_(weight_sum)?.to_scalar()?;
 
-            let l2_grad = &weights * (2.0 * self.alpha); 
+            let l2_grad = &weights * (2.0 * self.alpha);
             w_grad.add_(l2_grad)?;
 
             w_grad.mul_(self.learning_rate)?;
@@ -117,7 +127,7 @@ impl RidgeRegression {
             bias -= b_grad;
         }
 
-        Ok(RidgeRegressionModel { weights, bias, alpha: self.alpha  })
+        Ok(RidgeRegressionModel { weights, bias, alpha: self.alpha })
     }
 }
 
@@ -125,7 +135,11 @@ impl RidgeRegression {
 mod tests {
     use luma_tensor::{Cpu, Tensor};
 
-    use crate::{datasets::{make_regression, RegressionOption}, linear::RidgeRegression, core::PredictFit};
+    use crate::{
+        core::PredictFit,
+        datasets::{RegressionOption, make_regression},
+        linear::RidgeRegression,
+    };
 
     #[test]
     fn test_gd_1d() {

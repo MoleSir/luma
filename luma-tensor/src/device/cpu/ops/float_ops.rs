@@ -356,16 +356,19 @@ impl FloatOps<Cpu> for Cpu {
         dims: &[usize],
         keepdim: bool,
         op: crate::ReduceOp,
-    ) -> Result<(<Cpu as Device>::FloatStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
         let reducer = reduce::Reducer::from(op);
         match x {
             CpuFloatStorage::F32(d) => {
                 let (v, s) = reduce::reduce_dims(d, l, dims, keepdim, reducer)?;
-                Ok((CpuFloatStorage::F32(v), s))
+                debug_assert_eq!(s.dims(), out_shape.dims(), "cpu f_reduce shape must match the layer");
+                Ok(CpuFloatStorage::F32(v))
             }
             CpuFloatStorage::F64(d) => {
                 let (v, s) = reduce::reduce_dims(d, l, dims, keepdim, reducer)?;
-                Ok((CpuFloatStorage::F64(v), s))
+                debug_assert_eq!(s.dims(), out_shape.dims(), "cpu f_reduce shape must match the layer");
+                Ok(CpuFloatStorage::F64(v))
             }
         }
     }
@@ -376,9 +379,11 @@ impl FloatOps<Cpu> for Cpu {
         dim: usize,
         keepdim: bool,
         take_max: bool,
-    ) -> Result<(<Cpu as Device>::IntStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         let (idx, shape) = dispatch_float_raw!(x, |d| reduce::arg_reduce(d, l, dim, keepdim, take_max))?;
-        Ok((usize_to_int_storage(&idx, DType::U32), shape))
+        debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu f_arg_reduce shape must match the layer");
+        Ok(usize_to_int_storage(&idx, DType::U32))
     }
 
     fn f_matmul(
@@ -386,15 +391,18 @@ impl FloatOps<Cpu> for Cpu {
         lhs_l: &Layout,
         rhs: &<Cpu as Device>::FloatStorage,
         rhs_l: &Layout,
-    ) -> Result<(<Cpu as Device>::FloatStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
         match (lhs, rhs) {
             (CpuFloatStorage::F32(a), CpuFloatStorage::F32(b)) => {
                 let (v, s) = matmul::matmul(a, lhs_l, b, rhs_l)?;
-                Ok((CpuFloatStorage::F32(v), s))
+                debug_assert_eq!(s.dims(), out_shape.dims(), "cpu f_matmul shape must match the layer");
+                Ok(CpuFloatStorage::F32(v))
             }
             (CpuFloatStorage::F64(a), CpuFloatStorage::F64(b)) => {
                 let (v, s) = matmul::matmul(a, lhs_l, b, rhs_l)?;
-                Ok((CpuFloatStorage::F64(v), s))
+                debug_assert_eq!(s.dims(), out_shape.dims(), "cpu f_matmul shape must match the layer");
+                Ok(CpuFloatStorage::F64(v))
             }
             (l, r) => Err(Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: "matmul" }),
         }
@@ -442,16 +450,19 @@ impl FloatOps<Cpu> for Cpu {
         idx: &<Cpu as Device>::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> Result<(<Cpu as Device>::FloatStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
         let ids = int_ids_as_usize(idx, idx_l);
         match x {
             CpuFloatStorage::F32(d) => {
                 let (v, dims) = indexing::index_select(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuFloatStorage::F32(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu f_index_select shape must match the layer");
+                Ok(CpuFloatStorage::F32(v))
             }
             CpuFloatStorage::F64(d) => {
                 let (v, dims) = indexing::index_select(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuFloatStorage::F64(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu f_index_select shape must match the layer");
+                Ok(CpuFloatStorage::F64(v))
             }
         }
     }
@@ -462,16 +473,19 @@ impl FloatOps<Cpu> for Cpu {
         idx: &<Cpu as Device>::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> Result<(<Cpu as Device>::FloatStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
         let ids = int_ids_as_usize(idx, idx_l);
         match x {
             CpuFloatStorage::F32(d) => {
                 let (v, dims) = indexing::gather(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuFloatStorage::F32(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu f_gather shape must match the layer");
+                Ok(CpuFloatStorage::F32(v))
             }
             CpuFloatStorage::F64(d) => {
                 let (v, dims) = indexing::gather(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuFloatStorage::F64(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu f_gather shape must match the layer");
+                Ok(CpuFloatStorage::F64(v))
             }
         }
     }
@@ -502,7 +516,11 @@ impl FloatOps<Cpu> for Cpu {
         dispatch_float2!(init, src, "scatter-add", |a, b| indexing::scatter_add(a, init_l, &ids, idx_l, b, dim)?)
     }
 
-    fn f_cat(srcs: &[(&<Cpu as Device>::FloatStorage, &Layout)], dim: usize) -> Result<(<Cpu as Device>::FloatStorage, Shape)> {
+    fn f_cat(
+        srcs: &[(&<Cpu as Device>::FloatStorage, &Layout)],
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::FloatStorage> {
         if srcs.is_empty() {
             return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
         }
@@ -517,12 +535,14 @@ impl FloatOps<Cpu> for Cpu {
             DType::F32 => {
                 let views: Vec<(&[f32], &Layout)> = srcs.iter().map(|(s, l)| (as_f32(s), *l)).collect();
                 let (v, shape) = super::kernels::shape::cat(&views, dim)?;
-                Ok((CpuFloatStorage::F32(v), shape))
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu f_cat shape must match the layer");
+                Ok(CpuFloatStorage::F32(v))
             }
             _ => {
                 let views: Vec<(&[f64], &Layout)> = srcs.iter().map(|(s, l)| (as_f64(s), *l)).collect();
                 let (v, shape) = super::kernels::shape::cat(&views, dim)?;
-                Ok((CpuFloatStorage::F64(v), shape))
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu f_cat shape must match the layer");
+                Ok(CpuFloatStorage::F64(v))
             }
         }
     }

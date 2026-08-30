@@ -2,7 +2,11 @@ use std::collections::HashMap;
 
 use luma_tensor::{Device, IndexOp, Int, IntDType, Tensor, ops::BaseOpsDTypeKind};
 
-use crate::{error::{MlError, MlResult}, core::{PredictFit, PredictModel}, utils};
+use crate::{
+    core::{PredictFit, PredictModel},
+    error::{MlError, MlResult},
+    utils,
+};
 
 // =========================================================================================== //
 //              Knn Regression
@@ -52,9 +56,7 @@ impl<Dev: Device> PredictModel for KnnRegressionModel<Dev> {
     /// ## Return
     /// - `prediction`: (n_test_samples,)
     fn predict(&self, x: &Tensor<Dev>) -> MlResult<Tensor<Dev>> {
-        let neighbors = find_closed_n_neighbors(
-            &self.x_train, &self.y_train, x, self.n_neighbors
-        )?;
+        let neighbors = find_closed_n_neighbors(&self.x_train, &self.y_train, x, self.n_neighbors)?;
 
         let prediction = neighbors.mean(1)?;
 
@@ -115,9 +117,7 @@ impl<Dev: Device> PredictModel for KnnClassifierModel<Dev> {
             luma_tensor::bail!("expect n_fetures {}, not got {}", self.n_features, n_features);
         }
 
-        let neighbor_labels = find_closed_n_neighbors(
-            &self.x_train, &self.y_train, x, self.n_neighbors
-        )?;
+        let neighbor_labels = find_closed_n_neighbors(&self.x_train, &self.y_train, x, self.n_neighbors)?;
 
         let mut labels = Vec::with_capacity(n_test_samples);
         for n in 0..n_test_samples {
@@ -128,10 +128,7 @@ impl<Dev: Device> PredictModel for KnnClassifierModel<Dev> {
                 *counters.entry(label).or_insert(0) += 1;
             }
 
-            let majority_label = counters.into_iter()
-                .max_by_key(|&(_, count)| count)
-                .map(|(label, _)| label)
-                .unwrap();
+            let majority_label = counters.into_iter().max_by_key(|&(_, count)| count).map(|(label, _)| label).unwrap();
 
             labels.push(majority_label);
         }
@@ -164,10 +161,10 @@ where
     let mut remaining = neg_distances;
     let mut idxs = Vec::with_capacity(n_neighbors);
     for _ in 0..n_neighbors {
-        let idx = remaining.argmax(1)?;                                    // (n_test_samples,)
-        let mask = arange.broadcast_eq(&idx.unsqueeze(1)?)?;               // (n_test_samples, n_samples)
-        remaining = mask.pick_true(f64::NEG_INFINITY, &remaining)?;        // 屏蔽已选位置
-        idxs.push(idx.unsqueeze(1)?);                                      // (n_test_samples, 1)
+        let idx = remaining.argmax(1)?; // (n_test_samples,)
+        let mask = arange.broadcast_eq(&idx.unsqueeze(1)?)?; // (n_test_samples, n_samples)
+        remaining = mask.pick_true(f64::NEG_INFINITY, &remaining)?; // 屏蔽已选位置
+        idxs.push(idx.unsqueeze(1)?); // (n_test_samples, 1)
     }
     let idx = Tensor::cat(&idxs, 1)?;
 
@@ -184,10 +181,10 @@ mod tests {
     use luma_tensor::{Cpu, Tensor};
 
     use crate::{
+        core::{PredictFit, PredictModel},
         datasets::{load_iris, train_test_split},
         metrics::accuracy_score,
         neighbor::{KnnClassifier, KnnRegression},
-        core::{PredictFit, PredictModel},
     };
 
     #[test]

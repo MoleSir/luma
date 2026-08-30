@@ -30,10 +30,7 @@ impl<H, T> PipelineModel<H, T> {
 
 impl<H, T> Pipeline<H, T> {
     pub fn pipe<U>(self, next: U) -> Pipeline<Self, U> {
-        Pipeline {
-            head: self,
-            tail: next
-        }
+        Pipeline { head: self, tail: next }
     }
 }
 

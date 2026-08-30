@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
+use crate::{
+    core::{PredictFit, PredictModel},
+    error::MlResult,
+    tree::{DecisionTreeClassifier, DecisionTreeClassifierModel},
+};
 use luma_tensor::{Device, IndexOp, Int, Tensor};
 use rand::Rng;
-use crate::{
-    error::MlResult,
-    core::{PredictFit, PredictModel},
-    tree::{DecisionTreeClassifier, DecisionTreeClassifierModel}
-};
 
 pub struct RandomForestClassifier {
     pub n_estimators: usize,
@@ -68,10 +68,7 @@ impl<Dev: Device> PredictModel for RandomForestClassifierModel<Dev> {
 
 impl RandomForestClassifier {
     pub fn new(n_estimators: usize, max_depth: usize) -> Self {
-        Self {
-            n_estimators,
-            max_depth,
-        }
+        Self { n_estimators, max_depth }
     }
 
     fn bootstrap_sample<Dev: Device>(x: &Tensor<Dev>, y: &Tensor<Dev, Int>, n_samples: usize) -> MlResult<(Tensor<Dev>, Tensor<Dev, Int>)> {

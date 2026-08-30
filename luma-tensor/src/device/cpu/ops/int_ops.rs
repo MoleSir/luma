@@ -433,19 +433,23 @@ impl IntOps<Cpu> for Cpu {
         lhs_l: &Layout,
         rhs: &<Cpu as Device>::IntStorage,
         rhs_l: &Layout,
-    ) -> Result<(<Cpu as Device>::IntStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         let result = match (lhs, rhs) {
             (CpuIntStorage::I32(a), CpuIntStorage::I32(b)) => {
                 let (vec, shape) = matmul::matmul(a, lhs_l, b, rhs_l)?;
-                (CpuIntStorage::I32(vec), shape)
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu i_matmul shape must match the layer");
+                CpuIntStorage::I32(vec)
             }
             (CpuIntStorage::U32(a), CpuIntStorage::U32(b)) => {
                 let (vec, shape) = matmul::matmul(a, lhs_l, b, rhs_l)?;
-                (CpuIntStorage::U32(vec), shape)
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu i_matmul shape must match the layer");
+                CpuIntStorage::U32(vec)
             }
             (CpuIntStorage::U8(a), CpuIntStorage::U8(b)) => {
                 let (vec, shape) = matmul::matmul(a, lhs_l, b, rhs_l)?;
-                (CpuIntStorage::U8(vec), shape)
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu i_matmul shape must match the layer");
+                CpuIntStorage::U8(vec)
             }
             (l, r) => return Err(Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: "int matmul" }),
         };
@@ -477,20 +481,24 @@ impl IntOps<Cpu> for Cpu {
         dims: &[usize],
         keepdim: bool,
         op: crate::ReduceOp,
-    ) -> Result<(<Cpu as Device>::IntStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         let reducer = reduce::Reducer::from(op);
         match x {
             CpuIntStorage::I32(d) => {
                 let (v, s) = reduce::reduce_dims(d, l, dims, keepdim, reducer)?;
-                Ok((CpuIntStorage::I32(v), s))
+                debug_assert_eq!(s.dims(), out_shape.dims(), "cpu i_reduce shape must match the layer");
+                Ok(CpuIntStorage::I32(v))
             }
             CpuIntStorage::U32(d) => {
                 let (v, s) = reduce::reduce_dims(d, l, dims, keepdim, reducer)?;
-                Ok((CpuIntStorage::U32(v), s))
+                debug_assert_eq!(s.dims(), out_shape.dims(), "cpu i_reduce shape must match the layer");
+                Ok(CpuIntStorage::U32(v))
             }
             CpuIntStorage::U8(d) => {
                 let (v, s) = reduce::reduce_dims(d, l, dims, keepdim, reducer)?;
-                Ok((CpuIntStorage::U8(v), s))
+                debug_assert_eq!(s.dims(), out_shape.dims(), "cpu i_reduce shape must match the layer");
+                Ok(CpuIntStorage::U8(v))
             }
         }
     }
@@ -501,20 +509,24 @@ impl IntOps<Cpu> for Cpu {
         idx: &<Cpu as Device>::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> Result<(<Cpu as Device>::IntStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         let ids = int_ids_as_usize(idx, idx_l);
         match x {
             CpuIntStorage::I32(d) => {
                 let (v, dims) = indexing::index_select(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuIntStorage::I32(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu i_index_select shape must match the layer");
+                Ok(CpuIntStorage::I32(v))
             }
             CpuIntStorage::U32(d) => {
                 let (v, dims) = indexing::index_select(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuIntStorage::U32(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu i_index_select shape must match the layer");
+                Ok(CpuIntStorage::U32(v))
             }
             CpuIntStorage::U8(d) => {
                 let (v, dims) = indexing::index_select(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuIntStorage::U8(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu i_index_select shape must match the layer");
+                Ok(CpuIntStorage::U8(v))
             }
         }
     }
@@ -525,25 +537,33 @@ impl IntOps<Cpu> for Cpu {
         idx: &<Cpu as Device>::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> Result<(<Cpu as Device>::IntStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         let ids = int_ids_as_usize(idx, idx_l);
         match x {
             CpuIntStorage::I32(d) => {
                 let (v, dims) = indexing::gather(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuIntStorage::I32(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu i_gather shape must match the layer");
+                Ok(CpuIntStorage::I32(v))
             }
             CpuIntStorage::U32(d) => {
                 let (v, dims) = indexing::gather(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuIntStorage::U32(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu i_gather shape must match the layer");
+                Ok(CpuIntStorage::U32(v))
             }
             CpuIntStorage::U8(d) => {
                 let (v, dims) = indexing::gather(d, x_l, &ids, idx_l, dim)?;
-                Ok((CpuIntStorage::U8(v), Shape::from(dims)))
+                debug_assert_eq!(&dims, out_shape.dims(), "cpu i_gather shape must match the layer");
+                Ok(CpuIntStorage::U8(v))
             }
         }
     }
 
-    fn i_cat(srcs: &[(&<Cpu as Device>::IntStorage, &Layout)], dim: usize) -> Result<(<Cpu as Device>::IntStorage, Shape)> {
+    fn i_cat(
+        srcs: &[(&<Cpu as Device>::IntStorage, &Layout)],
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         if srcs.is_empty() {
             return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
         }
@@ -557,7 +577,8 @@ impl IntOps<Cpu> for Cpu {
             ($variant:path, $getter:ident) => {{
                 let views: Vec<(&[_], &Layout)> = srcs.iter().map(|(s, l)| ($getter(s), *l)).collect();
                 let (v, shape) = super::kernels::shape::cat(&views, dim)?;
-                Ok(($variant(v), shape))
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu i_cat shape must match the layer");
+                Ok($variant(v))
             }};
         }
         match dt {
@@ -573,10 +594,12 @@ impl IntOps<Cpu> for Cpu {
         dim: usize,
         keepdim: bool,
         take_max: bool,
-    ) -> Result<(<Cpu as Device>::IntStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::IntStorage> {
         let (indices, shape) = dispatch_int_raw!(x, |d| reduce::arg_reduce(d, layout, dim, keepdim, take_max))?;
+        debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu i_arg_reduce shape must match the layer");
         let indices_u32: Vec<u32> = indices.into_iter().map(|i| i as u32).collect();
-        Ok((CpuIntStorage::U32(indices_u32), shape))
+        Ok(CpuIntStorage::U32(indices_u32))
     }
 
     fn i_index_add(

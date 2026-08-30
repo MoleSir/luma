@@ -19,8 +19,22 @@ pub trait BoolOps<D: super::Device> {
     fn b_cast_int(x: &D::BoolStorage, layout: &Layout, to: IntDType) -> Result<D::IntStorage>;
     fn b_cast_bool(x: &D::BoolStorage, layout: &Layout, to: BoolDType) -> Result<D::BoolStorage>;
 
-    fn b_index_select(x: &D::BoolStorage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> Result<(D::BoolStorage, Shape)>;
-    fn b_gather(x: &D::BoolStorage, x_l: &Layout, idx: &D::IntStorage, idx_l: &Layout, dim: usize) -> Result<(D::BoolStorage, Shape)>;
+    fn b_index_select(
+        x: &D::BoolStorage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<D::BoolStorage>;
+    fn b_gather(
+        x: &D::BoolStorage,
+        x_l: &Layout,
+        idx: &D::IntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<D::BoolStorage>;
 
     /// Read all elements into a `Vec<bool>` in logical (layout) order.
     fn b_to_vec(x: &D::BoolStorage, layout: &Layout) -> Result<Vec<bool>>;
@@ -36,14 +50,14 @@ pub trait BoolOps<D: super::Device> {
     fn b_xor(lhs: &D::BoolStorage, lhs_l: &Layout, rhs: &D::BoolStorage, rhs_l: &Layout) -> Result<D::BoolStorage>;
     fn b_not(x: &D::BoolStorage, layout: &Layout) -> Result<D::BoolStorage>;
 
-    // reductions (all/any over dims)
-    fn b_reduce_all(x: &D::BoolStorage, layout: &Layout, dims: &[usize], keepdim: bool) -> Result<(D::BoolStorage, Shape)>;
-    fn b_reduce_any(x: &D::BoolStorage, layout: &Layout, dims: &[usize], keepdim: bool) -> Result<(D::BoolStorage, Shape)>;
+    // reductions (all/any over dims); `out_shape` computed by the tensor layer
+    fn b_reduce_all(x: &D::BoolStorage, layout: &Layout, dims: &[usize], keepdim: bool, out_shape: &Shape) -> Result<D::BoolStorage>;
+    fn b_reduce_any(x: &D::BoolStorage, layout: &Layout, dims: &[usize], keepdim: bool, out_shape: &Shape) -> Result<D::BoolStorage>;
 
     fn b_true_count(x: &D::BoolStorage, layout: &Layout) -> Result<usize>;
 
-    // shape
-    fn b_cat(srcs: &[(&D::BoolStorage, &Layout)], dim: usize) -> Result<(D::BoolStorage, Shape)>;
+    // shape (`out_shape` computed by the tensor layer)
+    fn b_cat(srcs: &[(&D::BoolStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<D::BoolStorage>;
 
     /// Produce the storage for a view of `src` under `dst_l`. See [`FloatOps::f_view`].
     fn b_view(_src: &D::BoolStorage, _src_l: &Layout, _dst_l: &Layout, _view: crate::ViewOp) -> Result<Option<D::BoolStorage>> {

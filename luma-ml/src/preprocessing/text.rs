@@ -1,5 +1,5 @@
+use luma_tensor::{Device, Int, Tensor, tensor::IntTensor};
 use std::collections::{HashMap, HashSet};
-use luma_tensor::{tensor::IntTensor, Device, Int, Tensor};
 
 pub struct CountVectorizer {}
 
@@ -10,10 +10,9 @@ impl CountVectorizer {
             for token in text.split_whitespace() {
                 vocab.insert(token);
             }
-        } 
+        }
 
-        let vocab = vocab.into_iter()
-            .enumerate().map(|(i, t)| (t, i)).collect::<HashMap<_, _>>();
+        let vocab = vocab.into_iter().enumerate().map(|(i, t)| (t, i)).collect::<HashMap<_, _>>();
 
         let mut output = vec![];
         for text in texts {
@@ -22,12 +21,12 @@ impl CountVectorizer {
                 let index = vocab[token];
                 counter[index] += 1;
             }
-            output.push(Tensor::<Dev, Int>::new(counter, device)?); 
+            output.push(Tensor::<Dev, Int>::new(counter, device)?);
         }
 
         // [(vocab.len(),); n_samples] => (n_samples, vocab.len())
         let output = Tensor::stack(&output, 0)?;
-            
+
         Ok(output)
     }
 }

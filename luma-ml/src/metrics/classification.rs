@@ -1,4 +1,4 @@
-use luma_tensor::{Device, DTypeKind, Float, IndexOp, Int, Tensor};
+use luma_tensor::{DTypeKind, Device, Float, IndexOp, Int, Tensor};
 
 /// 统一的取数接口：luma 的 `to_vec` 是分 kind 实现的，用本 trait 让 metrics 保持对 kind 泛型。
 #[doc(hidden)]
@@ -48,11 +48,7 @@ pub fn confusion_matrix<Dev: Device>(y_true: &Tensor<Dev, Int>, y_pred: &Tensor<
         for col in 0..n_class {
             // row: 预测值为 row 的样本
             // col: 真实值为 col 的样本
-            let count = pred_true_pairs.iter()
-                .filter(|(pred, true_)| {
-                    *pred == row as i64 && *true_ == col as i64
-                })
-                .count() as i64;
+            let count = pred_true_pairs.iter().filter(|(pred, true_)| *pred == row as i64 && *true_ == col as i64).count() as i64;
             matrix[row * n_class + col] = count;
         }
     }
@@ -76,11 +72,9 @@ where
         luma_tensor::bail!("no samples!");
     }
 
-    let n_correct = y_true.to_vec_local()?.into_iter().zip(y_pred.to_vec_local()?)
-        .filter(|(t, p)| t == p)
-        .count();
+    let n_correct = y_true.to_vec_local()?.into_iter().zip(y_pred.to_vec_local()?).filter(|(t, p)| t == p).count();
 
-    Ok( n_correct as f64 / n_samples as f64 )
+    Ok(n_correct as f64 / n_samples as f64)
 }
 
 pub fn precision_score<Dev: Device>(y_true: &Tensor<Dev, Int>, y_pred: &Tensor<Dev, Int>) -> luma_tensor::Result<f64> {
@@ -100,7 +94,7 @@ pub fn precision_score<Dev: Device>(y_true: &Tensor<Dev, Int>, y_pred: &Tensor<D
             scores += tp / all_samples;
         }
 
-        Ok( scores / n_class as f64 )
+        Ok(scores / n_class as f64)
     }
 }
 
@@ -120,22 +114,22 @@ pub fn recall_score<Dev: Device>(y_true: &Tensor<Dev, Int>, y_pred: &Tensor<Dev,
             scores += tp / all_samples;
         }
 
-        Ok( scores / n_class as f64 )
+        Ok(scores / n_class as f64)
     }
 }
 
 pub fn f1_score<Dev: Device>(y_true: &Tensor<Dev, Int>, y_pred: &Tensor<Dev, Int>) -> luma_tensor::Result<f64> {
     let precision = precision_score(y_true, y_pred)?;
     let recall = recall_score(y_true, y_pred)?;
-    Ok( 2.0 * (precision * recall) / (precision + recall) )
+    Ok(2.0 * (precision * recall) / (precision + recall))
 }
 
 #[cfg(test)]
 mod tests {
     use luma_tensor::{Cpu, Int, Tensor};
 
-    use crate::metrics::{confusion_matrix, f1_score, recall_score};
     use super::precision_score;
+    use crate::metrics::{confusion_matrix, f1_score, recall_score};
 
     #[test]
     fn test_confusion_binary_matrix() {

@@ -1,3 +1,4 @@
+use super::shape_infer::{gather_out_shape, index_select_out_shape};
 use crate::{Bool, DTypeKind, Device, Dim, Float, Int, Layout, Shape, Tensor, TensorMeta, dtype::Storage};
 
 pub trait IndexingDTypeKind<D: Device>: DTypeKind<D> + Sized {
@@ -7,7 +8,8 @@ pub trait IndexingDTypeKind<D: Device>: DTypeKind<D> + Sized {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)>;
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage>;
 
     fn gather_dispatch(
         x: &Self::Storage,
@@ -15,7 +17,8 @@ pub trait IndexingDTypeKind<D: Device>: DTypeKind<D> + Sized {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)>;
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage>;
 }
 
 pub trait IndexingAddDTypeKind<D: Device>: IndexingDTypeKind<D> + Sized {
@@ -47,8 +50,9 @@ impl<D: Device> IndexingDTypeKind<D> for Float {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::f_index_select(x, x_l, idx, idx_l, dim)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::f_index_select(x, x_l, idx, idx_l, dim, out_shape)
     }
 
     fn gather_dispatch(
@@ -57,8 +61,9 @@ impl<D: Device> IndexingDTypeKind<D> for Float {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::f_gather(x, x_l, idx, idx_l, dim)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::f_gather(x, x_l, idx, idx_l, dim, out_shape)
     }
 }
 
@@ -95,8 +100,9 @@ impl<D: Device> IndexingDTypeKind<D> for Int {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::i_index_select(x, x_l, idx, idx_l, dim)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::i_index_select(x, x_l, idx, idx_l, dim, out_shape)
     }
 
     fn gather_dispatch(
@@ -105,8 +111,9 @@ impl<D: Device> IndexingDTypeKind<D> for Int {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::i_gather(x, x_l, idx, idx_l, dim)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::i_gather(x, x_l, idx, idx_l, dim, out_shape)
     }
 }
 
@@ -143,8 +150,9 @@ impl<D: Device> IndexingDTypeKind<D> for Bool {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::b_index_select(x, x_l, idx, idx_l, dim)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::b_index_select(x, x_l, idx, idx_l, dim, out_shape)
     }
 
     fn gather_dispatch(
@@ -153,8 +161,9 @@ impl<D: Device> IndexingDTypeKind<D> for Bool {
         idx: &D::IntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> crate::Result<(Self::Storage, Shape)> {
-        D::b_gather(x, x_l, idx, idx_l, dim)
+        out_shape: &Shape,
+    ) -> crate::Result<Self::Storage> {
+        D::b_gather(x, x_l, idx, idx_l, dim, out_shape)
     }
 }
 
@@ -162,20 +171,23 @@ impl<D: Device, K: IndexingDTypeKind<D>> Tensor<D, K> {
     /// Select slices along `dim` at the given 1-D `indices`.
     pub fn index_select<Dm: Dim>(&self, indices: &Tensor<D, Int>, dim: Dm) -> crate::Result<Self> {
         let dim = dim.to_index(self.shape(), "index_select")?;
-        let (storage, shape) =
-            K::index_select_dispatch(&*self.storage_read()?, self.layout(), &*indices.storage_read()?, indices.layout(), dim)?;
+        let out_shape = index_select_out_shape(self.shape(), indices.element_count(), dim);
+        let storage =
+            K::index_select_dispatch(&*self.storage_read()?, self.layout(), &*indices.storage_read()?, indices.layout(), dim, &out_shape)?;
         let meta = K::Meta::on_index_select(self, indices, dim);
         assert_eq!(self.dtype(), storage.dtype());
-        Ok(Self::from_storage(storage, shape, meta))
+        Ok(Self::from_storage(storage, out_shape, meta))
     }
 
     /// Gather along `dim` using an index tensor of the same rank.
     pub fn gather<Dm: Dim>(&self, indices: &Tensor<D, Int>, dim: Dm) -> crate::Result<Self> {
         let dim = dim.to_index(self.shape(), "gather")?;
-        let (storage, shape) = K::gather_dispatch(&*self.storage_read()?, self.layout(), &*indices.storage_read()?, indices.layout(), dim)?;
+        let out_shape = gather_out_shape(indices.shape());
+        let storage =
+            K::gather_dispatch(&*self.storage_read()?, self.layout(), &*indices.storage_read()?, indices.layout(), dim, &out_shape)?;
         let meta = K::Meta::on_gather(self, indices, dim);
         assert_eq!(self.dtype(), storage.dtype());
-        Ok(Self::from_storage(storage, shape, meta))
+        Ok(Self::from_storage(storage, out_shape, meta))
     }
 }
 

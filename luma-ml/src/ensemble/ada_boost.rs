@@ -1,6 +1,6 @@
 use luma_tensor::{Device, Tensor};
 
-use crate::{utils, MlResult, PredictFit, PredictFitWithWeight, PredictModel};
+use crate::{MlResult, PredictFit, PredictFitWithWeight, PredictModel, utils};
 
 pub struct AdaBoostRegressor<F> {
     pub fiter: F,
@@ -39,9 +39,7 @@ where
         // 对每个样本：按预测值排序，累计 \alpha 权重，取累计权重首次过半的预测值
         let mut result = Vec::with_capacity(n_samples);
         for i in 0..n_samples {
-            let mut pairs: Vec<(f64, f64)> = preds.iter().zip(&self.estimators)
-                .map(|(p, (_, alpha))| (p[i], *alpha))
-                .collect();
+            let mut pairs: Vec<(f64, f64)> = preds.iter().zip(&self.estimators).map(|(p, (_, alpha))| (p[i], *alpha)).collect();
             pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
             let mut acc = 0.0;
@@ -121,7 +119,10 @@ impl<F> AdaBoostRegressor<F> {
                 - 预测非常糟糕：err->1,更新因子接近 1，样本权重保持不变
 
             */
-            let new_weights = rel_errors.to_vec()?.into_iter().zip(weights.to_vec()?)
+            let new_weights = rel_errors
+                .to_vec()?
+                .into_iter()
+                .zip(weights.to_vec()?)
                 .map(|(e, old_w)| {
                     let factor = beta.powf(1.0 - e);
                     old_w * factor
@@ -173,19 +174,18 @@ mod tests {
         let y = 3.0 * &x + 2.0 + 0.1 * Tensor::<Cpu>::randn(0.0, 1.0, (N_SAMPLES,), &Cpu).unwrap();
         let x = x.unsqueeze(1).unwrap();
 
-        let trainer = AdaBoostRegressor {
-            fiter: LinearRegression::default(),
-            n_estimators: 10,
-            learning_rate: 1.0,
-        };
+        let trainer = AdaBoostRegressor { fiter: LinearRegression::default(), n_estimators: 10, learning_rate: 1.0 };
         // inherent fit 与 PredictFit trait fit 两条路径都可训练（trait 路径可接入 Pipeline 等泛型接口）
         let _model_inherent = trainer.fit(&x, &y).unwrap();
         let model = PredictFit::fit(&trainer, &x, &y).unwrap();
 
         // 至少训练出一个弱模型；误差率 < 0.5 时 \alpha = ln((1-L)/L) > 0
         assert!(!model.estimators.is_empty());
-        assert!(model.estimators.iter().all(|(_, alpha)| *alpha > 0.0),
-            "alphas = {:?}", model.estimators.iter().map(|(_, a)| a).collect::<Vec<_>>());
+        assert!(
+            model.estimators.iter().all(|(_, alpha)| *alpha > 0.0),
+            "alphas = {:?}",
+            model.estimators.iter().map(|(_, a)| a).collect::<Vec<_>>()
+        );
 
         // 10 轮 boosting 后训练误差应远小于 0.5（噪声标准差仅 0.1）
         let y_pred = model.predict(&x).unwrap();
@@ -193,11 +193,7 @@ mod tests {
         assert!(mse < 0.5, "mse = {mse}");
 
         // learning_rate 应线性收缩 \alpha（训练过程与 learning_rate 无关，\alpha 恰好减半）
-        let trainer_half = AdaBoostRegressor {
-            fiter: LinearRegression::default(),
-            n_estimators: 10,
-            learning_rate: 0.5,
-        };
+        let trainer_half = AdaBoostRegressor { fiter: LinearRegression::default(), n_estimators: 10, learning_rate: 0.5 };
         let model_half = PredictFit::fit(&trainer_half, &x, &y).unwrap();
         assert_eq!(model_half.estimators.len(), model.estimators.len());
         for ((_, alpha), (_, alpha_half)) in model.estimators.iter().zip(&model_half.estimators) {

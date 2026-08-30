@@ -48,7 +48,15 @@ impl DBSCAN {
         Ok(labels)
     }
 
-    fn expand_cluster<Dev: Device>(&self, cluster_id: i64, sample: usize, labels: &mut Vec<i64>, neighbors: &mut Vec<usize>, visited: &mut Vec<bool>, distances: &Tensor<Dev>) -> MlResult<()> {
+    fn expand_cluster<Dev: Device>(
+        &self,
+        cluster_id: i64,
+        sample: usize,
+        labels: &mut Vec<i64>,
+        neighbors: &mut Vec<usize>,
+        visited: &mut Vec<bool>,
+        distances: &Tensor<Dev>,
+    ) -> MlResult<()> {
         labels[sample] = cluster_id;
 
         let mut i = 0;
@@ -78,14 +86,7 @@ impl DBSCAN {
         // 过滤数量 (n_samples,)
         let mask = sample_dis.le(self.eps)?;
 
-        Ok(
-            mask.to_vec()?
-                .into_iter()
-                .enumerate()
-                .filter(|(_, m)| *m)
-                .map(|(i, _)| i )
-                .collect::<Vec<_>>()
-        )
+        Ok(mask.to_vec()?.into_iter().enumerate().filter(|(_, m)| *m).map(|(i, _)| i).collect::<Vec<_>>())
     }
 }
 
@@ -144,8 +145,7 @@ mod tests {
     fn test_dbscan_all_noise() {
         // 所有点彼此相距很远 -> 每个点都只有自己一个邻居，全部判为噪声（标签全部相同即可，
         // 不依赖 i64::MAX 标记，因为 Int 张量默认 I32 存储会把它截断成 -1）
-        let x = Tensor::<Cpu>::new(vec![0.0, 0.0, 100.0, 0.0, 0.0, 100.0], &Cpu)
-            .unwrap().reshape((3, 2)).unwrap();
+        let x = Tensor::<Cpu>::new(vec![0.0, 0.0, 100.0, 0.0, 0.0, 100.0], &Cpu).unwrap().reshape((3, 2)).unwrap();
 
         let dbscan = DBSCAN { eps: 1.0, min_pts: 2 };
         let labels = dbscan.fit(&x).unwrap().to_vec().unwrap();

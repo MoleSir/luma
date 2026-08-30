@@ -6,7 +6,7 @@ use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
 use luma_tensor::{BinaryOp, CmpOp, DType, FloatOps, FloatUnaryOp, Layout, ReduceOp, Result, Shape, UnaryOp, ViewOp};
 
 use super::{Trace, TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
-use super::{inplace_unsupported, matmul_out_shape, readback_unsupported, reduce_out_shape};
+use super::{inplace_unsupported, readback_unsupported};
 use crate::graph::{NodeOp, Scalar, ValueId};
 
 impl FloatOps<Trace> for Trace {
@@ -121,22 +121,39 @@ impl FloatOps<Trace> for Trace {
     }
 
     // ---- reduction ----
-    fn f_reduce(x: &TraceFloatStorage, layout: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp) -> Result<(TraceFloatStorage, Shape)> {
-        let out_shape = reduce_out_shape(layout.shape(), dims, keepdim);
+    fn f_reduce(
+        x: &TraceFloatStorage,
+        _layout: &Layout,
+        dims: &[usize],
+        _keepdim: bool,
+        op: ReduceOp,
+        out_shape: &Shape,
+    ) -> Result<TraceFloatStorage> {
         let id = x.device.emit(NodeOp::Reduce(op, dims.to_vec()), vec![x.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
-    fn f_arg_reduce(x: &TraceFloatStorage, layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> Result<(TraceIntStorage, Shape)> {
-        let out_shape = reduce_out_shape(layout.shape(), &[dim], keepdim);
+    fn f_arg_reduce(
+        x: &TraceFloatStorage,
+        _layout: &Layout,
+        dim: usize,
+        _keepdim: bool,
+        take_max: bool,
+        out_shape: &Shape,
+    ) -> Result<TraceIntStorage> {
         let id = x.device.emit(NodeOp::ArgReduce(dim, take_max), vec![x.value], DType::I32, out_shape.clone())?;
-        Ok((TraceIntStorage { value: id, dtype: IntDType::I32, device: x.device.clone() }, out_shape))
+        Ok(TraceIntStorage { value: id, dtype: IntDType::I32, device: x.device.clone() })
     }
 
     // ---- matmul ----
-    fn f_matmul(lhs: &TraceFloatStorage, lhs_l: &Layout, rhs: &TraceFloatStorage, rhs_l: &Layout) -> Result<(TraceFloatStorage, Shape)> {
-        let out_shape = matmul_out_shape(lhs_l.shape(), rhs_l.shape())?;
+    fn f_matmul(
+        lhs: &TraceFloatStorage,
+        _lhs_l: &Layout,
+        rhs: &TraceFloatStorage,
+        _rhs_l: &Layout,
+        out_shape: &Shape,
+    ) -> Result<TraceFloatStorage> {
         let id = lhs.device.emit(NodeOp::Matmul, vec![lhs.value, rhs.value], lhs.dtype.into(), out_shape.clone())?;
-        Ok((TraceFloatStorage { value: id, dtype: lhs.dtype, device: lhs.device.clone() }, out_shape))
+        Ok(TraceFloatStorage { value: id, dtype: lhs.dtype, device: lhs.device.clone() })
     }
     fn f_add_matmul_(
         _dst: &mut TraceFloatStorage,
@@ -152,27 +169,25 @@ impl FloatOps<Trace> for Trace {
     // ---- indexing ----
     fn f_index_select(
         x: &TraceFloatStorage,
-        x_l: &Layout,
+        _x_l: &Layout,
         idx: &TraceIntStorage,
-        idx_l: &Layout,
+        _idx_l: &Layout,
         dim: usize,
-    ) -> Result<(TraceFloatStorage, Shape)> {
-        let mut dims = x_l.shape().dims().to_vec();
-        dims[dim] = idx_l.element_count();
-        let out_shape = Shape::from(dims);
+        out_shape: &Shape,
+    ) -> Result<TraceFloatStorage> {
         let id = x.device.emit(NodeOp::IndexSelect(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
     fn f_gather(
         x: &TraceFloatStorage,
         _x_l: &Layout,
         idx: &TraceIntStorage,
-        idx_l: &Layout,
+        _idx_l: &Layout,
         dim: usize,
-    ) -> Result<(TraceFloatStorage, Shape)> {
-        let out_shape = idx_l.shape().clone();
+        out_shape: &Shape,
+    ) -> Result<TraceFloatStorage> {
         let id = x.device.emit(NodeOp::Gather(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
     fn f_index_add(
         init: &TraceFloatStorage,
@@ -204,14 +219,11 @@ impl FloatOps<Trace> for Trace {
     }
 
     // ---- shape ----
-    fn f_cat(srcs: &[(&TraceFloatStorage, &Layout)], dim: usize) -> Result<(TraceFloatStorage, Shape)> {
+    fn f_cat(srcs: &[(&TraceFloatStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<TraceFloatStorage> {
         let first = &srcs[0];
-        let mut dims = first.1.shape().dims().to_vec();
-        dims[dim] = srcs.iter().map(|(_, l)| l.dims()[dim]).sum();
-        let out_shape = Shape::from(dims);
         let inputs: Vec<ValueId> = srcs.iter().map(|(s, _)| s.value).collect();
         let id = first.0.device.emit(NodeOp::Cat(dim), inputs, first.0.dtype.into(), out_shape.clone())?;
-        Ok((TraceFloatStorage { value: id, dtype: first.0.dtype, device: first.0.device.clone() }, out_shape))
+        Ok(TraceFloatStorage { value: id, dtype: first.0.dtype, device: first.0.device.clone() })
     }
 
     fn f_view(src: &TraceFloatStorage, _src_l: &Layout, dst_l: &Layout, view: ViewOp) -> Result<Option<TraceFloatStorage>> {

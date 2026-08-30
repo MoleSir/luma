@@ -6,7 +6,7 @@ use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
 use luma_tensor::{BinaryOp, CmpOp, DType, IntOps, Layout, ReduceOp, Result, Shape, UnaryOp, ViewOp};
 
 use super::{Trace, TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
-use super::{arange_len, inplace_unsupported, matmul_out_shape, readback_unsupported, reduce_out_shape};
+use super::{arange_len, inplace_unsupported, readback_unsupported};
 use crate::graph::{NodeOp, Scalar, ValueId};
 
 impl IntOps<Trace> for Trace {
@@ -91,10 +91,15 @@ impl IntOps<Trace> for Trace {
     fn i_unary_(_dst: &mut TraceIntStorage, _dst_l: &Layout, _op: UnaryOp<i64>) -> Result<()> {
         inplace_unsupported("i_unary_")
     }
-    fn i_matmul(lhs: &TraceIntStorage, lhs_l: &Layout, rhs: &TraceIntStorage, rhs_l: &Layout) -> Result<(TraceIntStorage, Shape)> {
-        let out_shape = matmul_out_shape(lhs_l.shape(), rhs_l.shape())?;
+    fn i_matmul(
+        lhs: &TraceIntStorage,
+        _lhs_l: &Layout,
+        rhs: &TraceIntStorage,
+        _rhs_l: &Layout,
+        out_shape: &Shape,
+    ) -> Result<TraceIntStorage> {
         let id = lhs.device.emit(NodeOp::Matmul, vec![lhs.value, rhs.value], lhs.dtype.into(), out_shape.clone())?;
-        Ok((TraceIntStorage { value: id, dtype: lhs.dtype, device: lhs.device.clone() }, out_shape))
+        Ok(TraceIntStorage { value: id, dtype: lhs.dtype, device: lhs.device.clone() })
     }
     fn i_cmp(lhs: &TraceIntStorage, lhs_l: &Layout, rhs: &TraceIntStorage, _rhs_l: &Layout, op: CmpOp) -> Result<TraceBoolStorage> {
         let id = lhs.device.emit(NodeOp::Cmp(op), vec![lhs.value, rhs.value], DType::Bool, lhs_l.shape().clone())?;
@@ -104,33 +109,49 @@ impl IntOps<Trace> for Trace {
         let id = lhs.device.emit(NodeOp::CmpScalar(Scalar::I64(rhs), op), vec![lhs.value], DType::Bool, lhs_l.shape().clone())?;
         Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: lhs.device.clone() })
     }
-    fn i_reduce(x: &TraceIntStorage, layout: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp) -> Result<(TraceIntStorage, Shape)> {
-        let out_shape = reduce_out_shape(layout.shape(), dims, keepdim);
+    fn i_reduce(
+        x: &TraceIntStorage,
+        _layout: &Layout,
+        dims: &[usize],
+        _keepdim: bool,
+        op: ReduceOp,
+        out_shape: &Shape,
+    ) -> Result<TraceIntStorage> {
         let id = x.device.emit(NodeOp::Reduce(op, dims.to_vec()), vec![x.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceIntStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceIntStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
-    fn i_arg_reduce(x: &TraceIntStorage, layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> Result<(TraceIntStorage, Shape)> {
-        let out_shape = reduce_out_shape(layout.shape(), &[dim], keepdim);
+    fn i_arg_reduce(
+        x: &TraceIntStorage,
+        _layout: &Layout,
+        dim: usize,
+        _keepdim: bool,
+        take_max: bool,
+        out_shape: &Shape,
+    ) -> Result<TraceIntStorage> {
         let id = x.device.emit(NodeOp::ArgReduce(dim, take_max), vec![x.value], DType::I32, out_shape.clone())?;
-        Ok((TraceIntStorage { value: id, dtype: IntDType::I32, device: x.device.clone() }, out_shape))
+        Ok(TraceIntStorage { value: id, dtype: IntDType::I32, device: x.device.clone() })
     }
     fn i_index_select(
         x: &TraceIntStorage,
-        x_l: &Layout,
+        _x_l: &Layout,
         idx: &TraceIntStorage,
-        idx_l: &Layout,
+        _idx_l: &Layout,
         dim: usize,
-    ) -> Result<(TraceIntStorage, Shape)> {
-        let mut dims = x_l.shape().dims().to_vec();
-        dims[dim] = idx_l.element_count();
-        let out_shape = Shape::from(dims);
+        out_shape: &Shape,
+    ) -> Result<TraceIntStorage> {
         let id = x.device.emit(NodeOp::IndexSelect(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceIntStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceIntStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
-    fn i_gather(x: &TraceIntStorage, _x_l: &Layout, idx: &TraceIntStorage, idx_l: &Layout, dim: usize) -> Result<(TraceIntStorage, Shape)> {
-        let out_shape = idx_l.shape().clone();
+    fn i_gather(
+        x: &TraceIntStorage,
+        _x_l: &Layout,
+        idx: &TraceIntStorage,
+        _idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<TraceIntStorage> {
         let id = x.device.emit(NodeOp::Gather(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceIntStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceIntStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
     fn i_index_add(
         init: &TraceIntStorage,
@@ -160,14 +181,11 @@ impl IntOps<Trace> for Trace {
                 .emit(NodeOp::ScatterAdd(dim), vec![init.value, idx.value, src.value], init.dtype.into(), init_l.shape().clone())?;
         Ok(TraceIntStorage { value: id, dtype: init.dtype, device: init.device.clone() })
     }
-    fn i_cat(srcs: &[(&TraceIntStorage, &Layout)], dim: usize) -> Result<(TraceIntStorage, Shape)> {
+    fn i_cat(srcs: &[(&TraceIntStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<TraceIntStorage> {
         let first = &srcs[0];
-        let mut dims = first.1.shape().dims().to_vec();
-        dims[dim] = srcs.iter().map(|(_, l)| l.dims()[dim]).sum();
-        let out_shape = Shape::from(dims);
         let inputs: Vec<ValueId> = srcs.iter().map(|(s, _)| s.value).collect();
         let id = first.0.device.emit(NodeOp::Cat(dim), inputs, first.0.dtype.into(), out_shape.clone())?;
-        Ok((TraceIntStorage { value: id, dtype: first.0.dtype, device: first.0.device.clone() }, out_shape))
+        Ok(TraceIntStorage { value: id, dtype: first.0.dtype, device: first.0.device.clone() })
     }
     fn i_view(src: &TraceIntStorage, _src_l: &Layout, dst_l: &Layout, view: ViewOp) -> Result<Option<TraceIntStorage>> {
         let out = src.device.emit_view(src.value, dst_l, view);

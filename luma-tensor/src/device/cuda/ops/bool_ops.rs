@@ -78,41 +78,51 @@ impl BoolOps<Cuda> for Cuda {
         Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
     }
 
-    fn b_index_select(x: &CudaBoolStorage, x_l: &Layout, idx: &CudaIntStorage, idx_l: &Layout, dim: usize) -> Result<(CudaBoolStorage, Shape)> {
+    fn b_index_select(
+        x: &CudaBoolStorage,
+        x_l: &Layout,
+        idx: &CudaIntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        _out_shape: &Shape,
+    ) -> Result<CudaBoolStorage> {
         if !x_l.is_contiguous() || !idx_l.is_contiguous() {
             return Err(crate::Error::RequiresContiguous { op: "index_select" });
         }
         x.device.same_ordinal(&idx.device, "index_select")?;
-        let mut out_dims = x_l.dims().to_vec();
-        out_dims[dim] = idx_l.dims()[0];
-        let out_shape = Shape::from(out_dims);
 
         match &idx.slice {
             CudaIntSlice::I32(ids) => {
                 let out = launch::launch_index_select(&x.device, "i32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+                Ok(CudaBoolStorage { slice: out, device: x.clone() })
             }
             CudaIntSlice::U32(ids) => {
                 let out = launch::launch_index_select(&x.device, "u32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+                Ok(CudaBoolStorage { slice: out, device: x.clone() })
             }
         }
     }
 
-    fn b_gather(x: &CudaBoolStorage, x_l: &Layout, idx: &CudaIntStorage, idx_l: &Layout, dim: usize) -> Result<(CudaBoolStorage, Shape)> {
+    fn b_gather(
+        x: &CudaBoolStorage,
+        x_l: &Layout,
+        idx: &CudaIntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        _out_shape: &Shape,
+    ) -> Result<CudaBoolStorage> {
         if !x_l.is_contiguous() || !idx_l.is_contiguous() {
             return Err(crate::Error::RequiresContiguous { op: "gather" });
         }
         x.device.same_ordinal(&idx.device, "gather")?;
-        let out_shape = Shape::from(idx_l.dims().to_vec());
         match &idx.slice {
             CudaIntSlice::I32(ids) => {
                 let out = launch::launch_gather(&x.device, "i32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+                Ok(CudaBoolStorage { slice: out, device: x.clone() })
             }
             CudaIntSlice::U32(ids) => {
                 let out = launch::launch_gather(&x.device, "u32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok((CudaBoolStorage { slice: out, device: x.clone() }, out_shape))
+                Ok(CudaBoolStorage { slice: out, device: x.clone() })
             }
         }
     }
@@ -155,16 +165,18 @@ impl BoolOps<Cuda> for Cuda {
         Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
     }
 
-    fn b_reduce_all(x: &CudaBoolStorage, layout: &Layout, dims: &[usize], keepdim: bool) -> Result<(CudaBoolStorage, Shape)> {
+    fn b_reduce_all(x: &CudaBoolStorage, layout: &Layout, dims: &[usize], keepdim: bool, out_shape: &Shape) -> Result<CudaBoolStorage> {
         let (out, shape) =
             launch::launch_multi_reduce_by_kernel_name::<u8>(&x.device, "sall_u8", &kernel::REDUCE, &x.slice, layout, dims, keepdim)?;
-        Ok((CudaBoolStorage { slice: out, device: x.device.clone() }, shape))
+        debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda b_reduce_all shape must match the layer");
+        Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
     }
 
-    fn b_reduce_any(x: &CudaBoolStorage, layout: &Layout, dims: &[usize], keepdim: bool) -> Result<(CudaBoolStorage, Shape)> {
+    fn b_reduce_any(x: &CudaBoolStorage, layout: &Layout, dims: &[usize], keepdim: bool, out_shape: &Shape) -> Result<CudaBoolStorage> {
         let (out, shape) =
             launch::launch_multi_reduce_by_kernel_name::<u8>(&x.device, "sany_u8", &kernel::REDUCE, &x.slice, layout, dims, keepdim)?;
-        Ok((CudaBoolStorage { slice: out, device: x.device.clone() }, shape))
+        debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda b_reduce_any shape must match the layer");
+        Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
     }
 
     fn b_true_count(x: &CudaBoolStorage, layout: &Layout) -> Result<usize> {
@@ -177,9 +189,10 @@ impl BoolOps<Cuda> for Cuda {
         Ok(count)
     }
 
-    fn b_cat(srcs: &[(&CudaBoolStorage, &Layout)], dim: usize) -> Result<(CudaBoolStorage, Shape)> {
+    fn b_cat(srcs: &[(&CudaBoolStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<CudaBoolStorage> {
         let layouts: Vec<&Layout> = srcs.iter().map(|(_, l)| *l).collect();
-        let out_shape = super::cat_compute_shape(&layouts, dim)?;
+        let internal_shape = super::cat_compute_shape(&layouts, dim)?;
+        debug_assert_eq!(internal_shape.dims(), out_shape.dims(), "cuda b_cat shape must match the layer");
         let device = &srcs[0].0.device;
         for (storage, _) in srcs {
             storage.device.same_ordinal(device, "cat")?;
@@ -192,7 +205,7 @@ impl BoolOps<Cuda> for Cuda {
                 launch::launch_copy_offset(device, "ucopy_u8", &kernel::COPY, &storage.slice, layout, &out, offset)?;
                 offset += layout.shape().element_count();
             }
-            Ok((CudaBoolStorage { slice: out, device: device.clone() }, out_shape))
+            Ok(CudaBoolStorage { slice: out, device: device.clone() })
         } else {
             let cat_size = out_shape.dims()[dim];
             let d1: usize = out_shape.dims()[..dim].iter().product();
@@ -225,7 +238,7 @@ impl BoolOps<Cuda> for Cuda {
                 }
                 offset += d2;
             }
-            Ok((CudaBoolStorage { slice: out, device: device.clone() }, out_shape))
+            Ok(CudaBoolStorage { slice: out, device: device.clone() })
         }
     }
 

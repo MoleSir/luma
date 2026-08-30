@@ -10,9 +10,5 @@ pub enum MlError {
     Knn(String),
 
     #[error("Mismatched number of samples: x has {x_samples}, y has {y_samples}")]
-    SampleSizeMismatch {
-        x_samples: usize,
-        y_samples: usize,
-    },
-
+    SampleSizeMismatch { x_samples: usize, y_samples: usize },
 }

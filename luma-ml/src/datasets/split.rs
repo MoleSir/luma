@@ -1,10 +1,12 @@
+use luma_tensor::{Bool, Device, IndexOp, Tensor, ops::BaseOpsDTypeKind};
 use std::collections::HashSet;
-use luma_tensor::{ops::BaseOpsDTypeKind, Bool, Device, IndexOp, Tensor};
 
 /// X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
 pub fn train_test_split<Dev, K1, K2>(
-    x: &Tensor<Dev, K1>, y: &Tensor<Dev, K2>, test_ratio: f64,
-) -> luma_tensor::Result<(Tensor<Dev, K1>, Tensor<Dev, K1>, Tensor<Dev, K2>, Tensor<Dev, K2>)> 
+    x: &Tensor<Dev, K1>,
+    y: &Tensor<Dev, K2>,
+    test_ratio: f64,
+) -> luma_tensor::Result<(Tensor<Dev, K1>, Tensor<Dev, K1>, Tensor<Dev, K2>, Tensor<Dev, K2>)>
 where
     Dev: Device,
     K1: BaseOpsDTypeKind<Dev>,
@@ -34,7 +36,7 @@ where
 
     let x_train = x.i(&train_mask)?;
     let y_train = y.i(&train_mask)?;
-    
+
     let x_test = x.i(&test_mask)?;
     let y_test = y.i(&test_mask)?;
 

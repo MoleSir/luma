@@ -262,15 +262,16 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
 // ============================================================================
 
 impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
-    pub(crate) fn unary_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<Tensor<D, K>> {
+    pub(crate) fn unary_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<Self> {
         let storage = K::unary_dispatch(&*self.storage_read()?, self.layout(), op)?;
         let meta = K::Meta::on_unary(self, op);
         Ok(Self::from_storage(storage, self.shape().clone(), meta))
     }
 
-    pub(crate) fn unary_inplace_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<()> {
+    pub(crate) fn unary_inplace_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<Self> {
         let mut s = self.storage_write()?;
-        K::unary_inplace_dispatch(&mut s, self.layout(), op)
+        K::unary_inplace_dispatch(&mut s, self.layout(), op)?;
+        Ok(self.clone())
     }
 }
 
@@ -283,7 +284,7 @@ macro_rules! unary_method {
             }
 
             #[inline]
-            pub fn [<$name _>](&self) -> crate::Result<()> {
+            pub fn [<$name _>](&self) -> crate::Result<Self> {
                 self.unary_inplace_impl(UnaryOp::$op)
             }
         }
@@ -301,7 +302,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     #[inline]
-    pub fn affine_(&self, mul: K::Scalar, add: K::Scalar) -> crate::Result<()> {
+    pub fn affine_(&self, mul: K::Scalar, add: K::Scalar) -> crate::Result<Self> {
         self.unary_inplace_impl(UnaryOp::Affine(mul, add))
     }
 
@@ -311,7 +312,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     #[inline]
-    pub fn pow_(&self, exp: K::Scalar) -> crate::Result<()> {
+    pub fn pow_(&self, exp: K::Scalar) -> crate::Result<Self> {
         self.unary_inplace_impl(UnaryOp::Pow(exp))
     }
 
@@ -321,7 +322,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     #[inline]
-    pub fn clamp_(&self, min: Option<K::Scalar>, max: Option<K::Scalar>) -> crate::Result<()> {
+    pub fn clamp_(&self, min: Option<K::Scalar>, max: Option<K::Scalar>) -> crate::Result<Self> {
         self.unary_inplace_impl(UnaryOp::Clamp(min, max))
     }
 

@@ -1,6 +1,10 @@
-use luma_tensor::{Cpu, Tensor};
-use crate::{linear::LinearRegression,  preprocessing::{MinMaxScaler, StandardScaler}, pipelines};
 use super::{PredictFit, TransformFit};
+use crate::{
+    linear::LinearRegression,
+    pipelines,
+    preprocessing::{MinMaxScaler, StandardScaler},
+};
+use luma_tensor::{Cpu, Tensor};
 
 #[test]
 fn test_pipe_transform() {

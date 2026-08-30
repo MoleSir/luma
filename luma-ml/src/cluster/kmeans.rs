@@ -1,16 +1,15 @@
 use std::collections::HashSet;
 
-use luma_tensor::{no_grad, tensor::IntTensor, Device, IndexOp, Tensor, D};
+use luma_tensor::{D, Device, IndexOp, Tensor, no_grad, tensor::IntTensor};
 use rand::Rng;
 
 use crate::{MlResult, TransformFit, TransformModel};
-
 
 pub struct KMeans {
     pub k: usize,
     pub init_policy: KMeansInitPolicy,
     pub max_iters: usize,
-    pub eps:f64,
+    pub eps: f64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,7 +34,7 @@ impl<Dev: Device> TransformFit<Tensor<Dev>> for KMeans {
 
     /// ## Args
     /// - `x`: (n_samples, n_features)
-    /// 
+    ///
     /// ## Return
     /// - `labels`: (n_samples,)
     fn fit_transform(&self, x: &Tensor<Dev>) -> MlResult<IntTensor<Dev>> {
@@ -50,7 +49,7 @@ impl<Dev: Device> TransformModel for KMeansModel<Dev> {
 
     /// ## Args
     /// - `x`: (n_samples, n_features)
-    /// 
+    ///
     /// ## Return
     /// - `labels`: (n_samples,)
     fn transform(&self, x: &Tensor<Dev>) -> MlResult<IntTensor<Dev>> {
@@ -60,21 +59,21 @@ impl<Dev: Device> TransformModel for KMeansModel<Dev> {
 
 impl KMeans {
     /// Kmeans fit
-    /// 
+    ///
     /// ## Args
     /// - `x`: (n_samples, n_features)
-    /// 
+    ///
     /// ## Returns
     /// - `centers`: (k, n_features)
     /// - `indexs`: (n_samples,)
-    /// 
+    ///
     /// ## Flow
-    /// 
+    ///
     /// 1. init k centers: (k, n_features)
     /// 2. for _ in range(max_iter):
     ///     1. for each samples, calculate distance for each center, and select min one(new index)
     ///     2. each sample now belong to a center, for each center update center values by (n_sample_in_center, n_features)
-    /// 
+    ///
     fn do_fit<Dev: Device>(&self, x: &Tensor<Dev>) -> MlResult<(Tensor<Dev>, IntTensor<Dev>)> {
         no_grad!();
 
@@ -86,7 +85,6 @@ impl KMeans {
         let mut centers = self.init_centers(x)?; // (k, n_features)
         let device = x.device();
         assert!(device.same_device(centers.device()));
-
 
         for _ in 0..self.max_iters {
             // 1. choise min distance center for each sample => (n_samples, k, n_features)
@@ -165,8 +163,8 @@ mod tests {
     use luma_tensor::{Cpu, Tensor};
 
     use crate::{
-        cluster::{KMeans, KMeansInitPolicy, KMeansModel},
         TransformFit, TransformModel,
+        cluster::{KMeans, KMeansInitPolicy, KMeansModel},
     };
 
     /// 两个 5x5 的网格团：一个在 (0..4, 0..4)，一个在 (10..14, 10..14)，相距足够远保证分类清晰
@@ -186,12 +184,7 @@ mod tests {
     #[test]
     fn test_kmeans_fit_two_blobs() {
         let x = two_blobs();
-        let kmeans = KMeans {
-            k: 2,
-            init_policy: KMeansInitPolicy::Random,
-            max_iters: 100,
-            eps: 1e-6,
-        };
+        let kmeans = KMeans { k: 2, init_policy: KMeansInitPolicy::Random, max_iters: 100, eps: 1e-6 };
 
         // 随机初始化可能让两个中心落在同一团：Lloyd 有时收敛到 30/20 之类的局部最优。
         // 用纯度（聚类标签与真实两团的对齐率）衡量质量，重试 20 次把 flake 概率压到极低。
@@ -199,9 +192,7 @@ mod tests {
         for _ in 0..20 {
             let labels = kmeans.fit_transform(&x).unwrap().to_vec().unwrap();
             // 真实标签：前 25 个是团 A，后 25 个是团 B；聚类标签 0/1 可能互换，取较好对齐
-            let n_correct = labels.iter().enumerate()
-                .filter(|&(i, &l)| (l == labels[0]) == (i < 25))
-                .count();
+            let n_correct = labels.iter().enumerate().filter(|&(i, &l)| (l == labels[0]) == (i < 25)).count();
             purity = purity.max(n_correct as f64 / 50.0);
             if purity >= 0.9 {
                 break;
@@ -213,8 +204,7 @@ mod tests {
     #[test]
     fn test_kmeans_transform_with_given_centers() {
         // 手设 centers 验证 transform 的最近中心分配逻辑（完全确定性）
-        let centers = Tensor::<Cpu>::new(vec![0.0, 0.0, 10.0, 10.0], &Cpu)
-            .unwrap().reshape((2, 2)).unwrap();
+        let centers = Tensor::<Cpu>::new(vec![0.0, 0.0, 10.0, 10.0], &Cpu).unwrap().reshape((2, 2)).unwrap();
         let model = KMeansModel { centers };
 
         let x = two_blobs();

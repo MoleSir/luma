@@ -97,7 +97,7 @@ impl<Dev: Device> MultinomialNBModel<Dev> {
         // (n_samples, n_features) @ (n_class, n_features).T
         // 相当于让 x 的每一行：一个样本与 feature_log_prob.T 向量矩阵乘，即：feature_log_prob @ 一个 sample 的特征
         // 正好相当于这个 sample 分别和 feature_log_prob 的每行（每行表示一个 class 的特征概率）点积，恰好就是上述公式的后半部分
-        let prob = x.matmul(&self.feature_log_prob.transpose_last()?)?;  // (n_samples, n_class)
+        let prob = x.matmul(&self.feature_log_prob.transpose_last()?)?; // (n_samples, n_class)
         // 利用广播，给每个样本加上 \ln P(Y)
         let prob = prob.broadcast_add(&self.class_log_prior)?; // (n_samples, n_class)
 

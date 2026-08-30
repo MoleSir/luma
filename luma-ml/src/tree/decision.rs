@@ -1,8 +1,11 @@
 use std::collections::HashMap;
 
-use luma_tensor::{Device, DTypeKind, Float, IndexOp, Int, Tensor};
+use luma_tensor::{DTypeKind, Device, Float, IndexOp, Int, Tensor};
 
-use crate::{error::MlResult, core::{PredictFit, PredictModel}};
+use crate::{
+    core::{PredictFit, PredictModel},
+    error::MlResult,
+};
 
 pub enum DecisionTree<Dev: Device, V: DTypeKind<Dev>> {
     Leaf(V::Scalar),
@@ -13,7 +16,7 @@ pub enum DecisionTree<Dev: Device, V: DTypeKind<Dev>> {
         left: Box<DecisionTree<Dev, V>>,
         /// features[feature_id] > threshold
         right: Box<DecisionTree<Dev, V>>,
-    }
+    },
 }
 
 impl<Dev: Device, V: DTypeKind<Dev>> DecisionTree<Dev, V> {
@@ -21,12 +24,12 @@ impl<Dev: Device, V: DTypeKind<Dev>> DecisionTree<Dev, V> {
         self.get_depth(1)
     }
 
-    fn get_depth(&self, d: usize) -> usize{
+    fn get_depth(&self, d: usize) -> usize {
         match self {
             Self::Leaf(_) => d,
             Self::Node { feature_id: _, threshold: _, left, right } => {
-                let left_d = left.get_depth(d+1);
-                let right_d = right.get_depth(d+1);
+                let left_d = left.get_depth(d + 1);
+                let right_d = right.get_depth(d + 1);
                 left_d.max(right_d)
             }
         }
@@ -37,11 +40,7 @@ impl<Dev: Device, V: DTypeKind<Dev>> DecisionTree<Dev, V> {
             Self::Leaf(v) => Ok(v.clone()),
             Self::Node { feature_id, threshold, left, right } => {
                 let value = x.i(*feature_id)?.to_scalar()?;
-                if value <= *threshold {
-                    left.predict_single(x)
-                } else {
-                    right.predict_single(x)
-                }
+                if value <= *threshold { left.predict_single(x) } else { right.predict_single(x) }
             }
         }
     }
@@ -116,7 +115,7 @@ impl<Dev: Device> PredictFit<Tensor<Dev>> for DecisionTreeClassifier {
         let n_class = y.max(0)?.to_scalar()? as usize + 1;
         let root = self.build_tree(0, x, y, n_class)?;
 
-        Ok(DecisionTreeClassifierModel { root})
+        Ok(DecisionTreeClassifierModel { root })
     }
 }
 
@@ -132,7 +131,13 @@ impl<Dev: Device> PredictModel for DecisionTreeClassifierModel<Dev> {
 impl DecisionTreeClassifier {
     /// - `x`: (n_samples, n_features)
     /// - `y`: (n_samples)
-    fn build_tree<Dev: Device>(&self, depth: usize, x: &Tensor<Dev>, y: &Tensor<Dev, Int>, n_class: usize) -> luma_tensor::Result<Box<DecisionTree<Dev, Int>>> {
+    fn build_tree<Dev: Device>(
+        &self,
+        depth: usize,
+        x: &Tensor<Dev>,
+        y: &Tensor<Dev, Int>,
+        n_class: usize,
+    ) -> luma_tensor::Result<Box<DecisionTree<Dev, Int>>> {
         let (n_samples, n_features) = x.dims2()?;
         let mut counter = HashMap::new();
         for label in y.to_vec()? {
@@ -175,15 +180,14 @@ impl DecisionTreeClassifier {
         let left_node = self.build_tree(depth + 1, &x.i(&left_mask)?, &y.i(&left_mask)?, n_class)?;
         let right_node = self.build_tree(depth + 1, &x.i(&right_mask)?, &y.i(&right_mask)?, n_class)?;
 
-        Ok(Box::new(DecisionTree::Node {
-            feature_id: best_record.1,
-            threshold: best_record.2,
-            left: left_node,
-            right: right_node
-        }))
+        Ok(Box::new(DecisionTree::Node { feature_id: best_record.1, threshold: best_record.2, left: left_node, right: right_node }))
     }
 
-    fn split_mask<Dev: Device>(x: &Tensor<Dev>, feature_id: usize, threshold: f64) -> luma_tensor::Result<(Tensor<Dev, luma_tensor::Bool>, Tensor<Dev, luma_tensor::Bool>)> {
+    fn split_mask<Dev: Device>(
+        x: &Tensor<Dev>,
+        feature_id: usize,
+        threshold: f64,
+    ) -> luma_tensor::Result<(Tensor<Dev, luma_tensor::Bool>, Tensor<Dev, luma_tensor::Bool>)> {
         let left_mask = x.i((.., feature_id))?.le(threshold)?;
         let right_mask = left_mask.not()?;
 
@@ -194,10 +198,12 @@ impl DecisionTreeClassifier {
         &self,
         x_feature: &Tensor<Dev>,
         y_labels: &Tensor<Dev, Int>,
-        n_class: usize
+        n_class: usize,
     ) -> luma_tensor::Result<(f64, f64)> {
         let n_samples = x_feature.dims1()?;
-        if n_samples < 2 { return Ok((f64::MAX, 0.0)); }
+        if n_samples < 2 {
+            return Ok((f64::MAX, 0.0));
+        }
 
         // 1. 将特征和标签配对并排序
         let mut samples: Vec<(f64, i64)> = x_feature.to_vec()?.into_iter().zip(y_labels.to_vec()?).collect();
@@ -239,8 +245,7 @@ impl DecisionTreeClassifier {
             let gini_left = Self::calculate_gini(&left_counts, n_left);
             let gini_right = Self::calculate_gini(&right_counts, n_right);
 
-            let weighted_gini = (n_left as f64 / n_samples as f64) * gini_left
-                              + (n_right as f64 / n_samples as f64) * gini_right;
+            let weighted_gini = (n_left as f64 / n_samples as f64) * gini_left + (n_right as f64 / n_samples as f64) * gini_right;
 
             if weighted_gini < best_gini {
                 best_gini = weighted_gini;
@@ -252,11 +257,15 @@ impl DecisionTreeClassifier {
     }
 
     fn calculate_gini(counts: &[usize], total: usize) -> f64 {
-        if total == 0 { return 0.0; }
+        if total == 0 {
+            return 0.0;
+        }
         let mut sum_sq = 0.0;
         let total_f = total as f64;
         for &count in counts {
-            if count == 0 { continue; }
+            if count == 0 {
+                continue;
+            }
             let p = count as f64 / total_f;
             sum_sq += p * p;
         }
@@ -316,7 +325,12 @@ impl DecisionTreeRegressor {
     }
 
     /// 构建回归树
-    fn build_tree<Dev: Device>(&self, depth: usize, x: &Tensor<Dev>, y: &Tensor<Dev>) -> luma_tensor::Result<Box<DecisionTree<Dev, Float>>> {
+    fn build_tree<Dev: Device>(
+        &self,
+        depth: usize,
+        x: &Tensor<Dev>,
+        y: &Tensor<Dev>,
+    ) -> luma_tensor::Result<Box<DecisionTree<Dev, Float>>> {
         let (n_samples, n_features) = x.dims2()?;
 
         // 1. 计算当前节点的平均值
@@ -345,10 +359,10 @@ impl DecisionTreeRegressor {
                 match best_record {
                     None => {
                         best_record = Some((sse, feature_id, threshold));
-                    },
+                    }
                     Some((min_sse, _, _)) if sse < min_sse => {
                         best_record = Some((sse, feature_id, threshold));
-                    },
+                    }
                     _ => {}
                 }
             }
@@ -378,11 +392,15 @@ impl DecisionTreeRegressor {
             feature_id: best_feature_id,
             threshold: best_threshold,
             left: left_node,
-            right: right_node
+            right: right_node,
         }))
     }
 
-    fn split_mask<Dev: Device>(x: &Tensor<Dev>, feature_id: usize, threshold: f64) -> luma_tensor::Result<(Tensor<Dev, luma_tensor::Bool>, Tensor<Dev, luma_tensor::Bool>)> {
+    fn split_mask<Dev: Device>(
+        x: &Tensor<Dev>,
+        feature_id: usize,
+        threshold: f64,
+    ) -> luma_tensor::Result<(Tensor<Dev, luma_tensor::Bool>, Tensor<Dev, luma_tensor::Bool>)> {
         let left_mask = x.i((.., feature_id))?.le(threshold)?;
         let right_mask = left_mask.not()?;
         Ok((left_mask, right_mask))
@@ -392,10 +410,12 @@ impl DecisionTreeRegressor {
     fn find_best_split_for_feature<Dev: Device>(
         &self,
         x_feature: &Tensor<Dev>,
-        y_targets: &Tensor<Dev>
+        y_targets: &Tensor<Dev>,
     ) -> luma_tensor::Result<Option<(f64, f64)>> {
         let n_samples = x_feature.dims1()?;
-        if n_samples < 2 { return Ok(None); }
+        if n_samples < 2 {
+            return Ok(None);
+        }
 
         // 1. 将特征和目标值配对并按特征值排序
         let mut samples: Vec<(f64, f64)> = x_feature.to_vec()?.into_iter().zip(y_targets.to_vec()?).collect();
@@ -451,11 +471,11 @@ impl DecisionTreeRegressor {
                 None => {
                     best_sse = Some(total_sse);
                     best_threshold = threshold;
-                },
+                }
                 Some(min_sse) if total_sse < min_sse => {
                     best_sse = Some(total_sse);
                     best_threshold = threshold;
-                },
+                }
                 _ => {}
             }
         }
@@ -478,7 +498,12 @@ impl<Dev: Device> DecisionTreeRegressorModel<Dev> {
 mod tests {
     use luma_tensor::{Cpu, Int, Tensor};
 
-    use crate::{datasets::{load_diabetes, load_iris, train_test_split}, metrics::accuracy_score, core::{PredictFit, PredictModel}, tree::{DecisionTreeClassifier, DecisionTreeRegressor}};
+    use crate::{
+        core::{PredictFit, PredictModel},
+        datasets::{load_diabetes, load_iris, train_test_split},
+        metrics::accuracy_score,
+        tree::{DecisionTreeClassifier, DecisionTreeRegressor},
+    };
 
     #[test]
     fn test_class_iris() {

@@ -13,23 +13,23 @@ use cudarc::driver::{CudaSlice, LaunchConfig, PushKernelArg};
 // ---- indexing dispatch helpers ----
 
 macro_rules! _float_select {
-    ($x:ident, $x_l:ident, $idx:ident, $idx_l:ident, $dim:ident, $launch_fn:ident, $op:literal, $out_shape:expr) => {
+    ($x:ident, $x_l:ident, $idx:ident, $idx_l:ident, $dim:ident, $launch_fn:ident, $op:literal, $_out_shape:expr) => {
         match (&$idx.slice, &$x.slice) {
             (CudaIntSlice::I32(ids), CudaFloatSlice::F32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "f32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: $x.device.clone() }, $out_shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::I32(ids), CudaFloatSlice::F64(v)) => {
                 let out = launch::$launch_fn(&$x.device, "i32", "f64", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: $x.device.clone() }, $out_shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaFloatSlice::F32(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "f32", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: $x.device.clone() }, $out_shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: $x.device.clone() })
             }
             (CudaIntSlice::U32(ids), CudaFloatSlice::F64(v)) => {
                 let out = launch::$launch_fn(&$x.device, "u32", "f64", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: $x.device.clone() }, $out_shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: $x.device.clone() })
             }
             _ => Err(crate::Error::DTypeMismatch { lhs: $x.slice.dtype(), rhs: $idx.slice.dtype(), op: $op }),
         }
@@ -537,7 +537,14 @@ impl FloatOps<Cuda> for Cuda {
         }
     }
 
-    fn f_reduce(x: &CudaFloatStorage, layout: &Layout, dims: &[usize], keepdim: bool, op: ReduceOp) -> Result<(CudaFloatStorage, Shape)> {
+    fn f_reduce(
+        x: &CudaFloatStorage,
+        layout: &Layout,
+        dims: &[usize],
+        keepdim: bool,
+        op: ReduceOp,
+        out_shape: &Shape,
+    ) -> Result<CudaFloatStorage> {
         let device = &x.device;
         let kernel_op = match op {
             ReduceOp::Mean => ReduceOp::Sum,
@@ -550,6 +557,7 @@ impl FloatOps<Cuda> for Cuda {
             CudaFloatSlice::F32(data) => {
                 let (out, shape) =
                     launch::launch_multi_reduce::<f32>(device, kernel_op, "f32", &kernel::REDUCE, data, layout, dims, keepdim)?;
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda f_reduce shape must match the layer");
                 let final_out = if is_mean {
                     let aff_layout = Layout::contiguous(shape.clone());
                     let mul = (1.0 / total_factor) as f32;
@@ -557,11 +565,12 @@ impl FloatOps<Cuda> for Cuda {
                 } else {
                     out
                 };
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F32(final_out), device: device.clone() }, shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(final_out), device: device.clone() })
             }
             CudaFloatSlice::F64(data) => {
                 let (out, shape) =
                     launch::launch_multi_reduce::<f64>(device, kernel_op, "f64", &kernel::REDUCE, data, layout, dims, keepdim)?;
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda f_reduce shape must match the layer");
                 let final_out = if is_mean {
                     let aff_layout = Layout::contiguous(shape.clone());
                     let mul = 1.0 / total_factor;
@@ -569,12 +578,19 @@ impl FloatOps<Cuda> for Cuda {
                 } else {
                     out
                 };
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F64(final_out), device: device.clone() }, shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(final_out), device: device.clone() })
             }
         }
     }
 
-    fn f_arg_reduce(x: &CudaFloatStorage, layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> Result<(CudaIntStorage, Shape)> {
+    fn f_arg_reduce(
+        x: &CudaFloatStorage,
+        layout: &Layout,
+        dim: usize,
+        _keepdim: bool,
+        take_max: bool,
+        _out_shape: &Shape,
+    ) -> Result<CudaIntStorage> {
         let dims = layout.dims().to_vec();
         let strides = layout.stride().to_vec();
         let reduce_size = dims[dim];
@@ -613,20 +629,12 @@ impl FloatOps<Cuda> for Cuda {
             }
         };
 
-        let mut out_dims = dims;
-        if keepdim {
-            out_dims[dim] = 1;
-        } else {
-            out_dims.remove(dim);
-        }
-        if out_dims.is_empty() {
-            out_dims = vec![1];
-        }
-
-        Ok((CudaIntStorage { slice: CudaIntSlice::U32(indices), device: x.device.clone() }, Shape::from(out_dims)))
+        // 注意：输出形状由层提供（此前 CUDA 侧在 rank-0 时会补一个 `[1]` 维，
+        // 与 Cpu/Trace 的 `[]` 不一致；该 quirk 已随此重构删除）
+        Ok(CudaIntStorage { slice: CudaIntSlice::U32(indices), device: x.device.clone() })
     }
 
-    fn f_matmul(lhs: &CudaFloatStorage, lhs_l: &Layout, rhs: &CudaFloatStorage, rhs_l: &Layout) -> Result<(CudaFloatStorage, Shape)> {
+    fn f_matmul(lhs: &CudaFloatStorage, lhs_l: &Layout, rhs: &CudaFloatStorage, rhs_l: &Layout, _out_shape: &Shape) -> Result<CudaFloatStorage> {
         lhs.device.same_ordinal(&rhs.device, "matmul")?;
         let lhs_dims = lhs_l.dims();
         let rhs_dims = rhs_l.dims();
@@ -650,19 +658,14 @@ impl FloatOps<Cuda> for Cuda {
             return Err(crate::Error::ShapeMismatchBinaryOp { lhs: lhs_l.shape().clone(), rhs: rhs_l.shape().clone(), op: "matmul" });
         }
 
-        let mut out_shape = lhs_batch.clone();
-        out_shape.push(m);
-        out_shape.push(n);
-        let out_shape = Shape::from(out_shape);
-
         match (&lhs.slice, &rhs.slice) {
             (CudaFloatSlice::F32(l), CudaFloatSlice::F32(r)) => {
                 let out = launch::launch_matmul(&lhs.device, 1.0f32, 0.0f32, (b, m, n, k), l, lhs_l, r, rhs_l)?;
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: lhs.device.clone() }, out_shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: lhs.device.clone() })
             }
             (CudaFloatSlice::F64(l), CudaFloatSlice::F64(r)) => {
                 let out = launch::launch_matmul(&lhs.device, 1.0f64, 0.0f64, (b, m, n, k), l, lhs_l, r, rhs_l)?;
-                Ok((CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: lhs.device.clone() }, out_shape))
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: lhs.device.clone() })
             }
             _ => Err(crate::Error::DTypeMismatch { lhs: lhs.dtype(), rhs: rhs.dtype(), op: "matmul" }),
         }
@@ -733,24 +736,28 @@ impl FloatOps<Cuda> for Cuda {
         idx: &CudaIntStorage,
         idx_l: &Layout,
         dim: usize,
-    ) -> Result<(CudaFloatStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<CudaFloatStorage> {
         if !x_l.is_contiguous() || !idx_l.is_contiguous() {
             return Err(crate::Error::RequiresContiguous { op: "index_select" });
         }
         x.device.same_ordinal(&idx.device, "index_select")?;
-        let mut out_dims = x_l.dims().to_vec();
-        out_dims[dim] = idx_l.dims()[0];
-        let out_shape = Shape::from(out_dims);
-        _float_select!(x, x_l, idx, idx_l, dim, launch_index_select, "index_select", out_shape)
+        _float_select!(x, x_l, idx, idx_l, dim, launch_index_select, "index_select", out_shape.clone())
     }
 
-    fn f_gather(x: &CudaFloatStorage, x_l: &Layout, idx: &CudaIntStorage, idx_l: &Layout, dim: usize) -> Result<(CudaFloatStorage, Shape)> {
+    fn f_gather(
+        x: &CudaFloatStorage,
+        x_l: &Layout,
+        idx: &CudaIntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<CudaFloatStorage> {
         if !x_l.is_contiguous() || !idx_l.is_contiguous() {
             return Err(crate::Error::RequiresContiguous { op: "gather" });
         }
         x.device.same_ordinal(&idx.device, "gather")?;
-        let out_shape = Shape::from(idx_l.dims().to_vec());
-        _float_select!(x, x_l, idx, idx_l, dim, launch_gather, "gather", out_shape)
+        _float_select!(x, x_l, idx, idx_l, dim, launch_gather, "gather", out_shape.clone())
     }
 
     fn f_index_add(
@@ -787,9 +794,10 @@ impl FloatOps<Cuda> for Cuda {
         _float_add!(init, init_l, idx, idx_l, src, src_l, dim, launch_scatter_add, "scatter_add")
     }
 
-    fn f_cat(srcs: &[(&CudaFloatStorage, &Layout)], dim: usize) -> Result<(CudaFloatStorage, Shape)> {
+    fn f_cat(srcs: &[(&CudaFloatStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<CudaFloatStorage> {
         let layouts: Vec<&Layout> = srcs.iter().map(|(_, l)| *l).collect();
-        let out_shape = super::cat_compute_shape(&layouts, dim)?;
+        let internal_shape = super::cat_compute_shape(&layouts, dim)?;
+        debug_assert_eq!(internal_shape.dims(), out_shape.dims(), "cuda f_cat shape must match the layer");
         let device = &srcs[0].0.device;
         for (storage, _) in srcs {
             storage.device.same_ordinal(device, "cat")?;
@@ -805,7 +813,7 @@ impl FloatOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_f32", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: device.clone() }, out_shape))
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: device.clone() })
                 }
                 CudaFloatSlice::F64(_) => {
                     let mut out = device.alloc::<f64>(out_shape.element_count())?;
@@ -815,7 +823,7 @@ impl FloatOps<Cuda> for Cuda {
                         launch::launch_copy_offset(device, "ucopy_f64", &kernel::COPY, data, layout, &out, offset)?;
                         offset += layout.shape().element_count();
                     }
-                    Ok((CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() }, out_shape))
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
                 }
             }
         } else {
@@ -853,7 +861,7 @@ impl FloatOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: device.clone() }, out_shape))
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: device.clone() })
                 }
                 CudaFloatSlice::F64(_) => {
                     let cat_size = out_shape.dims()[dim];
@@ -888,7 +896,7 @@ impl FloatOps<Cuda> for Cuda {
                         }
                         offset += d2;
                     }
-                    Ok((CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() }, out_shape))
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
                 }
             }
         }

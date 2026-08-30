@@ -5,8 +5,8 @@ use std::borrow::Cow;
 use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
 use luma_tensor::{BoolOps, DType, Layout, Result, Shape, ViewOp};
 
+use super::readback_unsupported;
 use super::{Trace, TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
-use super::{readback_unsupported, reduce_out_shape};
 use crate::graph::{NodeOp, Scalar, ValueId};
 
 impl BoolOps<Trace> for Trace {
@@ -39,18 +39,28 @@ impl BoolOps<Trace> for Trace {
         Ok(TraceBoolStorage { value: id, dtype: to, device: x.device.clone() })
     }
 
-    fn b_index_select(x: &TraceBoolStorage, x_l: &Layout, idx: &TraceIntStorage, idx_l: &Layout, dim: usize) -> Result<(TraceBoolStorage, Shape)> {
-        let mut dims = x_l.shape().dims().to_vec();
-        dims[dim] = idx_l.element_count();
-        let out_shape = Shape::from(dims);
+    fn b_index_select(
+        x: &TraceBoolStorage,
+        _x_l: &Layout,
+        idx: &TraceIntStorage,
+        _idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<TraceBoolStorage> {
         let id = x.device.emit(NodeOp::IndexSelect(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceBoolStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceBoolStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
 
-    fn b_gather(x: &TraceBoolStorage, _x_l: &Layout, idx: &TraceIntStorage, idx_l: &Layout, dim: usize) -> Result<(TraceBoolStorage, Shape)> {
-        let out_shape = idx_l.shape().clone();
+    fn b_gather(
+        x: &TraceBoolStorage,
+        _x_l: &Layout,
+        idx: &TraceIntStorage,
+        _idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<TraceBoolStorage> {
         let id = x.device.emit(NodeOp::Gather(dim), vec![x.value, idx.value], x.dtype.into(), out_shape.clone())?;
-        Ok((TraceBoolStorage { value: id, dtype: x.dtype, device: x.device.clone() }, out_shape))
+        Ok(TraceBoolStorage { value: id, dtype: x.dtype, device: x.device.clone() })
     }
 
     fn b_to_vec(_x: &TraceBoolStorage, _layout: &Layout) -> Result<Vec<bool>> {
@@ -76,27 +86,22 @@ impl BoolOps<Trace> for Trace {
         let id = x.device.emit(NodeOp::Not, vec![x.value], DType::Bool, layout.shape().clone())?;
         Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: x.device.clone() })
     }
-    fn b_reduce_all(x: &TraceBoolStorage, layout: &Layout, dims: &[usize], keepdim: bool) -> Result<(TraceBoolStorage, Shape)> {
-        let out_shape = reduce_out_shape(layout.shape(), dims, keepdim);
+    fn b_reduce_all(x: &TraceBoolStorage, _layout: &Layout, dims: &[usize], _keepdim: bool, out_shape: &Shape) -> Result<TraceBoolStorage> {
         let id = x.device.emit(NodeOp::ReduceAll(dims.to_vec()), vec![x.value], DType::Bool, out_shape.clone())?;
-        Ok((TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: x.device.clone() }, out_shape))
+        Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: x.device.clone() })
     }
-    fn b_reduce_any(x: &TraceBoolStorage, layout: &Layout, dims: &[usize], keepdim: bool) -> Result<(TraceBoolStorage, Shape)> {
-        let out_shape = reduce_out_shape(layout.shape(), dims, keepdim);
+    fn b_reduce_any(x: &TraceBoolStorage, _layout: &Layout, dims: &[usize], _keepdim: bool, out_shape: &Shape) -> Result<TraceBoolStorage> {
         let id = x.device.emit(NodeOp::ReduceAny(dims.to_vec()), vec![x.value], DType::Bool, out_shape.clone())?;
-        Ok((TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: x.device.clone() }, out_shape))
+        Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: x.device.clone() })
     }
     fn b_true_count(_x: &TraceBoolStorage, _layout: &Layout) -> Result<usize> {
         readback_unsupported("true_count")
     }
-    fn b_cat(srcs: &[(&TraceBoolStorage, &Layout)], dim: usize) -> Result<(TraceBoolStorage, Shape)> {
+    fn b_cat(srcs: &[(&TraceBoolStorage, &Layout)], dim: usize, out_shape: &Shape) -> Result<TraceBoolStorage> {
         let first = &srcs[0];
-        let mut dims = first.1.shape().dims().to_vec();
-        dims[dim] = srcs.iter().map(|(_, l)| l.dims()[dim]).sum();
-        let out_shape = Shape::from(dims);
         let inputs: Vec<ValueId> = srcs.iter().map(|(s, _)| s.value).collect();
         let id = first.0.device.emit(NodeOp::Cat(dim), inputs, DType::Bool, out_shape.clone())?;
-        Ok((TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: first.0.device.clone() }, out_shape))
+        Ok(TraceBoolStorage { value: id, dtype: BoolDType::Bool, device: first.0.device.clone() })
     }
     fn b_view(src: &TraceBoolStorage, _src_l: &Layout, dst_l: &Layout, view: ViewOp) -> Result<Option<TraceBoolStorage>> {
         let out = src.device.emit_view(src.value, dst_l, view);

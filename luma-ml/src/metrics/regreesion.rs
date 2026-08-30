@@ -15,11 +15,7 @@ pub fn mean_absolute_error<Dev: Device>(y_true: &Tensor<Dev>, y_pred: &Tensor<De
 pub fn r2_score<Dev: Device>(y_true: &Tensor<Dev>, y_pred: &Tensor<Dev>) -> luma_tensor::Result<f64> {
     let y_mean = y_true.mean_all()?.to_scalar()?;
 
-    Ok(1.0 - (
-        (y_true - y_pred).sqr()?.sum_all()?.to_scalar()?
-    ) / (
-        (y_true - y_mean).sqr()?.sum_all()?.to_scalar()?
-    ))
+    Ok(1.0 - ((y_true - y_pred).sqr()?.sum_all()?.to_scalar()?) / ((y_true - y_mean).sqr()?.sum_all()?.to_scalar()?))
 }
 
 #[cfg(test)]

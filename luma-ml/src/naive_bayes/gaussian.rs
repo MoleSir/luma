@@ -1,6 +1,9 @@
 use luma_tensor::{Device, IndexOp, Int, Tensor};
 
-use crate::{core::{PredictFit, PredictModel}, utils};
+use crate::{
+    core::{PredictFit, PredictModel},
+    utils,
+};
 
 pub struct GaussianNB {
     pub var_smoothing: f64,
@@ -148,8 +151,7 @@ mod tests {
     fn test_gaussian_nb_toy_params_and_log_proba() {
         let device = Cpu;
         // 2 类 × 2 特征，每类 2 个样本，特征可分
-        let x = Tensor::<Cpu>::new(vec![0.0, 0.0, 1.0, 1.0, 10.0, 10.0, 11.0, 11.0], &device)
-            .unwrap().reshape((4, 2)).unwrap();
+        let x = Tensor::<Cpu>::new(vec![0.0, 0.0, 1.0, 1.0, 10.0, 10.0, 11.0, 11.0], &device).unwrap().reshape((4, 2)).unwrap();
         let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &device).unwrap();
 
         let nb = GaussianNB { var_smoothing: 1e-9 };
@@ -168,9 +170,7 @@ mod tests {
         // 独立重算 \ln P(x|Y) + \ln P(Y)，验证 predict_log_proba 的矩阵展开公式
         let lp = model.predict_log_proba(&x).unwrap().to_vec().unwrap();
         let ln_prior = 0.5f64.ln();
-        let e = |xi: f64, mu: f64, var: f64| {
-            -0.5 * (2.0 * std::f64::consts::PI * var).ln() - (xi - mu).powi(2) / (2.0 * var)
-        };
+        let e = |xi: f64, mu: f64, var: f64| -0.5 * (2.0 * std::f64::consts::PI * var).ln() - (xi - mu).powi(2) / (2.0 * var);
         // 样本 [0, 0] 属于类别 0 的对数概率
         let expected_0 = e(0.0, theta[0], var[0]) + e(0.0, theta[1], var[1]) + ln_prior;
         assert!((lp[0] - expected_0).abs() < 1e-9, "lp0 = {}, expected = {}", lp[0], expected_0);
@@ -198,11 +198,8 @@ mod tests {
     #[test]
     fn test_gaussian_nb_f32_input() {
         // 默认 F32 输入：验证 fit 内部 Tensor::new + to_dtype 的 dtype 对齐
-        let x = Tensor::<Cpu>::from_slice(
-            &[0.0, 0.0, 1.0, 1.0, 10.0, 10.0, 11.0, 11.0],
-            (4, 2),
-            (Cpu, luma_tensor::FloatDType::F32),
-        ).unwrap();
+        let x =
+            Tensor::<Cpu>::from_slice(&[0.0, 0.0, 1.0, 1.0, 10.0, 10.0, 11.0, 11.0], (4, 2), (Cpu, luma_tensor::FloatDType::F32)).unwrap();
         let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &Cpu).unwrap();
 
         let model = GaussianNB::default().fit(&x, &y).unwrap();

@@ -1,9 +1,8 @@
 use std::f64;
 
-use luma_tensor::{no_grad, Device, Tensor, D};
+use luma_tensor::{D, Device, Tensor, no_grad};
 
 use crate::{TransformFit, TransformModel};
-
 
 pub struct StandardScaler {
     pub eps: f64,
@@ -38,9 +37,7 @@ impl<Dev: Device> TransformModel for StandardScalerModel<Dev> {
     type Output = Tensor<Dev>;
 
     fn transform(&self, x: &Self::Input) -> crate::MlResult<Self::Output> {
-        let y = x
-            .broadcast_sub(&self.mean)?
-            .broadcast_div(&self.std)?;
+        let y = x.broadcast_sub(&self.mean)?.broadcast_div(&self.std)?;
         Ok(y)
     }
 }
@@ -82,9 +79,7 @@ impl<Dev: Device> TransformModel for MinMaxScalerModel<Dev> {
     type Output = Tensor<Dev>;
 
     fn transform(&self, x: &Self::Input) -> crate::MlResult<Self::Output> {
-        let y = x
-            .broadcast_sub(&self.min)?
-            .broadcast_div(&self.delta)?;
+        let y = x.broadcast_sub(&self.min)?.broadcast_div(&self.delta)?;
         Ok(y)
     }
 }

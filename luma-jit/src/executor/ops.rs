@@ -11,7 +11,7 @@ use super::step::ViewStep;
 
 pub(crate) fn binary_result<D: Device, K>(x: &Tensor<D, K>, y: &Tensor<D, K>, op: BinaryOp) -> Result<Tensor<D, K>>
 where
-    K: NumOpsDTypeKind<D>
+    K: NumOpsDTypeKind<D>,
 {
     match op {
         BinaryOp::Add => x.add(y),
@@ -25,7 +25,7 @@ where
 
 pub(crate) fn cmp_result<D: Device, K>(x: &Tensor<D, K>, y: &Tensor<D, K>, op: CmpOp) -> Result<Tensor<D, Bool>>
 where
-    K: NumOpsDTypeKind<D>
+    K: NumOpsDTypeKind<D>,
 {
     match op {
         CmpOp::Eq => x.eq(y),
@@ -39,7 +39,7 @@ where
 
 pub(crate) fn unary_result<D: Device, K>(x: &Tensor<D, K>, op: UnaryOp<K::Scalar>) -> Result<Tensor<D, K>>
 where
-    K: NumOpsDTypeKind<D>
+    K: NumOpsDTypeKind<D>,
 {
     match op {
         UnaryOp::Neg => x.neg(),

@@ -1,3 +1,1 @@
-pub fn fetch_california_housing() {
-
-}
+pub fn fetch_california_housing() {}

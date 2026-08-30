@@ -62,16 +62,32 @@ impl BoolOps<Cpu> for Cpu {
         Ok(CpuBoolStorage(layout.storage_indices().map(|i| x.0[i]).collect()))
     }
 
-    fn b_index_select(x: &CpuBoolStorage, x_l: &Layout, idx: &CpuIntStorage, idx_l: &Layout, dim: usize) -> Result<(CpuBoolStorage, Shape)> {
+    fn b_index_select(
+        x: &CpuBoolStorage,
+        x_l: &Layout,
+        idx: &CpuIntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<CpuBoolStorage> {
         let ids = int_ids_as_usize(idx, idx_l);
         let (v, dims) = indexing::index_select(&x.0, x_l, &ids, idx_l, dim)?;
-        Ok((CpuBoolStorage(v), Shape::from(dims)))
+        debug_assert_eq!(&dims, out_shape.dims(), "cpu b_index_select shape must match the layer");
+        Ok(CpuBoolStorage(v))
     }
 
-    fn b_gather(x: &CpuBoolStorage, x_l: &Layout, idx: &CpuIntStorage, idx_l: &Layout, dim: usize) -> Result<(CpuBoolStorage, Shape)> {
+    fn b_gather(
+        x: &CpuBoolStorage,
+        x_l: &Layout,
+        idx: &CpuIntStorage,
+        idx_l: &Layout,
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<CpuBoolStorage> {
         let ids = int_ids_as_usize(idx, idx_l);
         let (v, dims) = indexing::gather(&x.0, x_l, &ids, idx_l, dim)?;
-        Ok((CpuBoolStorage(v), Shape::from(dims)))
+        debug_assert_eq!(&dims, out_shape.dims(), "cpu b_gather shape must match the layer");
+        Ok(CpuBoolStorage(v))
     }
 
     fn b_to_vec(x: &<Cpu as Device>::BoolStorage, layout: &Layout) -> Result<Vec<bool>> {
@@ -126,12 +142,14 @@ impl BoolOps<Cpu> for Cpu {
         l: &Layout,
         dims: &[usize],
         keepdim: bool,
-    ) -> Result<(<Cpu as Device>::BoolStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
         // reduce as u8 with min (all true == min == 1), then back to bool.
         let as_u8: Vec<u8> = super::kernels::iter::gather(&x.0, l).iter().map(|&b| b as u8).collect();
         let contig = Layout::contiguous(l.shape().clone());
         let (v, shape) = reduce::reduce_dims(&as_u8, &contig, dims, keepdim, reduce::Reducer::Min)?;
-        Ok((CpuBoolStorage(v.into_iter().map(|u| u != 0).collect()), shape))
+        debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu b_reduce_all shape must match the layer");
+        Ok(CpuBoolStorage(v.into_iter().map(|u| u != 0).collect()))
     }
 
     fn b_reduce_any(
@@ -139,24 +157,31 @@ impl BoolOps<Cpu> for Cpu {
         l: &Layout,
         dims: &[usize],
         keepdim: bool,
-    ) -> Result<(<Cpu as Device>::BoolStorage, Shape)> {
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
         let as_u8: Vec<u8> = super::kernels::iter::gather(&x.0, l).iter().map(|&b| b as u8).collect();
         let contig = Layout::contiguous(l.shape().clone());
         let (v, shape) = reduce::reduce_dims(&as_u8, &contig, dims, keepdim, reduce::Reducer::Max)?;
-        Ok((CpuBoolStorage(v.into_iter().map(|u| u != 0).collect()), shape))
+        debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu b_reduce_any shape must match the layer");
+        Ok(CpuBoolStorage(v.into_iter().map(|u| u != 0).collect()))
     }
 
     fn b_true_count(x: &<Cpu as Device>::BoolStorage, l: &Layout) -> Result<usize> {
         Ok(l.storage_indices().filter(|&i| x.0[i]).count())
     }
 
-    fn b_cat(srcs: &[(&<Cpu as Device>::BoolStorage, &Layout)], dim: usize) -> Result<(<Cpu as Device>::BoolStorage, Shape)> {
+    fn b_cat(
+        srcs: &[(&<Cpu as Device>::BoolStorage, &Layout)],
+        dim: usize,
+        out_shape: &Shape,
+    ) -> Result<<Cpu as Device>::BoolStorage> {
         if srcs.is_empty() {
             return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
         }
         let views: Vec<(&[bool], &Layout)> = srcs.iter().map(|(s, l)| (s.0.as_slice(), *l)).collect();
         let (v, shape) = shape_k::cat(&views, dim)?;
-        Ok((CpuBoolStorage(v), shape))
+        debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu b_cat shape must match the layer");
+        Ok(CpuBoolStorage(v))
     }
 
     fn b_pick(

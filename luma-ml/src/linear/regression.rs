@@ -1,9 +1,14 @@
-use luma_tensor::{no_grad, Device, Tensor};
+use luma_tensor::{Device, Tensor, no_grad};
 
-use crate::{core::{PredictFit, PredictModel}, error::MlResult, utils, PredictFitWithWeight};
+use crate::{
+    PredictFitWithWeight,
+    core::{PredictFit, PredictModel},
+    error::MlResult,
+    utils,
+};
 
 pub enum LinearRegression {
-    GradientDescent { n_iter: usize, learning_rate: f64, },
+    GradientDescent { n_iter: usize, learning_rate: f64 },
     NormalEquations,
 }
 
@@ -26,11 +31,11 @@ impl<Dev: Device> PredictFit<Tensor<Dev>> for LinearRegression {
     /// $$
     /// y = w x + b
     /// $$
-    /// 
+    ///
     /// ## Args
-    /// - `x`: (n_samples, n_features) 
+    /// - `x`: (n_samples, n_features)
     /// - `y`: (n_samples,)
-    /// 
+    ///
     /// ## Return
     /// - linear gression model
     fn fit(&self, x: &Tensor<Dev>, y: &Tensor<Dev>) -> MlResult<Self::Model> {
@@ -58,7 +63,7 @@ impl<Dev: Device> PredictModel for LinearRegressionModel<Dev> {
 
     /// ## Args:
     /// - `x`: (n_samples, n_features)
-    /// 
+    ///
     /// ## Return
     /// - `y`: (n_samples, )
     fn predict(&self, x: &Tensor<Dev>) -> MlResult<Tensor<Dev>> {
@@ -78,12 +83,18 @@ impl LinearRegression {
     /// - `x`: (n_samples, n_features)
     /// - `y`: (n_samples),
     /// - `sample_weight`: Option<(n_samples)>,    
-    fn fit_gd<Dev: Device>(x: &Tensor<Dev>, y: &Tensor<Dev>, sample_weight: Option<&Tensor<Dev>>, n_iter: usize, learning_rate: f64) -> MlResult<LinearRegressionModel<Dev>> {
+    fn fit_gd<Dev: Device>(
+        x: &Tensor<Dev>,
+        y: &Tensor<Dev>,
+        sample_weight: Option<&Tensor<Dev>>,
+        n_iter: usize,
+        learning_rate: f64,
+    ) -> MlResult<LinearRegressionModel<Dev>> {
         let device = x.device();
         let dtype = x.dtype();
 
         let (n_samples, n_features) = utils::validate_xy_shapes(x, y, sample_weight)?;
-        
+
         let weights = Tensor::zeros((n_features, 1), (device, dtype))?;
         let mut bias = 0.0;
 
@@ -122,7 +133,11 @@ impl LinearRegression {
 mod tests {
     use luma_tensor::{Cpu, Tensor};
 
-    use crate::{datasets::{make_regression, RegressionOption}, linear::LinearRegression, core::PredictFit};
+    use crate::{
+        core::PredictFit,
+        datasets::{RegressionOption, make_regression},
+        linear::LinearRegression,
+    };
 
     #[test]
     fn test_gd_1d() {

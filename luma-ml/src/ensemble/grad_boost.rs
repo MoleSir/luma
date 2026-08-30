@@ -25,7 +25,7 @@ pub struct GradientBoostRegressorModel<Dev: Device, F> {
 
 impl<Dev: Device, F> PredictFit<Tensor<Dev>> for GradientBoostRegressor<F>
 where
-    F: PredictFit<Tensor<Dev>, Output = Tensor<Dev>>
+    F: PredictFit<Tensor<Dev>, Output = Tensor<Dev>>,
 {
     type Model = GradientBoostRegressorModel<Dev, F::Model>;
     type Output = Tensor<Dev>;
@@ -56,7 +56,7 @@ where
 
 impl<Dev: Device, M> PredictModel for GradientBoostRegressorModel<Dev, M>
 where
-    M: PredictModel<Input = Tensor<Dev>, Output = Tensor<Dev>>
+    M: PredictModel<Input = Tensor<Dev>, Output = Tensor<Dev>>,
 {
     type Input = M::Input;
     type Output = M::Output;
@@ -79,7 +79,7 @@ impl Loss {
             Loss::Mse => {
                 // Loss = (y_pred - y)^2
                 // dLoss = 2 * (y_pred - y)
-                let grad = y_pred - y;  // y_pred - y
+                let grad = y_pred - y; // y_pred - y
                 grad.mul_(2.0)?;
                 Ok(grad)
             }
@@ -129,12 +129,8 @@ mod tests {
 
         // 训练误差应随 n_estimators 增加而下降
         let train_mse = |n_estimators: usize| {
-            let trainer = GradientBoostRegressor {
-                fitter: DecisionTreeRegressor::new(3),
-                n_estimators,
-                learning_rate: 0.1,
-                loss: Loss::Mse,
-            };
+            let trainer =
+                GradientBoostRegressor { fitter: DecisionTreeRegressor::new(3), n_estimators, learning_rate: 0.1, loss: Loss::Mse };
             let model = trainer.fit(&x, &y).unwrap();
             let y_pred = model.predict(&x).unwrap();
             (y_pred - &y).sqr().unwrap().mean_all().unwrap().to_scalar().unwrap()
