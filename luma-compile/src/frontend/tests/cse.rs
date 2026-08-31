@@ -1,5 +1,5 @@
-use crate::frontend::opt::cse::cse;
-use crate::frontend::opt::verify::verify;
+use crate::frontend::cse::cse;
+use crate::frontend::verify::verify;
 use crate::{Graph, NodeOp, Scalar};
 use luma_tensor::dtype::FloatDType;
 use luma_tensor::{BinaryOp, Cpu, DType, FloatUnaryOp, Shape, Tensor};

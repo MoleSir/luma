@@ -1,4 +1,4 @@
-use crate::frontend::opt::verify::verify;
+use crate::frontend::verify::verify;
 use crate::{Graph, NodeOp, Scalar};
 use luma_nn::Linear;
 use luma_tensor::dtype::FloatDType;

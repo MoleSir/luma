@@ -1,5 +1,5 @@
-use crate::frontend::opt::dce::dce;
-use crate::frontend::opt::verify::verify;
+use crate::frontend::dce::dce;
+use crate::frontend::verify::verify;
 use crate::{Graph, NodeOp, trace};
 use luma_nn::Linear;
 use luma_tensor::dtype::FloatDType;

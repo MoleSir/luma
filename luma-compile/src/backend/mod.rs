@@ -1,7 +1,7 @@
 //! Execute a traced [`Graph`] on a concrete device.
 //!
 //! [`Graph::compile`] is a one-time, per-device step that:
-//! 1. **verifies** the graph's structural invariants ([`verify`](crate::frontend::opt::verify::verify));
+//! 1. **verifies** the graph's structural invariants ([`verify`](crate::frontend::verify::verify));
 //! 2. **infers the kind** (`Float`/`Int`/`Bool`) of every value (constants and
 //!    inputs from their dtype, op outputs from their semantics) — rejecting
 //!    malformed graphs, e.g. a `Bool` fed into `Matmul`;
@@ -30,7 +30,7 @@ use luma_tensor::dtype::{BoolDType, DType};
 use luma_tensor::{BinaryOp, Bool, CmpOp, Device, DynTensor, Float, Int, KindTag, Shape, Tensor};
 
 use crate::graph::Graph;
-use crate::{ExecuteError, JitResult};
+use crate::{CompileResult, ExecuteError};
 
 // ============================================================================
 //    GraphExecutor
@@ -52,8 +52,8 @@ pub struct GraphExecutor<D: Device> {
 impl<D: Device> GraphExecutor<D> {
     /// Compile a graph: kind inference + validation, slot allocation, one-time
     /// constant materialisation, and lowering into typed steps.
-    pub fn compile(graph: &Graph, device: &D) -> JitResult<Self> {
-        crate::frontend::opt::verify::verify(graph)?;
+    pub fn compile(graph: &Graph, device: &D) -> CompileResult<Self> {
+        crate::frontend::verify::verify(graph)?;
         let kinds = infer_kinds(graph)?;
 
         // Allocate one slot per value, dense within its kind array.
@@ -117,7 +117,7 @@ impl<D: Device> GraphExecutor<D> {
 
     /// Run the graph against concrete inputs (one per recorded graph input,
     /// in order) and return the graph outputs.
-    pub fn run(&mut self, inputs: &[DynTensor<D>]) -> JitResult<Vec<DynTensor<D>>> {
+    pub fn run(&mut self, inputs: &[DynTensor<D>]) -> CompileResult<Vec<DynTensor<D>>> {
         if inputs.len() != self.inputs.len() {
             return Err(ExecuteError::InputCountMismatch { expected: self.inputs.len(), got: inputs.len() }.into());
         }
@@ -140,9 +140,12 @@ impl<D: Device> GraphExecutor<D> {
             }
         }
 
-        for step in self.steps.clone() {
-            self.exec_step(&step)?;
-        }
+        // exec_step 要 &mut self，不能和 &self.steps 的借用共存——take 出来
+        // 按引用遍历，零克隆（原实现每次 run 克隆整个指令表）；出错也要归还。
+        let steps = std::mem::take(&mut self.steps);
+        let result = steps.iter().try_for_each(|step| self.exec_step(step));
+        self.steps = steps;
+        result?;
 
         Ok(self
             .outputs
@@ -155,7 +158,7 @@ impl<D: Device> GraphExecutor<D> {
             .collect())
     }
 
-    fn exec_step(&mut self, step: &Step) -> JitResult<()> {
+    fn exec_step(&mut self, step: &Step) -> CompileResult<()> {
         match step {
             Step::BinaryF(op, a, b, o) => {
                 let r = binary_result(self.floats[a.f()].as_ref().unwrap(), self.floats[b.f()].as_ref().unwrap(), *op)?;
@@ -475,7 +478,7 @@ impl Graph {
     /// A one-time, per-device step: kind inference (with validation),
     /// constant materialisation, and lowering into a type-specialised plan.
     /// Run the result with [`GraphExecutor::run`].
-    pub fn compile<D: Device>(&self, device: &D) -> JitResult<GraphExecutor<D>> {
+    pub fn compile<D: Device>(&self, device: &D) -> CompileResult<GraphExecutor<D>> {
         GraphExecutor::compile(self, device)
     }
 }

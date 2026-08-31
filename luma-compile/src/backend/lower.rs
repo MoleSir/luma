@@ -3,7 +3,7 @@
 use luma_tensor::{KindTag, ReduceOp, Shape};
 
 use crate::graph::{Graph, Node, NodeOp, Scalar, ValueId};
-use crate::{ExecuteError, JitResult};
+use crate::{CompileResult, ExecuteError};
 
 use super::step::{Slot, Step, ViewStep};
 
@@ -11,15 +11,15 @@ use super::step::{Slot, Step, ViewStep};
 //    Lowering — nodes become type-specialised steps
 // ============================================================================
 
-fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> JitResult<Step> {
-    let slot = |i: usize| -> JitResult<Slot> {
+fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> CompileResult<Step> {
+    let slot = |i: usize| -> CompileResult<Slot> {
         let id = *node.inputs.get(i).ok_or_else(|| ExecuteError::ExpectMoreInputs { op: node.op.to_string(), got: node.inputs.len() })?;
         Ok(slots.get(id).copied().ok_or_else(|| ExecuteError::UnknownValue(id))?)
     };
     let out = slots.get(node.outputs[0]).copied().ok_or_else(|| ExecuteError::NodeWithoutOutput(node.op.to_string()))?;
 
     let num = |id: ValueId| kinds[id];
-    let in_num = |i: usize| -> JitResult<KindTag> {
+    let in_num = |i: usize| -> CompileResult<KindTag> {
         let id = *node.inputs.get(i).expect("infer validated input count");
         Ok(num(id))
     };
@@ -120,7 +120,7 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
             KindTag::Bool => unreachable!("kind inference validated"),
         },
         NodeOp::Cat(dim) => {
-            let inputs: Vec<Slot> = (0..node.inputs.len()).map(slot).collect::<JitResult<_>>()?;
+            let inputs: Vec<Slot> = (0..node.inputs.len()).map(slot).collect::<CompileResult<_>>()?;
             match in_num(0)? {
                 KindTag::Float => Step::CatF(*dim, inputs, out),
                 KindTag::Int => Step::CatI(*dim, inputs, out),
@@ -158,6 +158,6 @@ fn lower_node(node: &Node, kinds: &[KindTag], slots: &[Slot], graph: &Graph) -> 
     })
 }
 
-pub(crate) fn lower_steps(graph: &Graph, kinds: &[KindTag], slots: &[Slot]) -> JitResult<Vec<Step>> {
+pub(crate) fn lower_steps(graph: &Graph, kinds: &[KindTag], slots: &[Slot]) -> CompileResult<Vec<Step>> {
     graph.nodes.iter().map(|node| lower_node(node, kinds, slots, graph)).collect()
 }

@@ -1,9 +1,9 @@
-use crate::{Graph, JitResult};
+use crate::{CompileResult, Graph};
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use super::util::build_producer;
 
-pub fn dce(graph: Graph) -> JitResult<Graph> {
+pub fn dce(graph: Graph) -> CompileResult<Graph> {
     // 生产映射：value -> 生产它的 node 索引（叶子为 None），供反向可达标记用
     let producers = build_producer(&graph);
 

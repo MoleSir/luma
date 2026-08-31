@@ -1,15 +1,15 @@
 //! luma-compile's unified error type, mirroring `luma_nn::error`:
-//! `#[thiserrorctx::context_error]` generates the `JitResult<T>` alias and
+//! `#[thiserrorctx::context_error]` generates the `CompileResult<T>` alias and
 //! `.context()` helpers, `#[error(transparent)] + #[from]` passes underlying
 //! tensor/nn errors through, and domain errors are grouped into per-category
 //! sub-enums ([`TraceError`], [`ExecuteError`], [`VerifyError`]).
 
-use crate::frontend::opt::verify::VerifyError;
+use crate::frontend::verify::VerifyError;
 use crate::graph::Scalar;
 use luma_tensor::{DType, KindTag, Shape};
 
 #[thiserrorctx::context_error]
-pub enum JitError {
+pub enum CompileError {
     /// Tensor-layer errors (kernels, shapes, dtypes) — shared by tracing,
     /// executing, and the optimization passes.
     #[error(transparent)]
@@ -27,6 +27,9 @@ pub enum JitError {
 
     #[error(transparent)]
     Verify(#[from] VerifyError),
+
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 /// Errors specific to tracing (symbolic execution) — the [`Trace`](crate::Trace)

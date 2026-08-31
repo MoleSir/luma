@@ -1,5 +1,5 @@
-use crate::frontend::opt::fold::fold;
-use crate::frontend::opt::verify::verify;
+use crate::frontend::fold::fold;
+use crate::frontend::verify::verify;
 use crate::{Graph, NodeOp, Scalar};
 use luma_tensor::dtype::FloatDType;
 use luma_tensor::{BinaryOp, Cpu, DType, Shape, Tensor, UnaryOp};

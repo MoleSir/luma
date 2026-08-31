@@ -7,11 +7,33 @@
 //!   `Float`/`Int`/`Bool` marker;
 //! - **SSA**: every value is produced by exactly one node (leaves have none).
 
-use std::fmt;
-
+use std::{fmt, path::Path};
 use luma_tensor::{BinaryOp, CmpOp, DType, FloatUnaryOp, ReduceOp, Shape, UnaryOp};
-
 pub type ValueId = usize;
+
+#[derive(Debug, Clone, Default)]
+pub struct Graph {
+    pub values: Vec<Value>,
+    pub nodes: Vec<Node>,
+    pub inputs: Vec<ValueId>,
+    pub outputs: Vec<ValueId>,
+}
+
+impl Graph {
+    pub fn optimize(&mut self) -> crate::CompileResult<()> {
+        let g = std::mem::take(self);
+        *self = crate::frontend::optimize(g)?;
+        Ok(())
+    }
+
+    pub fn write<P: AsRef<Path>>(&self, path: P) -> crate::CompileResult<()> {
+        crate::io::write::write(self, path)
+    }
+
+    pub fn read<P: AsRef<Path>>(path: P) -> crate::CompileResult<Self> {
+        crate::io::read::read(path)
+    }
+}
 
 /// Raw little-endian bytes of a constant leaf (canonical logical order, the
 /// form produced by `Tensor::to_bytes` and consumed by `Tensor::from_bytes`).
@@ -127,14 +149,6 @@ pub struct Node {
     pub outputs: Vec<ValueId>,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct Graph {
-    pub values: Vec<Value>,
-    pub nodes: Vec<Node>,
-    pub inputs: Vec<ValueId>,
-    pub outputs: Vec<ValueId>,
-}
-
 impl Graph {
     /// Add a leaf value (no producing node). Ids are dense and never reused.
     ///
@@ -185,14 +199,6 @@ impl Graph {
 
     pub fn value(&self, id: ValueId) -> &Value {
         &self.values[id]
-    }
-
-    /// Run the front-end optimization pipeline in place
-    /// (simplify → fold → simplify → cse → dce → verify).
-    pub fn optimize(&mut self) -> crate::JitResult<()> {
-        let g = std::mem::take(self);
-        *self = crate::frontend::opt::optimize(g)?;
-        Ok(())
     }
 }
 

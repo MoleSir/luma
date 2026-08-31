@@ -9,13 +9,15 @@
 //! This is the Rust analogue of `torch.jit.trace` plus a graph optimizer and
 //! lowering pipeline, a first step toward TorchScript/ONNX export.
 
-pub mod backend;
-mod error;
-pub mod frontend;
 pub mod graph;
+pub mod trace;
+pub mod backend;
+pub mod frontend;
+pub mod io;
 
+mod error;
 pub use error::*;
 
 pub use backend::{GraphExecutor, Step};
-pub use frontend::trace::{Trace, TraceBoolStorage, TraceFloatStorage, TraceInput, TraceIntStorage, Traced, trace};
+pub use trace::{Trace, TraceBoolStorage, TraceFloatStorage, TraceInput, TraceIntStorage, Traced, trace};
 pub use graph::{ConstData, Graph, Node, NodeOp, Scalar, Value, ValueId};

@@ -16,7 +16,7 @@ use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
 use luma_tensor::{Bool, DTypeKind, Device, Float, Int, Result, Shape, Tensor};
 
 use super::{Trace, TraceValueId, Traced};
-use crate::JitResult;
+use crate::CompileResult;
 use crate::graph::Graph;
 
 /// Kind-level constructor for input placeholders on the trace device.
@@ -122,7 +122,7 @@ impl<D: Device, A: TraceInput<D>, B: TraceInput<D>> TraceInput<D> for (A, B) {
 /// parameter and buffer as a graph constant; the example input becomes a graph
 /// input; the forward's output is marked as the graph output. The graph is
 /// self-contained — no reference to the original module is needed afterwards.
-pub fn trace<D, M>(module: &M, example: &M::Input) -> JitResult<Arc<Mutex<Graph>>>
+pub fn trace<D, M>(module: &M, example: &M::Input) -> CompileResult<Arc<Mutex<Graph>>>
 where
     D: Device,
     M: ModuleForward<D> + ToDevice<Trace>,

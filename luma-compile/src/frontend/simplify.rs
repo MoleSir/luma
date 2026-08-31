@@ -2,10 +2,10 @@ use super::{
     dce::dce,
     util::{self, build_producer, build_use_counts, topo_sort},
 };
-use crate::{Graph, JitResult, NodeOp, Scalar, ValueId};
+use crate::{CompileResult, Graph, NodeOp, Scalar, ValueId};
 use luma_tensor::{BinaryOp, UnaryOp};
 
-pub fn simplify(graph: Graph) -> JitResult<Graph> {
+pub fn simplify(graph: Graph) -> CompileResult<Graph> {
     let mut graph = graph;
 
     loop {

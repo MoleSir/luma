@@ -1,10 +1,10 @@
 use super::dce::dce;
 use super::util::replace_uses;
-use crate::{Graph, JitResult};
+use crate::{CompileResult, Graph};
 use std::collections::HashMap;
 
 /// 公共子表达式消除：op 相同且输入相同的节点合并成一个。
-pub fn cse(graph: Graph) -> JitResult<Graph> {
+pub fn cse(graph: Graph) -> CompileResult<Graph> {
     let mut graph = graph;
     // 每个 node 的 key：(op, 输入，输出)
     let mut seen: HashMap<(String, Vec<usize>), usize> = HashMap::new();

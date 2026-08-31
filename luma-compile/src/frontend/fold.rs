@@ -1,9 +1,9 @@
 use super::{dce::dce, util};
-use crate::{Graph, GraphExecutor, JitResult};
+use crate::{CompileResult, Graph, GraphExecutor};
 use luma_tensor::{Cpu, DynTensor};
 use std::collections::HashMap;
 
-pub fn fold(graph: Graph) -> JitResult<Graph> {
+pub fn fold(graph: Graph) -> CompileResult<Graph> {
     let mut graph = graph;
 
     // 标记哪些 values 是 const
