@@ -94,12 +94,13 @@ impl BoolOps<Cuda> for Cuda {
         match &idx.slice {
             CudaIntSlice::I32(ids) => {
                 let out = launch::launch_index_select(&x.device, "i32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok(CudaBoolStorage { slice: out, device: x.clone() })
+                Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
             }
             CudaIntSlice::U32(ids) => {
                 let out = launch::launch_index_select(&x.device, "u32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok(CudaBoolStorage { slice: out, device: x.clone() })
+                Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
             }
+            _ => Err(crate::Error::DTypeMismatch { lhs: crate::DType::Bool, rhs: crate::DType::U8, op: "b_index_select" }),
         }
     }
 
@@ -118,12 +119,13 @@ impl BoolOps<Cuda> for Cuda {
         match &idx.slice {
             CudaIntSlice::I32(ids) => {
                 let out = launch::launch_gather(&x.device, "i32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok(CudaBoolStorage { slice: out, device: x.clone() })
+                Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
             }
             CudaIntSlice::U32(ids) => {
                 let out = launch::launch_gather(&x.device, "u32", "u8", &kernel::INDEXING, &x.slice, x_l, ids, idx_l, dim)?;
-                Ok(CudaBoolStorage { slice: out, device: x.clone() })
+                Ok(CudaBoolStorage { slice: out, device: x.device.clone() })
             }
+            _ => Err(crate::Error::DTypeMismatch { lhs: crate::DType::Bool, rhs: crate::DType::U8, op: "b_index_select" }),
         }
     }
 
