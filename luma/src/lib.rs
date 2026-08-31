@@ -8,9 +8,9 @@
 //! |---|---|---|
 //! | `io` *(default)* | `luma-io` | `luma::io` |
 //! | `nn` | `luma-nn`, `luma-optim`, `luma-dataset` | `luma::nn`, `luma::optim`, `luma::dataset` |
-//! | `jit` | `luma-jit` (implies `nn`) | `luma::jit` |
-//! | `cuda` | CUDA backend for tensor/nn/jit | — |
-//! | `full` | `nn` + `jit` | — |
+//! | `compile` | `luma-compile` (implies `nn`) | `luma::compile` |
+//! | `cuda` | CUDA backend for tensor/nn/compile | — |
+//! | `full` | `nn` + `compile` | — |
 //!
 //! ```toml
 //! [dependencies]
@@ -24,12 +24,12 @@
 
 pub use luma_tensor::*;
 
+#[cfg(feature = "compile")]
+pub use luma_compile as compile;
 #[cfg(feature = "nn")]
 pub use luma_dataset as dataset;
 #[cfg(feature = "io")]
 pub use luma_io as io;
-#[cfg(feature = "jit")]
-pub use luma_jit as jit;
 #[cfg(feature = "nn")]
 pub use luma_nn as nn;
 #[cfg(feature = "nn")]

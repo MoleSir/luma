@@ -8,7 +8,7 @@ members = [
     "luma-dataset",
     "luma-macros",
     "luma-io",
-    "luma-jit",
+    "luma-compile",
     "luma-ml",
 ]
 
@@ -28,7 +28,7 @@ luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.1.0" 
 luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.1.0" }
 luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.1.0" }
 luma-io = { path = "./luma-io", package = "luma-io", version = "0.1.0" }
-luma-jit = { path = "./luma-jit", package = "luma-jit", version = "0.1.0" }
+luma-compile = { path = "./luma-compile", package = "luma-compile", version = "0.1.0" }
 luma-ml = { path = "./luma-ml", package = "luma-ml", version = "0.1.0" }
 
 thiserror = "2.0"

@@ -16,12 +16,12 @@ luma-nn = { workspace = true, optional = true }
 luma-optim = { workspace = true, optional = true }
 luma-dataset = { workspace = true, optional = true }
 luma-io = { workspace = true, optional = true }
-luma-jit = { workspace = true, optional = true }
+luma-compile = { workspace = true, optional = true }
 
 [features]
 default = ["io"]
 io = ["dep:luma-io"]
 nn = ["dep:luma-nn", "dep:luma-optim", "dep:luma-dataset"]
-jit = ["dep:luma-jit", "nn"]
-cuda = ["luma-tensor/cuda", "luma-nn?/cuda", "luma-jit?/cuda"]
-full = ["nn", "jit"]
+compile = ["dep:luma-compile", "nn"]
+cuda = ["luma-tensor/cuda", "luma-nn?/cuda", "luma-compile?/cuda"]
+full = ["nn", "compile"]
