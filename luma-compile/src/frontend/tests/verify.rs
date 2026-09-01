@@ -21,7 +21,7 @@ fn valid_hand_built_graph_passes() {
 
 #[test]
 fn valid_traced_module_passes() {
-    let linear = Linear::new(3, 4, true, Cpu).unwrap();
+    let linear = Linear::new(3, 4, true, Cpu::default()).unwrap();
     let x = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0], (1, 3), FloatDType::F32).unwrap();
     let graph = trace(&linear, &x).unwrap();
     verify(&graph.lock().unwrap()).unwrap();

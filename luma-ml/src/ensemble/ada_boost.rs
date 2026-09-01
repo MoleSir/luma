@@ -170,8 +170,8 @@ mod tests {
         const N_SAMPLES: usize = 100;
         // x 取 [-1, 1] 保证默认学习率 (0.01) 的线性回归收敛（x 尺度太大会发散）
         // 输入用默认 F32 验证内部 Tensor::new + to_dtype 的 dtype 对齐
-        let x = Tensor::<Cpu>::rand(-1.0, 1.0, (N_SAMPLES,), &Cpu).unwrap();
-        let y = 3.0 * &x + 2.0 + 0.1 * Tensor::<Cpu>::randn(0.0, 1.0, (N_SAMPLES,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(-1.0, 1.0, (N_SAMPLES,), &Cpu::default()).unwrap();
+        let y = 3.0 * &x + 2.0 + 0.1 * Tensor::<Cpu>::randn(0.0, 1.0, (N_SAMPLES,), &Cpu::default()).unwrap();
         let x = x.unsqueeze(1).unwrap();
 
         let trainer = AdaBoostRegressor { fiter: LinearRegression::default(), n_estimators: 10, learning_rate: 1.0 };

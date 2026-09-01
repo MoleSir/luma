@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_confusion_binary_matrix() {
-        let device = Cpu;
+        let device = Cpu::default();
         let y_true = Tensor::<Cpu, Int>::new(vec![1i64, 0, 1, 1, 0, 0, 1, 0, 0, 1], &device).unwrap();
         let y_pred = Tensor::<Cpu, Int>::new(vec![1i64, 0, 0, 1, 0, 0, 1, 1, 0, 1], &device).unwrap();
         let cm = confusion_matrix(&y_true, &y_pred).unwrap();
@@ -142,7 +142,7 @@ mod tests {
 
     #[test]
     fn test_binary_scores() {
-        let device = Cpu;
+        let device = Cpu::default();
         let y_true = Tensor::<Cpu, Int>::new(vec![1i64, 0, 1, 1, 0, 0, 1, 0, 0, 1], &device).unwrap();
         let y_pred = Tensor::<Cpu, Int>::new(vec![1i64, 0, 0, 1, 0, 0, 1, 1, 0, 1], &device).unwrap();
         let pr = precision_score(&y_true, &y_pred).unwrap();

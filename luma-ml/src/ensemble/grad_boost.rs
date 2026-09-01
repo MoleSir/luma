@@ -107,8 +107,8 @@ mod tests {
     /// 输入用默认 F32，验证决策树 predict 的 to_dtype 对齐（y.zeros_like 是 F32）
     fn make_linear_data() -> (Tensor<Cpu>, Tensor<Cpu>) {
         const N_SAMPLES: usize = 100;
-        let x = Tensor::<Cpu>::rand(0.0, 10.0, (N_SAMPLES,), &Cpu).unwrap();
-        let y = 3.0 * &x + 2.0 + 0.1 * Tensor::<Cpu>::randn(0.0, 1.0, (N_SAMPLES,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 10.0, (N_SAMPLES,), &Cpu::default()).unwrap();
+        let y = 3.0 * &x + 2.0 + 0.1 * Tensor::<Cpu>::randn(0.0, 1.0, (N_SAMPLES,), &Cpu::default()).unwrap();
         let x = x.unsqueeze(1).unwrap();
         (x, y)
     }
@@ -116,8 +116,8 @@ mod tests {
     #[test]
     fn test_loss_mse_gradient() {
         // Loss = (y_pred - y)^2, 梯度 = 2 * (y_pred - y)
-        let y = Tensor::<Cpu>::new(vec![1.0, 2.0, 3.0], &Cpu).unwrap();
-        let y_pred = Tensor::<Cpu>::new(vec![2.0, 2.0, 1.0], &Cpu).unwrap();
+        let y = Tensor::<Cpu>::new(vec![1.0, 2.0, 3.0], &Cpu::default()).unwrap();
+        let y_pred = Tensor::<Cpu>::new(vec![2.0, 2.0, 1.0], &Cpu::default()).unwrap();
 
         let grad = Loss::Mse.gradient(&y, &y_pred).unwrap();
         assert_eq!(grad.to_vec().unwrap(), vec![2.0, 0.0, -4.0]);

@@ -92,7 +92,7 @@ fn flags() -> FlagHolder<Cpu> {
 #[test]
 fn linear_transfer_same_device() {
     let m = linear(3, 4);
-    let moved: Linear<Cpu> = m.to_device(&Cpu).unwrap();
+    let moved: Linear<Cpu> = m.to_device(&Cpu::default()).unwrap();
 
     // skipped config copied verbatim
     assert_eq!(moved.in_features, 3);
@@ -116,7 +116,7 @@ fn linear_transfer_same_device() {
 #[test]
 fn nested_transfer_copies_all_field_categories() {
     let m = net();
-    let moved: Net<Cpu> = m.to_device(&Cpu).unwrap();
+    let moved: Net<Cpu> = m.to_device(&Cpu::default()).unwrap();
 
     assert_eq!(moved.label, "net-1");
     assert_eq!(moved.steps, 42);
@@ -140,7 +140,7 @@ fn nested_transfer_copies_all_field_categories() {
 #[test]
 fn buffer_kinds_transfer() {
     let m = flags();
-    let moved: FlagHolder<Cpu> = m.to_device(&Cpu).unwrap();
+    let moved: FlagHolder<Cpu> = m.to_device(&Cpu::default()).unwrap();
 
     assert_eq!(moved.momentum, 0.9);
     assert_eq!(moved.mean.id(), m.mean.id());
@@ -154,11 +154,11 @@ fn buffer_kinds_transfer() {
 #[test]
 fn enum_module_transfers() {
     let a = Act::<Cpu>::Relu(ReluMod { _marker: PhantomData });
-    let moved: Act<Cpu> = a.to_device(&Cpu).unwrap();
+    let moved: Act<Cpu> = a.to_device(&Cpu::default()).unwrap();
     assert!(matches!(moved, Act::Relu(_)));
 
     let c = Act::<Cpu>::Config(7);
-    let moved_c: Act<Cpu> = c.to_device(&Cpu).unwrap();
+    let moved_c: Act<Cpu> = c.to_device(&Cpu::default()).unwrap();
     assert!(matches!(moved_c, Act::Config(7)));
 }
 
@@ -167,11 +167,11 @@ fn requires_grad_state_survives_transfer() {
     let m = linear(3, 2);
     // A param switched off (e.g. eval-style) must keep its flag.
     m.weight.set_requires_grad(false);
-    let moved: Linear<Cpu> = m.to_device(&Cpu).unwrap();
+    let moved: Linear<Cpu> = m.to_device(&Cpu::default()).unwrap();
     assert!(!moved.weight.requires_grad());
 
     m.weight.set_requires_grad(true);
-    let moved2: Linear<Cpu> = m.to_device(&Cpu).unwrap();
+    let moved2: Linear<Cpu> = m.to_device(&Cpu::default()).unwrap();
     assert!(moved2.weight.requires_grad());
 }
 
@@ -197,7 +197,7 @@ fn linear_cpu_cuda_roundtrip() {
     }
 
     // roundtrip back to CPU reproduces the original weights
-    let back: Linear<Cpu> = gpu.to_device(&Cpu).unwrap();
+    let back: Linear<Cpu> = gpu.to_device(&Cpu::default()).unwrap();
     assert_ne!(back.weight.id(), m.weight.id(), "cross-device transfer must copy");
     let w1 = m.weight.to_vec().unwrap();
     let w2 = back.weight.to_vec().unwrap();
@@ -228,7 +228,7 @@ fn nested_cuda_roundtrip() {
     assert!(gpu.block.linear.weight.requires_grad(), "params stay trainable on the GPU");
 
     // roundtrip back reproduces every parameter and buffer
-    let back: Net<Cpu> = gpu.to_device(&Cpu).unwrap();
+    let back: Net<Cpu> = gpu.to_device(&Cpu::default()).unwrap();
     assert_eq!(back.label, "net-1");
     assert_eq!(back.block.layers.len(), 2);
 
@@ -260,7 +260,7 @@ fn buffer_kinds_cuda_roundtrip() {
     // buffers stay non-trainable on the GPU
     assert!(!gpu.mean.requires_grad());
 
-    let back: FlagHolder<Cpu> = gpu.to_device(&Cpu).unwrap();
+    let back: FlagHolder<Cpu> = gpu.to_device(&Cpu::default()).unwrap();
     assert_eq!(back.mean.to_vec().unwrap(), m.mean.to_vec().unwrap());
     assert_eq!(back.count.to_vec().unwrap(), m.count.to_vec().unwrap());
     assert_eq!(back.seen.to_vec().unwrap(), vec![true]);
@@ -274,7 +274,7 @@ fn enum_module_cuda_roundtrip() {
     let a = Act::<Cpu>::Relu(ReluMod { _marker: PhantomData });
     let gpu: Act<Cuda> = a.to_device(&dev).unwrap();
     assert!(matches!(gpu, Act::Relu(_)));
-    let back: Act<Cpu> = gpu.to_device(&Cpu).unwrap();
+    let back: Act<Cpu> = gpu.to_device(&Cpu::default()).unwrap();
     assert!(matches!(back, Act::Relu(_)));
 
     let c = Act::<Cpu>::Config(7);
@@ -293,6 +293,6 @@ fn requires_grad_state_survives_cross_device() {
     let gpu: Linear<Cuda> = m.to_device(&dev).unwrap();
     assert!(!gpu.weight.requires_grad(), "disabled grad must stay disabled on the GPU");
 
-    let back: Linear<Cpu> = gpu.to_device(&Cpu).unwrap();
+    let back: Linear<Cpu> = gpu.to_device(&Cpu::default()).unwrap();
     assert!(!back.weight.requires_grad(), "disabled grad must survive the roundtrip");
 }

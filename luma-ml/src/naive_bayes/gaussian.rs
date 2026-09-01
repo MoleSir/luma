@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_gaussian_nb_iris() {
-        let device = Cpu;
+        let device = Cpu::default();
         let iris = load_iris(&device).unwrap();
         let model = GaussianNB::default().fit(&iris.data, &iris.target).unwrap();
 
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_gaussian_nb_toy_params_and_log_proba() {
-        let device = Cpu;
+        let device = Cpu::default();
         // 2 类 × 2 特征，每类 2 个样本，特征可分
         let x = Tensor::<Cpu>::new(vec![0.0, 0.0, 1.0, 1.0, 10.0, 10.0, 11.0, 11.0], &device).unwrap().reshape((4, 2)).unwrap();
         let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &device).unwrap();
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_gaussian_nb_single_sample_per_class() {
-        let device = Cpu;
+        let device = Cpu::default();
         // 每类只有一个样本 => 方差为 0，依赖 var_smoothing 兜底（否则 ln(0) = -inf）
         let x = Tensor::<Cpu>::new(vec![1.0, 100.0], &device).unwrap().reshape((2, 1)).unwrap();
         let y = Tensor::<Cpu, Int>::new(vec![0i64, 1], &device).unwrap();
@@ -198,9 +198,13 @@ mod tests {
     #[test]
     fn test_gaussian_nb_f32_input() {
         // 默认 F32 输入：验证 fit 内部 Tensor::new + to_dtype 的 dtype 对齐
-        let x =
-            Tensor::<Cpu>::from_slice(&[0.0, 0.0, 1.0, 1.0, 10.0, 10.0, 11.0, 11.0], (4, 2), (Cpu, luma_tensor::FloatDType::F32)).unwrap();
-        let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &Cpu).unwrap();
+        let x = Tensor::<Cpu>::from_slice(
+            &[0.0, 0.0, 1.0, 1.0, 10.0, 10.0, 11.0, 11.0],
+            (4, 2),
+            (Cpu::default(), luma_tensor::FloatDType::F32),
+        )
+        .unwrap();
+        let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &Cpu::default()).unwrap();
 
         let model = GaussianNB::default().fit(&x, &y).unwrap();
         assert_eq!(model.theta.dtype(), luma_tensor::FloatDType::F32);

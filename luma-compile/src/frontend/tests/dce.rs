@@ -8,7 +8,7 @@ use luma_tensor::{BinaryOp, Cpu, DType, FloatUnaryOp, Shape, Tensor, UnaryOp};
 /// 无死代码的图必须原样保留（节点数、值数不变），且通过 verify。
 #[test]
 fn traced_linear_survives_dce() {
-    let linear = Linear::new(3, 4, true, Cpu).unwrap();
+    let linear = Linear::new(3, 4, true, Cpu::default()).unwrap();
     let x = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0], (1, 3), FloatDType::F32).unwrap();
     let g = trace(&linear, &x).unwrap();
     let g = g.lock().unwrap().clone();

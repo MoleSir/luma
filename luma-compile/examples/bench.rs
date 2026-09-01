@@ -26,7 +26,7 @@ fn time<F: FnMut()>(mut f: F) -> Duration {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let linear = Linear::new(512, 1024, true, Cpu)?;
+    let linear = Linear::new(512, 1024, true, Cpu::default())?;
     let x = Tensor::<Cpu>::from_slice(&[0.5f64; 512 * 16], (16, 512), FloatDType::F32)?;
 
     // 1. direct forward
@@ -39,14 +39,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut g = graph.lock().unwrap().clone();
     println!("traced nodes: {}", g.nodes.len());
 
-    let mut exec_raw = g.clone().compile(&Cpu)?;
+    let mut exec_raw = g.clone().compile(&Cpu::default())?;
     let raw_run = time(|| {
         let _ = exec_raw.run(&[x.clone().into()]).unwrap();
     });
 
     g.optimize()?;
     println!("optimized nodes: {}", g.nodes.len());
-    let mut exec_opt = g.compile(&Cpu)?;
+    let mut exec_opt = g.compile(&Cpu::default())?;
     let opt_run = time(|| {
         let _ = exec_opt.run(&[x.clone().into()]).unwrap();
     });

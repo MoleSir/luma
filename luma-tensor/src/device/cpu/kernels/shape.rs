@@ -1,11 +1,13 @@
 //! Shape-movement kernels that materialize data: concatenation.
 
 use super::iter::gather;
+use crate::Cpu;
+use crate::device::cpu::allocator::AllocVec;
 use crate::{Error, Layout, Result, Shape};
 
 /// Concatenate contiguous logical views along `dim`. Each source is first
 /// materialized in logical order, then copied block-by-block into the output.
-pub fn cat<T: Copy + Default>(srcs: &[(&[T], &Layout)], dim: usize) -> Result<(Vec<T>, Shape)> {
+pub fn cat<T: Copy + Default + AllocVec>(srcs: &[(&[T], &Layout)], dim: usize, device: &Cpu) -> Result<(Vec<T>, Shape)> {
     if srcs.is_empty() {
         return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
     }
@@ -32,9 +34,9 @@ pub fn cat<T: Copy + Default>(srcs: &[(&[T], &Layout)], dim: usize) -> Result<(V
     let outer: usize = out_dims[..dim].iter().product();
     let right: usize = out_dims[dim + 1..].iter().product();
 
-    let mut out = vec![T::default(); out_shape.element_count()];
+    let mut out = device.fill_alloc(out_shape.element_count(), T::default());
     // materialize each source contiguously, then interleave along `dim`.
-    let materialized: Vec<Vec<T>> = srcs.iter().map(|(d, l)| gather(d, l)).collect();
+    let materialized: Vec<Vec<T>> = srcs.iter().map(|(d, l)| gather(d, l, device)).collect();
 
     for o in 0..outer {
         let mut dst_dim_base = 0usize;

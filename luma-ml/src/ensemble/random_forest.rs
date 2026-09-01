@@ -104,7 +104,7 @@ mod tests {
 
     #[test]
     fn test_random_forest_iris() {
-        let iris = load_iris(&Cpu).unwrap();
+        let iris = load_iris(&Cpu::default()).unwrap();
         let (x_train, x_test, y_train, y_test) = train_test_split(&iris.data, &iris.target, 0.3).unwrap();
 
         let rf = RandomForestClassifier::new(10, 10);

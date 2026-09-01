@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn test_make_regression_shapes_and_linearity() {
-        let data = make_regression(50, 3, &Cpu, RegressionOptionBuilder::default().noise(0.0).build().unwrap()).unwrap();
+        let data = make_regression(50, 3, &Cpu::default(), RegressionOptionBuilder::default().noise(0.0).build().unwrap()).unwrap();
 
         assert_eq!(data.x.dims(), [50, 3]);
         assert_eq!(data.y.dims(), [50]);
@@ -100,11 +100,16 @@ mod tests {
     #[test]
     fn test_make_regression_dtype_option() {
         // dtype 选项应生效（默认 F32）
-        let data_f32 = make_regression(10, 2, &Cpu, RegressionOption::default()).unwrap();
+        let data_f32 = make_regression(10, 2, &Cpu::default(), RegressionOption::default()).unwrap();
         assert_eq!(data_f32.x.dtype(), luma_tensor::FloatDType::F32);
 
-        let data_f64 =
-            make_regression(10, 2, &Cpu, RegressionOptionBuilder::default().dtype(luma_tensor::FloatDType::F64).build().unwrap()).unwrap();
+        let data_f64 = make_regression(
+            10,
+            2,
+            &Cpu::default(),
+            RegressionOptionBuilder::default().dtype(luma_tensor::FloatDType::F64).build().unwrap(),
+        )
+        .unwrap();
         assert_eq!(data_f64.x.dtype(), luma_tensor::FloatDType::F64);
         assert_eq!(data_f64.y.dtype(), luma_tensor::FloatDType::F64);
     }

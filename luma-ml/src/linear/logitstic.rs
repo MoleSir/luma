@@ -129,7 +129,7 @@ mod tests {
 
     #[test]
     fn test_iris() {
-        let iris = load_iris(&Cpu).unwrap();
+        let iris = load_iris(&Cpu::default()).unwrap();
         let x = iris.data;
         let y = iris.target;
         let x = x.i((.., ..2)).unwrap().contiguous().unwrap();

@@ -113,7 +113,7 @@ mod tests {
         }
         data.push(100.0);
         data.push(100.0);
-        Tensor::from_vec_f64(data, (201, 2), &Cpu).unwrap()
+        Tensor::from_vec_f64(data, (201, 2), &Cpu::default()).unwrap()
     }
 
     #[test]
@@ -145,7 +145,7 @@ mod tests {
     fn test_dbscan_all_noise() {
         // 所有点彼此相距很远 -> 每个点都只有自己一个邻居，全部判为噪声（标签全部相同即可，
         // 不依赖 i64::MAX 标记，因为 Int 张量默认 I32 存储会把它截断成 -1）
-        let x = Tensor::<Cpu>::new(vec![0.0, 0.0, 100.0, 0.0, 0.0, 100.0], &Cpu).unwrap().reshape((3, 2)).unwrap();
+        let x = Tensor::<Cpu>::new(vec![0.0, 0.0, 100.0, 0.0, 0.0, 100.0], &Cpu::default()).unwrap().reshape((3, 2)).unwrap();
 
         let dbscan = DBSCAN { eps: 1.0, min_pts: 2 };
         let labels = dbscan.fit(&x).unwrap().to_vec().unwrap();

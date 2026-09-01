@@ -507,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_class_iris() {
-        let device = Cpu;
+        let device = Cpu::default();
         let iris = load_iris(&device).unwrap();
         let x = iris.data;
         let y = iris.target;
@@ -527,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_diabetes() {
-        let device = Cpu;
+        let device = Cpu::default();
         let diabetes = load_diabetes(&device).unwrap();
         let x = diabetes.data;
         let y = diabetes.target;
@@ -546,8 +546,8 @@ mod tests {
     #[test]
     fn test_decision_tree_toy_exact_fit() {
         // 手造可完美切分的数据：特征 < 5.5 => 类别 0，否则类别 1
-        let x = Tensor::<Cpu>::new(vec![0.0, 1.0, 10.0, 11.0], &Cpu).unwrap().reshape((4, 1)).unwrap();
-        let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &Cpu).unwrap();
+        let x = Tensor::<Cpu>::new(vec![0.0, 1.0, 10.0, 11.0], &Cpu::default()).unwrap().reshape((4, 1)).unwrap();
+        let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &Cpu::default()).unwrap();
 
         let model = DecisionTreeClassifier::new(3).fit(&x, &y).unwrap();
         let y_pred = model.predict(&x).unwrap();

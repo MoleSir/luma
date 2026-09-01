@@ -146,10 +146,10 @@ mod tests {
         const N_SAMPLES: usize = 50;
         const W: f64 = 3.0;
         const B: f64 = 2.5;
-        let x_train = Tensor::rand(-1.0, 1.0, (N_SAMPLES,), &Cpu).unwrap();
+        let x_train = Tensor::rand(-1.0, 1.0, (N_SAMPLES,), &Cpu::default()).unwrap();
         let y_train = W * &x_train + B;
         let x_train = x_train.unsqueeze(1).unwrap();
-        let y_train = y_train + 0.1 * Tensor::randn(0.0, 1.0, (N_SAMPLES,), &Cpu).unwrap();
+        let y_train = y_train + 0.1 * Tensor::randn(0.0, 1.0, (N_SAMPLES,), &Cpu::default()).unwrap();
 
         let trainer = RidgeRegression::default();
         let model = trainer.fit(&x_train, &y_train).unwrap();
@@ -161,7 +161,7 @@ mod tests {
     fn test_gd_nd() {
         const N_SAMPLES: usize = 50;
         const N_FEATURES: usize = 5;
-        let train_data = make_regression(N_SAMPLES, N_FEATURES, &Cpu, RegressionOption::default()).unwrap();
+        let train_data = make_regression(N_SAMPLES, N_FEATURES, &Cpu::default(), RegressionOption::default()).unwrap();
         let x_train = train_data.x;
         let y_train = train_data.y;
         let weight_bias = train_data.coef;

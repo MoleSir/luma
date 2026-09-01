@@ -14,6 +14,7 @@ pub trait CpuDType: Copy + PartialOrd + Send + Sync + 'static {
 
 pub trait CpuNum:
     CpuDType
+    + crate::device::cpu::allocator::AllocVec
     + std::ops::Add<Output = Self>
     + std::ops::Sub<Output = Self>
     + std::ops::Mul<Output = Self>

@@ -140,7 +140,7 @@ mod tests {
 
     #[test]
     fn test_load_iris() {
-        let iris = load_iris(&Cpu).unwrap();
+        let iris = load_iris(&Cpu::default()).unwrap();
         let x = iris.data;
         let y = iris.target;
         assert_eq!(x.dims(), [IRIS_N_SAMPLES, IRIS_N_FEATURES]);
@@ -149,7 +149,7 @@ mod tests {
 
     #[test]
     fn test_load_diabetes() {
-        let diabetes = load_diabetes(&Cpu).unwrap();
+        let diabetes = load_diabetes(&Cpu::default()).unwrap();
         let x = diabetes.data;
         let y = diabetes.target;
         assert_eq!(x.dims(), [DIABETES_N_SAMPLES, DIABETES_N_FEATURES]);

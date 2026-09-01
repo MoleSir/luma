@@ -5,7 +5,8 @@
 
 use super::element::CpuNum;
 use super::iter::DimArray;
-use crate::{Layout, ReduceOp, Result, Shape};
+use crate::device::cpu::allocator::AllocVec;
+use crate::{Cpu, Layout, ReduceOp, Result, Shape};
 
 /// Which single-axis reduction to run.
 #[derive(Clone, Copy)]
@@ -31,7 +32,14 @@ impl From<ReduceOp> for Reducer {
 
 /// Reduce over multiple dims. Reduces from the highest dim down (with keepdim to
 /// preserve dim indices), then optionally squeezes the reduced dims out.
-pub fn reduce_dims<T: CpuNum>(x: &[T], layout: &Layout, dims: &[usize], keepdim: bool, reducer: Reducer) -> Result<(Vec<T>, Shape)> {
+pub fn reduce_dims<T: CpuNum + AllocVec>(
+    x: &[T],
+    layout: &Layout,
+    dims: &[usize],
+    keepdim: bool,
+    reducer: Reducer,
+    device: &Cpu,
+) -> Result<(Vec<T>, Shape)> {
     let mut sorted: Vec<usize> = dims.to_vec();
     sorted.sort_unstable();
     sorted.dedup();
@@ -42,19 +50,19 @@ pub fn reduce_dims<T: CpuNum>(x: &[T], layout: &Layout, dims: &[usize], keepdim:
     let (mut data, mut shape): (Vec<T>, Shape);
 
     if sorted.is_empty() {
-        return Ok((crate::device::cpu::kernels::iter::gather(x, layout), layout.shape().clone()));
+        return Ok((crate::device::cpu::kernels::iter::gather(x, layout, device), layout.shape().clone()));
     }
 
     // reduce highest dim first so lower indices stay valid
     let mut iter = sorted.iter().rev();
     let first = *iter.next().unwrap();
-    let (d, s) = reduce_dim(x, &cur_layout, first, true, reducer)?;
+    let (d, s) = reduce_dim(x, &cur_layout, first, true, reducer, device)?;
     data = d;
     shape = s;
     for &dim in iter {
         cur_layout = Layout::contiguous(shape.clone());
         cur_data = data;
-        let (d, s) = reduce_dim(&cur_data, &cur_layout, dim, true, reducer)?;
+        let (d, s) = reduce_dim(&cur_data, &cur_layout, dim, true, reducer, device)?;
         data = d;
         shape = s;
     }
@@ -89,21 +97,26 @@ impl Reducer {
 
 /// Reduce `x`/`layout` over a single `reduce_dim`. Returns the reduced buffer and
 /// its shape (with `reduce_dim` kept as size-1 if `keepdim`, else removed).
-pub fn reduce_dim<T: CpuNum>(x: &[T], layout: &Layout, reduce_dim: usize, keepdim: bool, reducer: Reducer) -> Result<(Vec<T>, Shape)> {
+pub fn reduce_dim<T: CpuNum + AllocVec>(
+    x: &[T],
+    layout: &Layout,
+    reduce_dim: usize,
+    keepdim: bool,
+    reducer: Reducer,
+    device: &Cpu,
+) -> Result<(Vec<T>, Shape)> {
     let reduce_dim_stride = layout.stride()[reduce_dim];
     let reduce_dim_size = layout.dims()[reduce_dim];
 
     let dst: Vec<T> = if layout.is_contiguous() && reduce_dim_stride == 1 {
         let x = &x[layout.start_offset()..];
-        (0..layout.element_count() / reduce_dim_size)
-            .map(|i| {
-                let chunk = &x[i * reduce_dim_size..i * reduce_dim_size + reduce_dim_size];
-                reducer.apply(chunk.iter().copied())
-            })
-            .collect()
+        device.collect_alloc((0..layout.element_count() / reduce_dim_size).map(|i| {
+            let chunk = &x[i * reduce_dim_size..i * reduce_dim_size + reduce_dim_size];
+            reducer.apply(chunk.iter().copied())
+        }))
     } else {
         let dst_len = layout.element_count() / reduce_dim_size;
-        let mut dst: Vec<T> = Vec::with_capacity(dst_len);
+        let mut dst: Vec<T> = device.alloc_vec(dst_len);
         let collapsed = layout.narrow(reduce_dim, 0, 1)?;
         if reduce_dim_stride == 1 {
             for src_index in collapsed.storage_indices() {
@@ -130,7 +143,14 @@ pub fn reduce_dim<T: CpuNum>(x: &[T], layout: &Layout, reduce_dim: usize, keepdi
 
 /// argmin/argmax over a single dim. Returns `usize` indices (caller casts to the
 /// int storage dtype) and the result shape. Ties keep the first index.
-pub fn arg_reduce<T: CpuNum>(x: &[T], layout: &Layout, dim: usize, keepdim: bool, take_max: bool) -> Result<(Vec<usize>, Shape)> {
+pub fn arg_reduce<T: CpuNum>(
+    x: &[T],
+    layout: &Layout,
+    dim: usize,
+    keepdim: bool,
+    take_max: bool,
+    device: &Cpu,
+) -> Result<(Vec<usize>, Shape)> {
     let reduce_dim_stride = layout.stride()[dim];
     let reduce_dim_size = layout.dims()[dim];
 
@@ -145,7 +165,7 @@ pub fn arg_reduce<T: CpuNum>(x: &[T], layout: &Layout, dim: usize, keepdim: bool
     };
 
     let dst_len = layout.element_count() / reduce_dim_size;
-    let mut dst: Vec<usize> = Vec::with_capacity(dst_len);
+    let mut dst: Vec<usize> = device.alloc_vec(dst_len);
     let collapsed = layout.narrow(dim, 0, 1)?;
     for src_index in collapsed.storage_indices() {
         let arr = DimArray::new(&x[src_index..], reduce_dim_size, reduce_dim_stride);

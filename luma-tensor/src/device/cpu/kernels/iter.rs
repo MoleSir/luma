@@ -1,7 +1,9 @@
 //! Shared strided-iteration helpers used by the generic CPU kernels, plus the
 //! `DimArray` view for iterating a single (possibly strided) dimension.
 
+use crate::Cpu;
 use crate::Layout;
+use crate::device::cpu::allocator::AllocVec;
 
 /// A strided view of one dimension: `get(i) = src[i * stride]`, for `size` steps.
 /// Used by reductions / nn kernels to walk the reduced axis.
@@ -51,11 +53,11 @@ impl<'a, T: Copy> ExactSizeIterator for DimArrayIter<'a, T> {
 
 /// Materialize the logical elements of `data` under `layout` (in row-major
 /// logical order) into a fresh `Vec`, applying `f` to each.
-pub fn gather_map<T: Copy, U, F: Fn(T) -> U>(data: &[T], layout: &Layout, f: F) -> Vec<U> {
-    layout.storage_indices().map(|i| f(data[i])).collect()
+pub fn gather_map<T: Copy, U: AllocVec, F: Fn(T) -> U>(data: &[T], layout: &Layout, f: F, device: &Cpu) -> Vec<U> {
+    device.collect_alloc(layout.storage_indices().map(|i| f(data[i])))
 }
 
 /// Materialize the logical elements of `data` under `layout` into a fresh `Vec`.
-pub fn gather<T: Copy>(data: &[T], layout: &Layout) -> Vec<T> {
-    layout.storage_indices().map(|i| data[i]).collect()
+pub fn gather<T: Copy + AllocVec>(data: &[T], layout: &Layout, device: &Cpu) -> Vec<T> {
+    device.collect_alloc(layout.storage_indices().map(|i| data[i]))
 }

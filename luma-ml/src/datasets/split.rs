@@ -51,8 +51,8 @@ mod tests {
 
     #[test]
     fn test_split_shapes() {
-        let x = Tensor::<Cpu>::rand(0.0, 1.0, (100, 4), &Cpu).unwrap();
-        let y = Tensor::<Cpu>::rand(0.0, 1.0, (100,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (100, 4), &Cpu::default()).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (100,), &Cpu::default()).unwrap();
 
         let (x_train, x_test, y_train, y_test) = train_test_split(&x, &y, 0.3).unwrap();
         assert_eq!(x_train.dims(), [70, 4]);
@@ -63,8 +63,8 @@ mod tests {
 
     #[test]
     fn test_split_train_and_test_disjoint() {
-        let x = Tensor::<Cpu>::rand(0.0, 1.0, (100, 1), &Cpu).unwrap();
-        let y = Tensor::<Cpu>::rand(0.0, 1.0, (100,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (100, 1), &Cpu::default()).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (100,), &Cpu::default()).unwrap();
 
         let (x_train, x_test, _, _) = train_test_split(&x, &y, 0.2).unwrap();
         // train 与 test 的样本不应重合（按第一列的值精确匹配）
@@ -77,9 +77,9 @@ mod tests {
 
     #[test]
     fn test_split_invalid_args() {
-        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu).unwrap();
-        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
-        let y9 = Tensor::<Cpu>::rand(0.0, 1.0, (9,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu::default()).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu::default()).unwrap();
+        let y9 = Tensor::<Cpu>::rand(0.0, 1.0, (9,), &Cpu::default()).unwrap();
 
         // 0.0 是允许的边界（测试集为空）
         let (x_train, x_test, _, _) = train_test_split(&x, &y, 0.0).unwrap();

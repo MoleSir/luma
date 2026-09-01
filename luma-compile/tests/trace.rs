@@ -67,8 +67,8 @@ fn traces_int_and_bool_ops() {
 
 #[test]
 fn trace_module_captures_state() {
-    let cpu = Cpu;
-    let linear = Linear::new(3, 4, true, cpu).unwrap();
+    let cpu = Cpu::default();
+    let linear = Linear::new(3, 4, true, &cpu).unwrap();
     let x = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3), FloatDType::F32).unwrap();
 
     let graph = trace(&linear, &x).unwrap();
@@ -86,7 +86,7 @@ fn trace_module_captures_state() {
 
     // The captured bytes round-trip through `Tensor::from_bytes` on a real
     // device — the exact path a future executor will use to materialise them.
-    let w_restored = Tensor::<Cpu>::from_bytes(&weight.data.as_ref().unwrap().0, weight.shape.clone(), (cpu, FloatDType::F32)).unwrap();
+    let w_restored = Tensor::<Cpu>::from_bytes(&weight.data.as_ref().unwrap().0, weight.shape.clone(), (&cpu, FloatDType::F32)).unwrap();
     let w_orig = linear.weight.to_vec().unwrap();
     let w_back = w_restored.to_vec().unwrap();
     assert_eq!(w_orig.len(), w_back.len());

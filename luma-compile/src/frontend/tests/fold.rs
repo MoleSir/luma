@@ -18,7 +18,7 @@ fn arange_folded() {
     assert!(g2.values[0].data.is_some(), "应留下带数据的常量");
 
     // 端到端：执行结果等于 arange
-    let mut exec = g2.compile(&Cpu).unwrap();
+    let mut exec = g2.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[]).unwrap();
     let got = out[0].as_int().unwrap().to_vec().unwrap();
     assert_eq!(got, vec![0, 1, 2, 3, 4]);
@@ -37,7 +37,9 @@ fn const_binary_folded() {
     verify(&g2).unwrap();
     assert!(g2.nodes.is_empty());
     assert_eq!(g2.values.len(), 1);
-    let t = Tensor::<Cpu>::from_bytes(g2.values[0].data.as_ref().unwrap().0.as_slice(), Shape::from(()), (&Cpu, FloatDType::F32)).unwrap();
+    let t =
+        Tensor::<Cpu>::from_bytes(g2.values[0].data.as_ref().unwrap().0.as_slice(), Shape::from(()), (&Cpu::default(), FloatDType::F32))
+            .unwrap();
     assert_eq!(t.to_vec().unwrap(), vec![5.0]);
 }
 
@@ -52,7 +54,9 @@ fn const_output_folded() {
     let g2 = fold(g).unwrap();
     verify(&g2).unwrap();
     assert!(g2.nodes.is_empty());
-    let t = Tensor::<Cpu>::from_bytes(g2.values[0].data.as_ref().unwrap().0.as_slice(), Shape::from(()), (&Cpu, FloatDType::F32)).unwrap();
+    let t =
+        Tensor::<Cpu>::from_bytes(g2.values[0].data.as_ref().unwrap().0.as_slice(), Shape::from(()), (&Cpu::default(), FloatDType::F32))
+            .unwrap();
     assert_eq!(t.to_vec().unwrap(), vec![-2.0]);
 }
 
@@ -90,7 +94,7 @@ fn folded_graph_executes_same() {
 
     let input = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0, 4.0], (2, 2), FloatDType::F32).unwrap();
     let expected = input.clone().add_scalar(5.0).unwrap().to_vec().unwrap();
-    let mut exec = g2.compile(&Cpu).unwrap();
+    let mut exec = g2.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[input.into()]).unwrap();
     assert_eq!(out[0].as_float().unwrap().to_vec().unwrap(), expected);
 }

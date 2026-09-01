@@ -42,8 +42,8 @@ mod tests {
 
     #[test]
     fn test_validate_ok() {
-        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu).unwrap();
-        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu::default()).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu::default()).unwrap();
 
         let (n_samples, n_features) = validate_xy_shapes(&x, &y, None).unwrap();
         assert_eq!((n_samples, n_features), (10, 2));
@@ -51,8 +51,8 @@ mod tests {
 
     #[test]
     fn test_validate_sample_mismatch() {
-        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu).unwrap();
-        let y = Tensor::<Cpu>::rand(0.0, 1.0, (9,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu::default()).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (9,), &Cpu::default()).unwrap();
 
         let err = validate_xy_shapes(&x, &y, None).unwrap_err();
         assert!(matches!(err, crate::MlError::SampleSizeMismatch { .. }));
@@ -60,9 +60,9 @@ mod tests {
 
     #[test]
     fn test_validate_sample_weight_mismatch() {
-        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu).unwrap();
-        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
-        let w = Tensor::<Cpu>::rand(0.0, 1.0, (8,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10, 2), &Cpu::default()).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu::default()).unwrap();
+        let w = Tensor::<Cpu>::rand(0.0, 1.0, (8,), &Cpu::default()).unwrap();
 
         let err = validate_xy_shapes(&x, &y, Some(&w)).unwrap_err();
         assert!(matches!(err, crate::MlError::SampleSizeMismatch { .. }));
@@ -70,8 +70,8 @@ mod tests {
 
     #[test]
     fn test_validate_x_not_2d() {
-        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
-        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu).unwrap();
+        let x = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu::default()).unwrap();
+        let y = Tensor::<Cpu>::rand(0.0, 1.0, (10,), &Cpu::default()).unwrap();
 
         assert!(validate_xy_shapes(&x, &y, None).is_err());
     }

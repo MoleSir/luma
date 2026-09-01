@@ -37,7 +37,11 @@ fn elem_bytes(dt: DType) -> usize {
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mlp = MLP { l1: Linear::new(128, 256, true, Cpu)?, l2: Linear::new(256, 256, true, Cpu)?, l3: Linear::new(256, 64, true, Cpu)? };
+    let mlp = MLP {
+        l1: Linear::new(128, 256, true, Cpu::default())?,
+        l2: Linear::new(256, 256, true, Cpu::default())?,
+        l3: Linear::new(256, 64, true, Cpu::default())?,
+    };
     let x = Tensor::<Cpu>::from_slice(&[0.5f64; 128], (1, 128), FloatDType::F32)?;
 
     let graph = trace(&mlp, &x)?;

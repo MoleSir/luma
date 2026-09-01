@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn test_knn_regression() {
         const N_SAMPLES: usize = 100;
-        let device = Cpu;
+        let device = Cpu::default();
         let x = Tensor::<Cpu>::rand(0.0, 10.0, (N_SAMPLES,), &device).unwrap();
         let y = x.sin().unwrap() + (0.1 * Tensor::<Cpu>::randn(0.0, 1.0, (N_SAMPLES,), &device).unwrap());
         let x = x.unsqueeze(1).unwrap();
@@ -213,7 +213,7 @@ mod tests {
 
     #[test]
     fn test_knn_classifier_iris() {
-        let iris = load_iris(&Cpu).unwrap();
+        let iris = load_iris(&Cpu::default()).unwrap();
         let (x_train, x_test, y_train, y_test) = train_test_split(&iris.data, &iris.target, 0.3).unwrap();
 
         let model = KnnClassifier::new(5).fit(&x_train, &y_train).unwrap();

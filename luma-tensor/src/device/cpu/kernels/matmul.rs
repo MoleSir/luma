@@ -6,6 +6,8 @@ use std::any::TypeId;
 use gemm::Parallelism;
 
 use super::element::CpuNum;
+use crate::Cpu;
+use crate::device::cpu::allocator::AllocVec;
 use crate::{Error, Layout, Result, Shape};
 
 fn num_threads() -> usize {
@@ -55,10 +57,10 @@ fn is_gemm_type<T: 'static>() -> bool {
 }
 
 /// `dst = lhs @ rhs` (batched). Returns the output buffer and shape.
-pub fn matmul<T: CpuNum>(lhs: &[T], lhs_l: &Layout, rhs: &[T], rhs_l: &Layout) -> Result<(Vec<T>, Shape)> {
+pub fn matmul<T: CpuNum + AllocVec>(lhs: &[T], lhs_l: &Layout, rhs: &[T], rhs_l: &Layout, device: &Cpu) -> Result<(Vec<T>, Shape)> {
     let (batch, m, n, k, out_shape) = matmul_dims(lhs_l, rhs_l)?;
     let mns = m * n;
-    let mut dst = vec![T::ZERO; batch * mns];
+    let mut dst = device.fill_alloc(batch * mns, T::ZERO);
     if out_shape.element_count() == 0 || k == 0 {
         return Ok((dst, out_shape));
     }

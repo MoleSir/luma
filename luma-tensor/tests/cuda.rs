@@ -409,26 +409,26 @@ fn cuda_to_device() {
     let gpu = src.to_device(dev).unwrap();
     assert_eq!(gpu.dtype(), src.dtype());
     assert_eq!(gpu.dims(), &[2, 3]);
-    let back = gpu.to_device(&Cpu).unwrap();
+    let back = gpu.to_device(&Cpu::default()).unwrap();
     assert_close(&back.to_vec().unwrap(), &[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 1e-5, 1e-5);
 
     // f64 roundtrip — dtype must be preserved on both sides.
-    let src64 = tensor_f64_dev(&[1.5, 2.5, 3.5], (3,), &Cpu);
+    let src64 = tensor_f64_dev(&[1.5, 2.5, 3.5], (3,), &Cpu::default());
     let gpu64 = src64.to_device(dev).unwrap();
     assert_eq!(gpu64.dtype(), FloatDType::F64);
-    let back64 = gpu64.to_device(&Cpu).unwrap();
+    let back64 = gpu64.to_device(&Cpu::default()).unwrap();
     assert_close(&back64.to_vec().unwrap(), &[1.5, 2.5, 3.5], 1e-5, 1e-5);
 
     // Int roundtrip.
     let srci = tensor_i32(&[1, 2, 3, 4], (4,));
     let gpui = srci.to_device(dev).unwrap();
-    let backi = gpui.to_device(&Cpu).unwrap();
+    let backi = gpui.to_device(&Cpu::default()).unwrap();
     assert_eq!(backi.to_vec().unwrap(), vec![1, 2, 3, 4]);
 
     // Bool roundtrip (stored as u8 on device — the bytes path bridges this).
-    let srcb = tensor_bool_dev(&[true, false, true, true], (4,), &Cpu);
+    let srcb = tensor_bool_dev(&[true, false, true, true], (4,), &Cpu::default());
     let gpub = srcb.to_device(dev).unwrap();
-    let backb = gpub.to_device(&Cpu).unwrap();
+    let backb = gpub.to_device(&Cpu::default()).unwrap();
     assert_eq!(backb.to_vec().unwrap(), vec![true, false, true, true]);
 
     // Non-contiguous cpu tensor -> cuda: result is contiguous, values in
@@ -440,7 +440,7 @@ fn cuda_to_device() {
     assert_close(&gpun.to_vec().unwrap(), &[1.0, 4.0, 2.0, 5.0, 3.0, 6.0], 1e-5, 1e-5);
 
     // requires_grad preserved across the transfer, graph severed.
-    let gr = tensor_f32_dev(&[1.0, 2.0], (2,), &Cpu);
+    let gr = tensor_f32_dev(&[1.0, 2.0], (2,), &Cpu::default());
     gr.set_requires_grad(true);
     let grg = gr.to_device(dev).unwrap();
     assert!(grg.requires_grad());
@@ -493,7 +493,7 @@ fn cuda_to_device_severs_graph_and_grad_flows() {
     // GPU non-leaf → CPU: the same severing in the other direction.
     let y2 = yg.mul(&yg).unwrap();
     assert!(y2.op().is_some());
-    let back = y2.to_device(&Cpu).unwrap();
+    let back = y2.to_device(&Cpu::default()).unwrap();
     assert!(back.op().is_none());
     assert!(back.is_leaf());
     assert!(back.requires_grad());

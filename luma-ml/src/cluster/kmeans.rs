@@ -178,7 +178,7 @@ mod tests {
             data.push(10.0 + (i % 5) as f64);
             data.push(10.0 + (i / 5) as f64);
         }
-        Tensor::from_vec_f64(data, (50, 2), &Cpu).unwrap()
+        Tensor::from_vec_f64(data, (50, 2), &Cpu::default()).unwrap()
     }
 
     #[test]
@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn test_kmeans_transform_with_given_centers() {
         // 手设 centers 验证 transform 的最近中心分配逻辑（完全确定性）
-        let centers = Tensor::<Cpu>::new(vec![0.0, 0.0, 10.0, 10.0], &Cpu).unwrap().reshape((2, 2)).unwrap();
+        let centers = Tensor::<Cpu>::new(vec![0.0, 0.0, 10.0, 10.0], &Cpu::default()).unwrap().reshape((2, 2)).unwrap();
         let model = KMeansModel { centers };
 
         let x = two_blobs();

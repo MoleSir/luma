@@ -26,8 +26,8 @@ mod tests {
 
     #[test]
     fn test_regression_metrics_hand_computed() {
-        let y_true = Tensor::<Cpu>::new(vec![1.0, 2.0, 3.0, 4.0], &Cpu).unwrap();
-        let y_pred = Tensor::<Cpu>::new(vec![1.5, 2.0, 2.5, 4.5], &Cpu).unwrap();
+        let y_true = Tensor::<Cpu>::new(vec![1.0, 2.0, 3.0, 4.0], &Cpu::default()).unwrap();
+        let y_pred = Tensor::<Cpu>::new(vec![1.5, 2.0, 2.5, 4.5], &Cpu::default()).unwrap();
 
         // 平方误差之和 = 0.25 + 0 + 0.25 + 0.25
         assert!((mean_squar_error(&y_true, &y_pred).unwrap() - 0.75).abs() < 1e-12);
@@ -44,19 +44,19 @@ mod tests {
     #[test]
     fn test_regression_metrics_extremes() {
         // 完美预测: SSE = 0（分母 SST 非 0，r2 = 1.0）
-        let y = Tensor::<Cpu>::new(vec![1.0, 2.0, 3.0, 4.0], &Cpu).unwrap();
+        let y = Tensor::<Cpu>::new(vec![1.0, 2.0, 3.0, 4.0], &Cpu::default()).unwrap();
         assert!((mean_squar_error(&y, &y).unwrap()).abs() < 1e-12);
         assert!((mean_squared_error(&y, &y).unwrap()).abs() < 1e-12);
         assert!((mean_absolute_error(&y, &y).unwrap()).abs() < 1e-12);
         assert!((r2_score(&y, &y).unwrap() - 1.0).abs() < 1e-12);
 
         // 近似完美预测: r2 -> 1
-        let y_near = Tensor::<Cpu>::new(vec![1.001, 2.001, 3.001, 4.001], &Cpu).unwrap();
+        let y_near = Tensor::<Cpu>::new(vec![1.001, 2.001, 3.001, 4.001], &Cpu::default()).unwrap();
         let r2 = r2_score(&y, &y_near).unwrap();
         assert!(r2 > 0.999, "r2 = {r2}");
 
         // y 恒定时分子分母同时为 0 -> NaN（r2 公式的已知边界，见迁移记录）
-        let y_const = Tensor::<Cpu>::new(vec![2.0, 2.0, 2.0], &Cpu).unwrap();
+        let y_const = Tensor::<Cpu>::new(vec![2.0, 2.0, 2.0], &Cpu::default()).unwrap();
         assert!(r2_score(&y_const, &y_const).unwrap().is_nan());
     }
 }

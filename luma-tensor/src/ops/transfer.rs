@@ -80,12 +80,12 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
         K::transfer(self, device)
     }
 
-    /// Convenience for `to_device(&Cpu)`.
+    /// Convenience for `to_device(&Cpu::default())`.
     pub fn cpu(&self) -> crate::Result<Tensor<Cpu, K>>
     where
         K: TransferDTypeKind<D, Cpu>,
     {
-        self.transfer(&Cpu)
+        self.transfer(&Cpu::default())
     }
 
     /// Convenience for `to_device(&Cuda::new(ordinal))`.

@@ -339,26 +339,26 @@ mod tests {
 
     #[test]
     fn test_init_zeros() {
-        let t = Init::zeros().init((2, 3), &Cpu).unwrap();
+        let t = Init::zeros().init((2, 3), &Cpu::default()).unwrap();
         assert_eq!(t.dims(), &[2, 3]);
         assert!(t.to_vec().unwrap().iter().all(|&x| x == 0.0));
     }
 
     #[test]
     fn test_init_ones() {
-        let t = Init::ones().init((2, 2), &Cpu).unwrap();
+        let t = Init::ones().init((2, 2), &Cpu::default()).unwrap();
         assert!(t.to_vec().unwrap().iter().all(|&x| (x - 1.0).abs() < 1e-5));
     }
 
     #[test]
     fn test_init_constant() {
-        let t = Init::constant(3.14).init((1,), &Cpu).unwrap();
+        let t = Init::constant(3.14).init((1,), &Cpu::default()).unwrap();
         assert!((t.to_vec().unwrap()[0] - 3.14).abs() < 1e-5);
     }
 
     #[test]
     fn test_init_normal() {
-        let t = Init::normal(0.0, 1.0).init((100,), &Cpu).unwrap();
+        let t = Init::normal(0.0, 1.0).init((100,), &Cpu::default()).unwrap();
         assert_eq!(t.dims(), &[100]);
         // values should not all be equal
         let v = t.to_vec().unwrap();
@@ -367,20 +367,20 @@ mod tests {
 
     #[test]
     fn test_init_uniform() {
-        let t = Init::uniform(-1.0, 1.0).init((50,), &Cpu).unwrap();
+        let t = Init::uniform(-1.0, 1.0).init((50,), &Cpu::default()).unwrap();
         let v = t.to_vec().unwrap();
         assert!(v.iter().all(|&x| x >= -1.0 && x <= 1.0));
     }
 
     #[test]
     fn test_init_kaiming_uniform() {
-        let t = Init::kaiming_uniform(NonLinearity::Relu, false).init_with((64, 128), 64, 128, &Cpu).unwrap();
+        let t = Init::kaiming_uniform(NonLinearity::Relu, false).init_with((64, 128), 64, 128, &Cpu::default()).unwrap();
         assert_eq!(t.dims(), &[64, 128]);
     }
 
     #[test]
     fn test_init_kaiming_uniform_with_gain() {
-        let t = Init::kaiming_uniform_with_gain(2.0, true).init_with((32, 64), 32, 64, &Cpu).unwrap();
+        let t = Init::kaiming_uniform_with_gain(2.0, true).init_with((32, 64), 32, 64, &Cpu::default()).unwrap();
         assert_eq!(t.dims(), &[32, 64]);
     }
 
@@ -394,20 +394,20 @@ mod tests {
 
     #[test]
     fn test_init_xavier_uniform() {
-        let t = Init::xavier_uniform(1.0).init_with((32, 64), 32, 64, &Cpu).unwrap();
+        let t = Init::xavier_uniform(1.0).init_with((32, 64), 32, 64, &Cpu::default()).unwrap();
         assert_eq!(t.dims(), &[32, 64]);
     }
 
     #[test]
     fn test_init_param() {
-        let p = Init::ones().init_param((4,), &Cpu).unwrap();
+        let p = Init::ones().init_param((4,), &Cpu::default()).unwrap();
         assert!(p.requires_grad());
         assert_eq!(p.0.dims(), &[4]);
     }
 
     #[test]
     fn test_init_buffer() {
-        let b = Init::zeros().init_buffer((3, 3), &Cpu).unwrap();
+        let b = Init::zeros().init_buffer((3, 3), &Cpu::default()).unwrap();
         let v = b.0.to_vec().unwrap();
         assert!(v.iter().all(|&x| x == 0.0));
     }
@@ -416,7 +416,7 @@ mod tests {
     fn test_meta_init_guard() {
         // Guard enables meta mode; currently falls back to zeros.
         let _guard = MetaInitGuard::new();
-        let t = Init::ones().init((2,), &Cpu).unwrap();
+        let t = Init::ones().init((2,), &Cpu::default()).unwrap();
         // TODO: once Tensor::meta() is public, this should be is_meta() == true
         assert!(!t.is_meta());
     }

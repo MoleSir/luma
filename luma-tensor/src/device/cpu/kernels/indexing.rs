@@ -5,12 +5,21 @@
 //! `usize::MAX` is the padding sentinel matching luma-core's `I::max_value()`).
 
 use super::element::{CpuDType, CpuNum};
+use crate::Cpu;
+use crate::device::cpu::allocator::AllocVec;
 use crate::{Error, Layout, Result};
 
 pub const PAD: usize = usize::MAX;
 
 /// `dst[.., i, ..] = src[.., ids[i], ..]` along `dim`.
-pub fn index_select<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Layout, dim: usize) -> Result<(Vec<T>, Vec<usize>)> {
+pub fn index_select<T: CpuDType + AllocVec>(
+    src: &[T],
+    src_l: &Layout,
+    ids: &[usize],
+    ids_l: &Layout,
+    dim: usize,
+    device: &Cpu,
+) -> Result<(Vec<T>, Vec<usize>)> {
     if !src_l.is_contiguous() {
         return Err(Error::RequiresContiguous { op: "index-select" });
     }
@@ -26,7 +35,7 @@ pub fn index_select<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l
     let left_len: usize = dst_dims[..dim].iter().product();
     let right_len: usize = dst_dims[dim + 1..].iter().product();
 
-    let mut dst = vec![T::ZERO; dst_len];
+    let mut dst = device.fill_alloc(dst_len, T::ZERO);
     for left_i in 0..left_len {
         let start_src = left_i * right_len * src_dim;
         let start_dst = left_i * right_len * n_ids;
@@ -48,7 +57,14 @@ pub fn index_select<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l
 }
 
 /// `dst[i,j,k] = src[i, ids[i,j,k], k]` along `dim`.
-pub fn gather<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Layout, dim: usize) -> Result<(Vec<T>, Vec<usize>)> {
+pub fn gather<T: CpuDType + AllocVec>(
+    src: &[T],
+    src_l: &Layout,
+    ids: &[usize],
+    ids_l: &Layout,
+    dim: usize,
+    device: &Cpu,
+) -> Result<(Vec<T>, Vec<usize>)> {
     if !src_l.is_contiguous() || !ids_l.is_contiguous() {
         return Err(Error::RequiresContiguous { op: "gather" });
     }
@@ -58,7 +74,7 @@ pub fn gather<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Lay
         return Err(Error::ShapeMismatchBinaryOp { lhs: src_l.shape().clone(), rhs: ids_l.shape().clone(), op: "gather" });
     }
     let dst_len = ids_l.shape().element_count();
-    let mut dst = vec![T::ZERO; dst_len];
+    let mut dst = device.fill_alloc(dst_len, T::ZERO);
     let left_len: usize = src_dims[..dim].iter().product();
     let right_len: usize = src_dims[dim + 1..].iter().product();
     let src_dim_size = src_dims[dim];
@@ -86,8 +102,16 @@ pub fn gather<T: CpuDType>(src: &[T], src_l: &Layout, ids: &[usize], ids_l: &Lay
 }
 
 /// `out = dst.clone(); out[.., ids[i], ..] += src[.., i, ..]` along `dim`.
-pub fn index_add<T: CpuNum>(dst: &[T], dst_l: &Layout, ids: &[usize], ids_l: &Layout, src: &[T], dim: usize) -> Result<Vec<T>> {
-    let mut result = dst.to_vec();
+pub fn index_add<T: CpuNum + AllocVec>(
+    dst: &[T],
+    dst_l: &Layout,
+    ids: &[usize],
+    ids_l: &Layout,
+    src: &[T],
+    dim: usize,
+    device: &Cpu,
+) -> Result<Vec<T>> {
+    let mut result = device.collect_alloc(dst.iter().copied());
     let n_ids = ids_l.dims()[0];
     let stride_ids = ids_l.stride()[0];
     let dst_dims = dst_l.dims();
@@ -117,8 +141,16 @@ pub fn index_add<T: CpuNum>(dst: &[T], dst_l: &Layout, ids: &[usize], ids_l: &La
 }
 
 /// `out = dst.clone(); out[.., ids[i,j,k], k] += src[i,j,k]` along `dim`.
-pub fn scatter_add<T: CpuNum>(dst: &[T], dst_l: &Layout, ids: &[usize], ids_l: &Layout, src: &[T], dim: usize) -> Result<Vec<T>> {
-    let mut result = dst.to_vec();
+pub fn scatter_add<T: CpuNum + AllocVec>(
+    dst: &[T],
+    dst_l: &Layout,
+    ids: &[usize],
+    ids_l: &Layout,
+    src: &[T],
+    dim: usize,
+    device: &Cpu,
+) -> Result<Vec<T>> {
+    let mut result = device.collect_alloc(dst.iter().copied());
     let dst_dims = dst_l.dims();
     let src_dims = ids_l.dims();
     if dst_dims.len() != src_dims.len() {

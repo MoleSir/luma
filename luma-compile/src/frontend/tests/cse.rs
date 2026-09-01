@@ -63,7 +63,7 @@ fn cse_executes_same() {
 
     let input = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0, 4.0], (2, 2), FloatDType::F32).unwrap();
     let expected = input.sqr().unwrap().to_vec().unwrap();
-    let mut exec = g2.compile(&Cpu).unwrap();
+    let mut exec = g2.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[input.into()]).unwrap();
     assert_eq!(out[0].as_float().unwrap().to_vec().unwrap(), expected);
     assert_eq!(out[1].as_float().unwrap().to_vec().unwrap(), expected, "两个输出都应指向合并后的值");

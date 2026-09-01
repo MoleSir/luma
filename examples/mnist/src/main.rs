@@ -6,7 +6,7 @@ use luma::optim::{Optimizer, SGD};
 use luma::{FloatDType, no_grad, Cpu, Device, Tensor};
 
 fn main() {
-    let device = Cpu;
+    let device = Cpu::default();
     if let Err(e) = result_main(&device) {
         eprintln!("{:?}", e);
     }

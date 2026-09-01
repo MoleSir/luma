@@ -115,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_multinomial_nb_basic() -> MlResult<()> {
-        let device = Cpu;
+        let device = Cpu::default();
         // 数据集：
         // 特征 0: "apple" 出现的次数
         // 特征 1: "macbook" 出现的次数
@@ -146,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_against_sklearn_values() -> crate::error::MlResult<()> {
-        let device = Cpu;
+        let device = Cpu::default();
         let x = Tensor::<Cpu, Int>::new(vec![1i64, 2, 2, 1, 3, 4, 4, 3], &device)?.reshape((4, 2))?;
         let y = Tensor::<Cpu, Int>::new(vec![0i64, 0, 1, 1], &device)?;
 

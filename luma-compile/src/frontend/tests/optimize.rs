@@ -7,7 +7,7 @@ use luma_tensor::{BinaryOp, Cpu, DType, FloatUnaryOp, Shape, Tensor};
 /// 端到端：trace Linear → optimize → compile/run，结果与直接 forward 一致。
 #[test]
 fn optimize_linear_matches_forward() {
-    let linear = Linear::new(3, 4, true, Cpu).unwrap();
+    let linear = Linear::new(3, 4, true, Cpu::default()).unwrap();
     let x = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0], (1, 3), FloatDType::F32).unwrap();
 
     let graph = crate::trace(&linear, &x).unwrap();
@@ -18,7 +18,7 @@ fn optimize_linear_matches_forward() {
     assert!(g.nodes.len() <= n_nodes_before, "优化后节点数不应增加");
 
     let expected = linear.forward(&x).unwrap().to_vec().unwrap();
-    let mut exec = g.compile(&Cpu).unwrap();
+    let mut exec = g.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[x.into()]).unwrap();
     let got = out[0].as_float().unwrap().to_vec().unwrap();
     // 容差断言：fold 折叠 transpose(weight) 后 matmul 输入布局变化，
@@ -65,7 +65,7 @@ fn optimize_mixed_graph() {
     // 执行：x² + 5（两个输出相同）
     let input = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0, 4.0], (2, 2), FloatDType::F32).unwrap();
     let expected = input.clone().sqr().unwrap().add_scalar(5.0).unwrap().to_vec().unwrap();
-    let mut exec = g.compile(&Cpu).unwrap();
+    let mut exec = g.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[input.into()]).unwrap();
     assert_close(&out[0].as_float().unwrap().to_vec().unwrap(), &expected, 1e-5);
     assert_close(&out[1].as_float().unwrap().to_vec().unwrap(), &expected, 1e-5);

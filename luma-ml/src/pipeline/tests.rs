@@ -8,7 +8,7 @@ use luma_tensor::{Cpu, Tensor};
 
 #[test]
 fn test_pipe_transform() {
-    let device = Cpu;
+    let device = Cpu::default();
     let f1 = StandardScaler::default();
     let f2 = MinMaxScaler::default();
 
@@ -20,7 +20,7 @@ fn test_pipe_transform() {
 
 #[test]
 fn test_stand_linear() {
-    let device = Cpu;
+    let device = Cpu::default();
     let pre = StandardScaler::default();
     let linear = LinearRegression::default();
     let fit = pipelines!(pre, linear);

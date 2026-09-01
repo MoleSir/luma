@@ -49,7 +49,7 @@ pub fn fold(graph: Graph) -> CompileResult<Graph> {
         sub.mark_output(tin);
 
         // 用 Cpu executor 执行临时图（无输入）
-        let mut exec = GraphExecutor::<Cpu>::compile(&sub, &Cpu)?;
+        let mut exec = GraphExecutor::<Cpu>::compile(&sub, &Cpu::default())?;
         let out = exec.run(&[])?;
         let bytes = match &out[0] {
             DynTensor::Float(t) => t.to_bytes()?,

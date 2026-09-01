@@ -117,7 +117,7 @@ fn simplified_graph_executes_same() {
     let input = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0, 4.0], (2, 2), FloatDType::F32).unwrap();
     let expected = input.sqr().unwrap().to_vec().unwrap();
 
-    let mut exec = g2.compile(&Cpu).unwrap();
+    let mut exec = g2.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[input.clone().into()]).unwrap();
     assert_eq!(out[0].as_float().unwrap().to_vec().unwrap(), expected);
 }
@@ -259,7 +259,7 @@ fn non_identity_views_kept() {
 /// trace 一个真实模块，simplify 不破坏任何东西。
 #[test]
 fn traced_linear_survives_simplify() {
-    let linear = luma_nn::Linear::new(3, 4, true, Cpu).unwrap();
+    let linear = luma_nn::Linear::new(3, 4, true, Cpu::default()).unwrap();
     let x = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0], (1, 3), FloatDType::F32).unwrap();
     let g = crate::trace(&linear, &x).unwrap();
     let g = g.lock().unwrap().clone();
@@ -272,7 +272,7 @@ fn traced_linear_survives_simplify() {
     assert_eq!(g2.nodes.len(), n_nodes - 1, "同 shape broadcast 应被消掉");
 
     let expected = linear.forward(&x).unwrap().to_vec().unwrap();
-    let mut exec = g2.compile(&Cpu).unwrap();
+    let mut exec = g2.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[x.into()]).unwrap();
     assert_eq!(out[0].as_float().unwrap().to_vec().unwrap(), expected);
 }
@@ -529,7 +529,7 @@ fn scalar_merge_shared_consumer_executes() {
     verify(&g2).unwrap();
 
     let input = Tensor::<Cpu>::from_slice(&[1.0, 2.0, 3.0, 4.0], (2, 2), FloatDType::F32).unwrap();
-    let mut exec = g2.compile(&Cpu).unwrap();
+    let mut exec = g2.compile(&Cpu::default()).unwrap();
     let out = exec.run(&[input.clone().into()]).unwrap();
     // out[0] = x + 3（b 被合并），out[1] = x + 6
     let expected0 = input.clone().add_scalar(3.0).unwrap().to_vec().unwrap();
