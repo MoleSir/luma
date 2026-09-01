@@ -1,9 +1,10 @@
 mod common;
+pub mod mem;
+use crate::Graph;
 pub use common::{GraphExecutor, Step};
 use luma_tensor::{Device, DynTensor};
-use crate::Graph;
 
-pub trait Executor : Sized {
+pub trait Executor: Sized {
     type Dev: Device;
     type Err: std::error::Error;
 

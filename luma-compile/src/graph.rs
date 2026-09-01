@@ -7,8 +7,8 @@
 //!   `Float`/`Int`/`Bool` marker;
 //! - **SSA**: every value is produced by exactly one node (leaves have none).
 
-use std::{fmt, path::Path};
 use luma_tensor::{BinaryOp, CmpOp, DType, FloatUnaryOp, ReduceOp, Shape, UnaryOp};
+use std::{fmt, path::Path};
 pub type ValueId = usize;
 
 #[derive(Debug, Clone, Default)]
