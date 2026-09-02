@@ -2,7 +2,7 @@ pub mod allocator;
 pub mod kernels;
 mod ops;
 mod storage;
-pub use allocator::{CpuAllocator, SystemAllocator};
+pub use allocator::{CpuAllocator, PoolAllocator, SystemAllocator};
 pub use storage::*;
 
 use std::fmt;
@@ -38,6 +38,11 @@ impl Cpu {
     /// for inference workloads).
     pub fn with_allocator(allocator: impl CpuAllocator) -> Self {
         Self { allocator: Arc::new(RwLock::new(allocator)) }
+    }
+
+    /// 与调用方共享 allocator 句柄（测试需要读计数/配置时用）。
+    pub fn with_allocator_shared(allocator: Arc<RwLock<dyn CpuAllocator>>) -> Self {
+        Self { allocator }
     }
 
     /// The allocator backing storage allocation on this device.

@@ -45,6 +45,9 @@ pub struct GraphExecutor<D: Device> {
     ints: Vec<Option<Tensor<D, Int>>>,
     bools: Vec<Option<Tensor<D, Bool>>>,
     steps: Vec<Step>,
+    /// 第 i 步执行完后清理的槽（死于此步的中间值 → drop → allocator 回收）。
+    /// 与 steps 对齐。常量不在内（跨 run 存活）；输出天然不在内（无 last_use）。
+    dead_after: Vec<Vec<Slot>>,
     inputs: Vec<(Slot, DType, Shape)>,
     outputs: Vec<Slot>,
 }
@@ -107,7 +110,27 @@ impl<D: Device> GraphExecutor<D> {
         let outputs = graph.outputs.iter().map(|&id| slots[id]).collect();
         let steps = lower_steps(graph, &kinds, &slots)?;
 
-        Ok(Self { device: device.clone(), floats, ints, bools, steps, inputs, outputs })
+        // 死值清理计划：last_use == i 的值在第 i 步后 drop。常量排除（编译期
+        // 物化、跨 run 存活）；输入可清（每次 run 重新 clone）；图输出无
+        // last_use 天然不在内。视图值共享 Arc——清源槽只丢句柄，视图仍持有
+        // storage，不会 use-after-free，只是块晚点回池（安全，次优）。
+        // 死值清理计划：last_use == i 的值在第 i 步后 drop。常量排除（编译期
+        // 物化、跨 run 存活）；图输出排除（run 结束时读取）；输入可清（每次
+        // run 重新 clone）。视图值共享 Arc——清源槽只丢句柄，视图仍持有
+        // storage，不会 use-after-free，只是块晚点回池（安全，次优）。
+        let last_use = crate::backend::mem::last_use(graph);
+        let mut dead_after: Vec<Vec<Slot>> = vec![Vec::new(); steps.len()];
+        for v in &graph.values {
+            if v.data.is_some() {
+                continue; // 常量
+            }
+            let Some(step) = last_use.get(v.id).copied().flatten() else { continue };
+            if step < dead_after.len() && !graph.outputs.contains(&v.id) {
+                dead_after[step].push(slots[v.id]);
+            }
+        }
+
+        Ok(Self { device: device.clone(), floats, ints, bools, steps, dead_after, inputs, outputs })
     }
 
     /// The device this executor runs on.
@@ -142,9 +165,18 @@ impl<D: Device> GraphExecutor<D> {
 
         // exec_step 要 &mut self，不能和 &self.steps 的借用共存——take 出来
         // 按引用遍历，零克隆（原实现每次 run 克隆整个指令表）；出错也要归还。
+        // dead_after 同样 take：清槽要 &mut self，不能在遍历时借用 self 字段。
         let steps = std::mem::take(&mut self.steps);
-        let result = steps.iter().try_for_each(|step| self.exec_step(step));
+        let dead_after = std::mem::take(&mut self.dead_after);
+        let result = steps.iter().enumerate().try_for_each(|(i, step)| -> CompileResult<()> {
+            self.exec_step(step)?;
+            for slot in &dead_after[i] {
+                self.clear_slot(slot); // 触发 drop → Storage Drop → allocator 回收
+            }
+            Ok(())
+        });
         self.steps = steps;
+        self.dead_after = dead_after;
         result?;
 
         Ok(self
@@ -156,6 +188,15 @@ impl<D: Device> GraphExecutor<D> {
                 Slot::B(i) => self.bools[*i].as_ref().expect("output computed").clone().into(),
             })
             .collect())
+    }
+
+    /// 清空一个槽：置 None → 旧 tensor drop（Arc 释放；视图仍持有则延迟）。
+    fn clear_slot(&mut self, slot: &Slot) {
+        match slot {
+            Slot::F(i) => self.floats[*i] = None,
+            Slot::I(i) => self.ints[*i] = None,
+            Slot::B(i) => self.bools[*i] = None,
+        }
     }
 
     fn exec_step(&mut self, step: &Step) -> CompileResult<()> {

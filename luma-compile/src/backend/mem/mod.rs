@@ -18,6 +18,18 @@ pub struct MemoryGroup {
     pub block_count: usize,
 }
 
+/// 每个 value 的最后一次使用（node 下标）。纯图分析，executor 的死槽清理和
+/// plan_memory 共用——按 node 执行顺序遍历，覆盖语义 = 最后一次使用。
+pub(crate) fn last_use(graph: &Graph) -> Vec<Option<usize>> {
+    let mut last_use: Vec<Option<usize>> = vec![None; graph.values.len()];
+    for (node_idx, node) in graph.nodes.iter().enumerate() {
+        for &input_tensor_id in node.inputs.iter() {
+            last_use[input_tensor_id] = Some(node_idx);
+        }
+    }
+    last_use
+}
+
 /// 对整张图做内存规划：每个中间值收集 (创建, 最后使用) 区间，按
 /// (dtype, 元素数) 分组，组内贪心复用 block。
 ///
@@ -26,16 +38,12 @@ pub struct MemoryGroup {
 pub fn plan_memory(graph: &Graph) -> CompileResult<Vec<MemoryGroup>> {
     // value id 是稠密索引，用 Vec 而不是 HashMap（和 opt/util.rs 的惯例一致）。
     let mut first_create: Vec<Option<usize>> = vec![None; graph.values.len()];
-    let mut last_use: Vec<Option<usize>> = vec![None; graph.values.len()];
+    let last_use = last_use(graph);
 
     for (node_idx, node) in graph.nodes.iter().enumerate() {
         // 如果图合法，每个 tensor 作为 node 输出只有一次，表示第一次创建时间
         for &output_tensor_id in node.outputs.iter() {
             first_create[output_tensor_id] = Some(node_idx);
-        }
-        // 直接覆盖，按 node 执行顺序遍历，最终留下的是最后一次使用
-        for &input_tensor_id in node.inputs.iter() {
-            last_use[input_tensor_id] = Some(node_idx);
         }
     }
 
