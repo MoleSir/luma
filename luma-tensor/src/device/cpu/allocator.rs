@@ -205,7 +205,7 @@ impl PoolAllocator {
         // 保留旧值（fill 路径）。clear 保留 capacity，零成本。
         v.clear();
         let cap = v.capacity();
-        let mut free = bucket.entry(cap).or_default();
+        let free = bucket.entry(cap).or_default();
         if max > 0 && free.len() >= max {
             return; // 超上限：drop（v 在此结束）
         }
