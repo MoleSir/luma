@@ -1,0 +1,20 @@
+[package]
+name = "luma-compile"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "Trace, compile, and execute luma modules as portable graphs (TorchScript/ONNX-style graph capture)"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[features]
+cuda = ["dep:luma-cuda", "luma-nn/cuda"]
+
+[dependencies]
+luma-tensor = { workspace = true }
+luma-cpu = { workspace = true }
+luma-cuda = { workspace = true, optional = true }
+luma-nn = { workspace = true }
+luma-macros = { workspace = true }
+thiserror = { workspace = true }
+thiserrorctx = { workspace = true }

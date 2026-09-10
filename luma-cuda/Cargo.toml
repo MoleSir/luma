@@ -1,0 +1,23 @@
+[package]
+name = "luma-cuda"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "luma cuda implement"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+cudarc = { workspace = true, features = ["cuda-version-from-build-system", "driver", "nvrtc", "cublas"] }
+luma-tensor = { workspace = true }
+thiserror =  { workspace = true }
+rand =  { workspace = true }
+rand_distr = { workspace = true }
+bytemuck = { workspace = true }
+
+[build-dependencies]
+bindgen_cuda = "0.1.1"
+
+[dev-dependencies]
+luma-tensor = { workspace = true, features = ["test-utils"] }
+luma-cpu = { workspace = true }

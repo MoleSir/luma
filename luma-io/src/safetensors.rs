@@ -262,7 +262,8 @@ pub enum SafeTensorsError {
 mod tests {
     use super::*;
     use luma_tensor::dtype::FloatDType;
-    use luma_tensor::{Cpu, Int, Tensor};
+    use luma_tensor::{Int, Tensor};
+    use luma_cpu::Cpu;
 
     #[test]
     fn test_safetensors_roundtrip_memory() {

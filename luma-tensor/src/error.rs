@@ -4,6 +4,9 @@ use crate::{DType, Shape};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    #[error("{device} error: {error}")]
+    Device { device: String, error: Box<dyn std::error::Error + Sync + Send> },
+
     // === DType Errors ===
     #[error("{msg}, expected: {expected:?}, got: {got:?}")]
     UnexpectedDType { msg: &'static str, expected: DType, got: DType },
@@ -63,6 +66,9 @@ pub enum Error {
     #[error("device mismatch in {op}, lhs: {lhs:?}, rhs: {rhs:?}")]
     DeviceMismatchBinaryOp { lhs: String, rhs: String, op: &'static str },
 
+    #[error("device mismatch, {lhs:?} and {rhs:?}")]
+    DeviceMismatch { lhs: String, rhs: String },
+
     #[error("shape mismatch in cat for dim {dim}, shape for arg1: {first_shape:?} shape for arg {n}: {nth_shape:?}")]
     ShapeMismatchCat { dim: usize, first_shape: Shape, n: usize, nth_shape: Shape },
 
@@ -108,10 +114,6 @@ pub enum Error {
     /// I/O error.
     #[error(transparent)]
     Io(#[from] std::io::Error),
-
-    #[cfg(feature = "cuda")]
-    #[error(transparent)]
-    Cuda(#[from] crate::device::cuda::CudaError),
 
     #[error(transparent)]
     Utf8(#[from] Utf8Error),

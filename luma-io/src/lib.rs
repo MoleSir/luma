@@ -7,7 +7,8 @@
 //! ```no_run
 //! use std::collections::HashMap;
 //! use luma_io::safetensors;
-//! use luma_tensor::{Cpu, DynTensor};
+//! use luma_cpu::Cpu;
+//! use luma_tensor::DynTensor;
 //!
 //! let device = Cpu::default();
 //! let content = safetensors::load_file("model.safetensors", &device).unwrap();

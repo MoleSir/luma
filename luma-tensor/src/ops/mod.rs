@@ -17,17 +17,24 @@ mod nn;
 mod numeric;
 mod reduce;
 mod shape;
+mod shape_infer;
+mod to;
 mod transfer;
 
-pub use construct::{DEFAULT_FLOAT, DEFAULT_INT};
-pub use indexer::IndexingDTypeKind;
+use boolean::PickDTypeKind;
+use cast::CastDTypeKind;
+use construct::{BytesDTypeKind, ConstructDTypeKind};
+use indexer::IndexingAddDTypeKind;
+use indexer::IndexingDTypeKind;
+use matmul::MatmulDTypeKind;
+use numeric::NumericDTypeKind;
+use reduce::ReduceDTypeKind;
+use shape::ShapeDTypeKind;
+
 pub use indexer::{IndexOp, Indexer, Slice};
-pub use numeric::NumericDTypeKind;
-pub use reduce::ReduceDTypeKind;
-pub use shape::ShapeDTypeKind;
 pub use transfer::TransferDTypeKind;
 
-use crate::{Bool, Device, Float, Int, Tensor};
+use crate::{Bool, DTypeKind, Device, Float, Int, Tensor};
 
 /// A node in the (implicit) computation graph: the operation that produced a
 /// `Float` tensor, holding `Arc` references to its inputs. Only `Float` tensors
@@ -77,8 +84,8 @@ pub enum ViewOp {
     Narrow(usize, usize, usize),
     Slice(usize, usize, usize, usize),
     Broadcast,
-    Squeeze,
-    Unsqueeze,
+    Squeeze(usize),
+    Unsqueeze(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,3 +148,27 @@ pub enum CmpOp {
     Lt,
     Gt,
 }
+
+pub trait BaseOpsDTypeKind<D: Device>:
+    DTypeKind<D>
+    + PickDTypeKind<D>
+    + CastDTypeKind<D>
+    + IndexingDTypeKind<D>
+    + ShapeDTypeKind<D>
+    + ConstructDTypeKind<D>
+    + BytesDTypeKind<D>
+    + Sized
+{
+}
+
+impl<D: Device> BaseOpsDTypeKind<D> for Float {}
+impl<D: Device> BaseOpsDTypeKind<D> for Int {}
+impl<D: Device> BaseOpsDTypeKind<D> for Bool {}
+
+pub trait NumOpsDTypeKind<D: Device>:
+    BaseOpsDTypeKind<D> + IndexingAddDTypeKind<D> + MatmulDTypeKind<D> + NumericDTypeKind<D> + ReduceDTypeKind<D> + Sized
+{
+}
+
+impl<D: Device> NumOpsDTypeKind<D> for Float {}
+impl<D: Device> NumOpsDTypeKind<D> for Int {}

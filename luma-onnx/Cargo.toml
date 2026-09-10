@@ -1,0 +1,17 @@
+[package]
+name = "luma-onnx"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = ""
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+prost = { workspace = true }
+luma-tensor = { workspace = true }
+luma-nn = { workspace = true }
+luma-compile = { workspace = true }
+
+[build-dependencies]
+prost-build = "0.12.1"

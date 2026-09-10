@@ -21,7 +21,8 @@ pub use visitor::*;
 mod tests {
     use super::*;
     use luma_macros::Module;
-    use luma_tensor::{Cpu, Device, Float, Int, Tensor};
+    use luma_cpu::Cpu;
+    use luma_tensor::{Device, Float, Int, Tensor};
     use std::marker::PhantomData;
 
     /// A minimal module that exercises the derive macro on a struct.

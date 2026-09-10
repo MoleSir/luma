@@ -76,7 +76,7 @@ pub trait Module<D: Device>: Sized {
     fn module_name() -> &'static str {
         let full_name = type_name::<Self>();
         // The type name may include generic parameters such as
-        // `Linear<luma_tensor::Cpu>`. Strip them before extracting
+        // `Linear<luma_cpu::Cpu>`. Strip them before extracting
         // the last path segment.
         let base = match full_name.find('<') {
             Some(i) => &full_name[..i],

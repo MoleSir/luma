@@ -10,7 +10,7 @@ use crate::{Bool, DTypeKind, Device, Float, Int, Tensor};
 //   TensorOrScalar — bridges concrete scalars to K::Scalar (like lumen)
 // ============================================================================
 
-enum TensorOrScalar<D: Device, K: DTypeKind<D>> {
+pub enum TensorOrScalar<D: Device, K: DTypeKind<D>> {
     Tensor(Tensor<D, K>),
     Scalar(K::Scalar),
 }
@@ -176,7 +176,7 @@ macro_rules! impl_assign_and_neg {
             $kind: NumericDTypeKind<D> + ShapeDTypeKind<D>,
         {
             fn add_assign(&mut self, rhs: &Tensor<D, $kind>) {
-                Tensor::add_(self, rhs).unwrap()
+                Tensor::add_(self, rhs).unwrap();
             }
         }
         impl<D: Device> SubAssign<&Tensor<D, $kind>> for Tensor<D, $kind>
@@ -184,7 +184,7 @@ macro_rules! impl_assign_and_neg {
             $kind: NumericDTypeKind<D> + ShapeDTypeKind<D>,
         {
             fn sub_assign(&mut self, rhs: &Tensor<D, $kind>) {
-                Tensor::sub_(self, rhs).unwrap()
+                Tensor::sub_(self, rhs).unwrap();
             }
         }
         impl<D: Device> MulAssign<&Tensor<D, $kind>> for Tensor<D, $kind>
@@ -192,7 +192,7 @@ macro_rules! impl_assign_and_neg {
             $kind: NumericDTypeKind<D> + ShapeDTypeKind<D>,
         {
             fn mul_assign(&mut self, rhs: &Tensor<D, $kind>) {
-                Tensor::mul_(self, rhs).unwrap()
+                Tensor::mul_(self, rhs).unwrap();
             }
         }
         impl<D: Device> DivAssign<&Tensor<D, $kind>> for Tensor<D, $kind>
@@ -200,7 +200,7 @@ macro_rules! impl_assign_and_neg {
             $kind: NumericDTypeKind<D> + ShapeDTypeKind<D>,
         {
             fn div_assign(&mut self, rhs: &Tensor<D, $kind>) {
-                Tensor::div_(self, rhs).unwrap()
+                Tensor::div_(self, rhs).unwrap();
             }
         }
 

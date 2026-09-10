@@ -1,4 +1,4 @@
-use super::shape::ShapeDTypeKind;
+use super::{arith::TensorOrScalar, shape::ShapeDTypeKind};
 use crate::{BinaryOp, Bool, CmpOp, DTypeKind, Device, Float, FloatMeta, FloatUnaryOp, Int, Layout, Storage, Tensor, TensorMeta, UnaryOp};
 
 // ============================================================================
@@ -134,14 +134,16 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
         Ok(Self::from_storage(storage, self.shape().clone(), meta))
     }
 
-    pub(crate) fn binary_inplace_impl(&self, rhs: &Self, op: BinaryOp) -> crate::Result<()> {
+    pub(crate) fn binary_inplace_impl(&self, rhs: &Self, op: BinaryOp) -> crate::Result<Self> {
         let mut s = self.storage_write()?;
-        K::binary_inplace_dispatch(&mut s, self.layout(), &*rhs.storage_read()?, rhs.layout(), op)
+        K::binary_inplace_dispatch(&mut s, self.layout(), &*rhs.storage_read()?, rhs.layout(), op)?;
+        Ok(self.clone())
     }
 
-    pub(crate) fn binary_scalar_inplace_impl(&self, rhs: K::Scalar, op: BinaryOp) -> crate::Result<()> {
+    pub(crate) fn binary_scalar_inplace_impl(&self, rhs: K::Scalar, op: BinaryOp) -> crate::Result<Self> {
         let mut s = self.storage_write()?;
-        K::binary_scalar_inplace_dispatch(&mut s, self.layout(), rhs, op)
+        K::binary_scalar_inplace_dispatch(&mut s, self.layout(), rhs, op)?;
+        Ok(self.clone())
     }
 
     pub(crate) fn binary_broadcast_impl(&self, rhs: &Self, op: BinaryOp, name: &'static str) -> crate::Result<Self> {
@@ -155,9 +157,12 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
 macro_rules! binary_impl {
     ($name:ident, $variant:ident) => {
         paste::paste! {
-            #[inline]
-            pub fn $name(&self, rhs: &Self) -> crate::Result<Self> {
-                self.binary_impl(rhs, BinaryOp::$variant, stringify!($name))
+            pub fn $name(&self, rhs: impl Into<TensorOrScalar<D, K>>) -> crate::Result<Self> {
+                let rhs: TensorOrScalar<D, K> = rhs.into();
+                match rhs {
+                    TensorOrScalar::Scalar(rhs) => self.binary_scalar_impl(rhs, BinaryOp::$variant),
+                    TensorOrScalar::Tensor(rhs) => self.binary_impl(&rhs, BinaryOp::$variant, stringify!($name)),
+                }
             }
 
             #[inline]
@@ -165,13 +170,16 @@ macro_rules! binary_impl {
                 self.binary_scalar_impl(rhs, BinaryOp::$variant)
             }
 
-            #[inline]
-            pub fn [<$name _>](&self, rhs: &Self) -> crate::Result<()> {
-                self.binary_inplace_impl(rhs, BinaryOp::$variant)
+            pub fn [<$name _>](&self, rhs: impl Into<TensorOrScalar<D, K>>) -> crate::Result<Self> {
+                let rhs: TensorOrScalar<D, K> = rhs.into();
+                match rhs {
+                    TensorOrScalar::Scalar(rhs) => self.binary_scalar_inplace_impl(rhs, BinaryOp::$variant),
+                    TensorOrScalar::Tensor(rhs) => self.binary_inplace_impl(&rhs, BinaryOp::$variant),
+                }
             }
 
             #[inline]
-            pub fn [<$name _scalar_>](&self, rhs: K::Scalar) -> crate::Result<()> {
+            pub fn [<$name _scalar_>](&self, rhs: K::Scalar) -> crate::Result<Self> {
                 self.binary_scalar_inplace_impl(rhs, BinaryOp::$variant)
             }
 
@@ -219,9 +227,12 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
 macro_rules! cmp_impl {
     ($name:ident, $variant:ident) => {
         paste::paste! {
-            #[inline]
-            pub fn $name(&self, rhs: &Self) -> crate::Result<Tensor<D, Bool>> {
-                self.cmp_impl(rhs, CmpOp::$variant, stringify!($name))
+            pub fn $name(&self, rhs: impl Into<TensorOrScalar<D, K>>) -> crate::Result<Tensor<D, Bool>> {
+                let rhs: TensorOrScalar<D, K> = rhs.into();
+                match rhs {
+                    TensorOrScalar::Scalar(rhs) => self.cmp_scalar_imlp(rhs, CmpOp::$variant),
+                    TensorOrScalar::Tensor(rhs) => self.cmp_impl(&rhs, CmpOp::$variant, stringify!($name)),
+                }
             }
 
             #[inline]
@@ -251,15 +262,16 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
 // ============================================================================
 
 impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
-    pub(crate) fn unary_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<Tensor<D, K>> {
+    pub(crate) fn unary_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<Self> {
         let storage = K::unary_dispatch(&*self.storage_read()?, self.layout(), op)?;
         let meta = K::Meta::on_unary(self, op);
         Ok(Self::from_storage(storage, self.shape().clone(), meta))
     }
 
-    pub(crate) fn unary_inplace_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<()> {
+    pub(crate) fn unary_inplace_impl(&self, op: UnaryOp<K::Scalar>) -> crate::Result<Self> {
         let mut s = self.storage_write()?;
-        K::unary_inplace_dispatch(&mut s, self.layout(), op)
+        K::unary_inplace_dispatch(&mut s, self.layout(), op)?;
+        Ok(self.clone())
     }
 }
 
@@ -272,7 +284,7 @@ macro_rules! unary_method {
             }
 
             #[inline]
-            pub fn [<$name _>](&self) -> crate::Result<()> {
+            pub fn [<$name _>](&self) -> crate::Result<Self> {
                 self.unary_inplace_impl(UnaryOp::$op)
             }
         }
@@ -290,7 +302,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     #[inline]
-    pub fn affine_(&self, mul: K::Scalar, add: K::Scalar) -> crate::Result<()> {
+    pub fn affine_(&self, mul: K::Scalar, add: K::Scalar) -> crate::Result<Self> {
         self.unary_inplace_impl(UnaryOp::Affine(mul, add))
     }
 
@@ -300,7 +312,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     #[inline]
-    pub fn pow_(&self, exp: K::Scalar) -> crate::Result<()> {
+    pub fn pow_(&self, exp: K::Scalar) -> crate::Result<Self> {
         self.unary_inplace_impl(UnaryOp::Pow(exp))
     }
 
@@ -310,7 +322,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     #[inline]
-    pub fn clamp_(&self, min: Option<K::Scalar>, max: Option<K::Scalar>) -> crate::Result<()> {
+    pub fn clamp_(&self, min: Option<K::Scalar>, max: Option<K::Scalar>) -> crate::Result<Self> {
         self.unary_inplace_impl(UnaryOp::Clamp(min, max))
     }
 

@@ -13,7 +13,7 @@ use crate::{BatchNorm1d, Dropout, Embedding, LayerNorm, Linear, NnResult, RMSNor
 ///
 /// `Module<D>` deliberately has no `forward` (every module defines it as an
 /// inherent method with its own signature). This trait pins a module's
-/// input/output types so generic machinery — e.g. `luma_jit::trace` — can feed
+/// input/output types so generic machinery — e.g. `luma_compile::trace` — can feed
 /// an example input through any module:
 ///
 /// - single-input modules use `Input = Tensor<D, K>`;

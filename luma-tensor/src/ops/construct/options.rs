@@ -92,6 +92,20 @@ impl<D: Device> ConstructDTypeKind<D> for Int {
     }
 }
 
+impl<D: Device> ConstructDTypeKind<D> for Bool {
+    fn zeros_dispatch(shape: &Shape, device: &D, dtype: BoolDType) -> crate::Result<Self::Storage> {
+        D::b_falses(shape, device, dtype)
+    }
+
+    fn ones_dispatch(shape: &Shape, device: &D, dtype: BoolDType) -> crate::Result<Self::Storage> {
+        D::b_trues(shape, device, dtype)
+    }
+
+    fn full_dispatch(_shape: &Shape, _value: Self::Scalar, _device: &D, _dtype: BoolDType) -> crate::Result<Self::Storage> {
+        todo!()
+    }
+}
+
 impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     pub fn phantom<S: Into<Shape>>(shape: S, options: impl Into<TensorCreationOptions<D, K>>) -> crate::Result<Self> {
         let options: TensorCreationOptions<D, K> = options.into();

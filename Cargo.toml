@@ -2,13 +2,16 @@
 members = [
     "luma",
     "luma-tensor",
-    "luma-cuda-kernel",
+    "luma-cpu",
+    "luma-cuda",
     "luma-nn",
     "luma-optim",
     "luma-dataset",
     "luma-macros",
     "luma-io",
-    "luma-jit",
+    "luma-compile",
+    "luma-onnx",
+    "luma-ml",
 ]
 
 [workspace.package]
@@ -21,13 +24,16 @@ license = "MIT"
 
 [workspace.dependencies]
 luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.1.0" }
-luma-cuda-kernel = { path = "./luma-cuda-kernel", package = "luma-cuda-kernel", version = "0.1.0" }
+luma-cpu = { path = "./luma-cpu", package = "luma-cpu", version = "0.1.0" }
+luma-cuda = { path = "./luma-cuda", package = "luma-cuda", version = "0.1.0" }
 luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.1.0" }
 luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.1.0" }
 luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.1.0" }
 luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.1.0" }
 luma-io = { path = "./luma-io", package = "luma-io", version = "0.1.0" }
-luma-jit = { path = "./luma-jit", package = "luma-jit", version = "0.1.0" }
+luma-compile = { path = "./luma-compile", package = "luma-compile", version = "0.1.0" }
+luma-onnx = { path = "./luma-onnx", package = "luma-onnx", version = "0.1.0" }
+luma-ml = { path = "./luma-ml", package = "luma-ml", version = "0.1.0" }
 
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
@@ -50,3 +56,5 @@ reqwest = "0.12"
 indicatif = "0.18"
 flate2 = "1.1"
 memmap2 = "0.9.9"
+derive_builder = "0.20"
+prost = "0.12.1"

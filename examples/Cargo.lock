@@ -865,6 +865,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
+name = "luma-cpu"
+version = "0.1.0"
+dependencies = [
+ "bytemuck",
+ "gemm",
+ "libm",
+ "luma-tensor",
+ "num_cpus",
+ "rand",
+ "rand_distr",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "luma-dataset"
 version = "0.1.0"
 dependencies = [
@@ -894,6 +908,7 @@ dependencies = [
 name = "luma-kit"
 version = "0.1.0"
 dependencies = [
+ "luma-cpu",
  "luma-dataset",
  "luma-io",
  "luma-nn",
@@ -937,8 +952,6 @@ name = "luma-tensor"
 version = "0.1.0"
 dependencies = [
  "bytemuck",
- "gemm",
- "libm",
  "num_cpus",
  "paste",
  "rand",

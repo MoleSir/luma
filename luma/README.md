@@ -8,9 +8,9 @@ Unified facade for the luma ML framework: `luma-tensor` is re-exported flat, and
 |---|---|---|
 | `io` *(default)* | `luma-io` | `luma::io` |
 | `nn` | `luma-nn`, `luma-optim`, `luma-dataset` | `luma::nn`, `luma::optim`, `luma::dataset` |
-| `jit` | `luma-jit` (implies `nn`) | `luma::jit` |
-| `cuda` | CUDA backend for tensor/nn/jit | — |
-| `full` | `nn` + `jit` | — |
+| `compile` | `luma-compile` (implies `nn`) | `luma::compile` |
+| `cuda` | CUDA backend for tensor/nn/compile | — |
+| `full` | `nn` + `compile` | — |
 
 ## Usage
 

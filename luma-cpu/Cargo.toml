@@ -1,0 +1,21 @@
+[package]
+name = "luma-cpu"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "luma cpu device implment"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+thiserror =  { workspace = true }
+rand =  { workspace = true }
+rand_distr =  { workspace = true }
+gemm =  { workspace = true }
+libm =  { workspace = true }
+num_cpus =  { workspace = true }
+bytemuck = { workspace = true }
+
+[dev-dependencies]
+luma-tensor = { workspace = true, features = ["test-utils"] }

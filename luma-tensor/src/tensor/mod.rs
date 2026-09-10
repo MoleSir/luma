@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, RwLock};
 
 use crate::dtype::Storage;
-use crate::{Bool, Cpu, DTypeKind, Device, Float, Int};
+use crate::{Bool, DTypeKind, Device, Float, Int};
 
 /// Unique, monotonically increasing tensor identity. Used as a map key during
 /// autograd (a tensor's storage/layout may change, but its id never does).
@@ -36,10 +36,10 @@ impl TensorId {
 ///   [`DType`] carried inside the tensor.
 ///
 /// `Float` is the default kind so `Tensor<Cpu>` means a float tensor.
-pub struct Tensor<D: Device = Cpu, K: DTypeKind<D> = Float>(pub(crate) Arc<TensorImpl<D, K>>);
-pub type FloatTensor<D = Cpu> = Tensor<D, Float>;
-pub type IntTensor<D = Cpu> = Tensor<D, Int>;
-pub type BoolTensor<D = Cpu> = Tensor<D, Bool>;
+pub struct Tensor<D: Device, K: DTypeKind<D> = Float>(pub(crate) Arc<TensorImpl<D, K>>);
+pub type FloatTensor<D> = Tensor<D, Float>;
+pub type IntTensor<D> = Tensor<D, Int>;
+pub type BoolTensor<D> = Tensor<D, Bool>;
 
 pub struct TensorImpl<D, K>
 where
@@ -169,6 +169,12 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
             meta,
             device: self.device().clone(),
         }))
+    }
+}
+
+impl<D: Device, K1: DTypeKind<D>> Tensor<D, K1> {
+    pub fn same_device<K2: DTypeKind<D>>(&self, other: &Tensor<D, K2>) -> bool {
+        self.device().same_device(other.device())
     }
 }
 

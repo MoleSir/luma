@@ -1,4 +1,4 @@
-use luma_tensor::{Device, Tensor, ops::ShapeDTypeKind};
+use luma_tensor::{Device, Tensor, ops::BaseOpsDTypeKind};
 use std::{convert::Infallible, fmt::Display, marker::PhantomData};
 
 pub trait Batcher {
@@ -18,7 +18,7 @@ impl<D, K1, K2> TensorPairBatcher<D, K1, K2> {
     }
 }
 
-impl<D: Device, K1: ShapeDTypeKind<D>, K2: ShapeDTypeKind<D>> Batcher for TensorPairBatcher<D, K1, K2> {
+impl<D: Device, K1: BaseOpsDTypeKind<D>, K2: BaseOpsDTypeKind<D>> Batcher for TensorPairBatcher<D, K1, K2> {
     type Item = (Tensor<D, K1>, Tensor<D, K2>);
     type Output = (Tensor<D, K1>, Tensor<D, K2>);
     type Error = luma_tensor::Error;

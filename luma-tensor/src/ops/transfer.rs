@@ -1,11 +1,6 @@
-//! Cross-device transfer: move a tensor to another device, e.g. `Cpu` → `Cuda`.
-
 use std::any::TypeId;
-
-#[cfg(feature = "cuda")]
-use crate::Cuda;
 use crate::ops::construct::BytesDTypeKind;
-use crate::{Bool, Cpu, DTypeKind, Device, Float, Int, Tensor};
+use crate::{Bool, DTypeKind, Device, Float, Int, Tensor};
 
 // ============================================================================
 //    TransferDTypeKind: kind dispatch for `to_device`
@@ -60,7 +55,7 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     ///   unchanged, result contiguous. For `Float` tensors the autograd graph
     ///   is severed (the result is a leaf) but `requires_grad` is preserved.
     /// - Meta tensors (no storage) error with [`Error::MetaTensor`](crate::Error::MetaTensor).
-    pub fn to_device<D2: Device>(&self, device: &D2) -> crate::Result<Tensor<D2, K>>
+    pub fn transfer<D2: Device>(&self, device: &D2) -> crate::Result<Tensor<D2, K>>
     where
         K: TransferDTypeKind<D, D2>,
     {
@@ -75,25 +70,9 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
                 return Ok(unsafe { (*p).clone() });
             }
         }
-        // Cross-device copy (covers `Cuda` → `Cuda` with different ordinals,
-        // which goes through the host — there is no DtoD primitive yet).
+        // Cross-device copy (e.g. two distinct GPU instances with different
+        // ordinals), which goes through the host — there is no DtoD primitive
+        // yet.
         K::transfer(self, device)
-    }
-
-    /// Convenience for `to_device(&Cpu)`.
-    pub fn cpu(&self) -> crate::Result<Tensor<Cpu, K>>
-    where
-        K: TransferDTypeKind<D, Cpu>,
-    {
-        self.to_device(&Cpu)
-    }
-
-    /// Convenience for `to_device(&Cuda::new(ordinal))`.
-    #[cfg(feature = "cuda")]
-    pub fn cuda(&self, ordinal: usize) -> crate::Result<Tensor<Cuda, K>>
-    where
-        K: TransferDTypeKind<D, Cuda>,
-    {
-        self.to_device(&Cuda::new(ordinal)?)
     }
 }

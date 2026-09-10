@@ -320,7 +320,8 @@ mod tests {
     use super::*;
     use luma_tensor::DType;
     use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
-    use luma_tensor::{Bool, Cpu, Int, Tensor};
+    use luma_tensor::{Bool, Int, Tensor};
+    use luma_cpu::Cpu;
 
     fn device() -> Cpu {
         Cpu::default()

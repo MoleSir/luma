@@ -1,10 +1,11 @@
 use std::sync::{Arc, RwLock};
 
+use super::shape_infer::cat_out_shape;
 use crate::{Bool, DTypeKind, Device, Dim, Dims, Error, Float, Int, Layout, Shape, Storage, Tensor, TensorMeta, ViewOp};
 
 pub trait ShapeDTypeKind<D: Device>: DTypeKind<D> {
     fn contiguous_dispatch(s: &Self::Storage, l: &Layout) -> crate::Result<Self::Storage>;
-    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)>;
+    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize, out_shape: &Shape) -> crate::Result<Self::Storage>;
     fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>>;
 }
 
@@ -15,8 +16,8 @@ impl<D: Device> ShapeDTypeKind<D> for Float {
     }
 
     #[inline]
-    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)> {
-        D::f_cat(srcs, dim)
+    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize, out_shape: &Shape) -> crate::Result<Self::Storage> {
+        D::f_cat(srcs, dim, out_shape)
     }
 
     fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>> {
@@ -31,8 +32,8 @@ impl<D: Device> ShapeDTypeKind<D> for Int {
     }
 
     #[inline]
-    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)> {
-        D::i_cat(srcs, dim)
+    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize, out_shape: &Shape) -> crate::Result<Self::Storage> {
+        D::i_cat(srcs, dim, out_shape)
     }
 
     fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>> {
@@ -47,8 +48,8 @@ impl<D: Device> ShapeDTypeKind<D> for Bool {
     }
 
     #[inline]
-    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize) -> crate::Result<(Self::Storage, Shape)> {
-        D::b_cat(srcs, dim)
+    fn cat_dispatch(srcs: &[(&Self::Storage, &Layout)], dim: usize, out_shape: &Shape) -> crate::Result<Self::Storage> {
+        D::b_cat(srcs, dim, out_shape)
     }
 
     fn view_dispatch(src: &Self::Storage, src_l: &Layout, dst_l: &Layout, view: ViewOp) -> crate::Result<Option<Self::Storage>> {
@@ -191,7 +192,7 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         new_dims.remove(dim);
         strides.remove(dim);
         let layout = Layout::new(new_dims, strides, self.layout().start_offset());
-        let storage = self.resolve_view_storage(ViewOp::Squeeze, &layout)?;
+        let storage = self.resolve_view_storage(ViewOp::Squeeze(dim), &layout)?;
         Ok(self.share_storage(layout, K::Meta::on_reshape(self), storage))
     }
 
@@ -203,7 +204,7 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         let stride = if dim < strides.len() { strides[dim] } else { 1 };
         strides.insert(dim, stride);
         let layout = Layout::new(new_dims, strides, self.layout().start_offset());
-        let storage = self.resolve_view_storage(ViewOp::Unsqueeze, &layout)?;
+        let storage = self.resolve_view_storage(ViewOp::Unsqueeze(dim), &layout)?;
         Ok(self.share_storage(layout, K::Meta::on_reshape(self), storage))
     }
 
@@ -225,13 +226,16 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
         let first = arrs[0].as_ref();
         let dim = dim.to_index(first.shape(), "cat")?;
 
+        let shapes: Vec<&Shape> = arrs.iter().map(|a| a.as_ref().shape()).collect();
+        let out_shape = cat_out_shape(&shapes, dim);
+
         let guards: Vec<_> = arrs.iter().map(|a| a.as_ref().storage_read()).collect::<crate::Result<_>>()?;
         let views: Vec<(&K::Storage, &Layout)> = guards.iter().zip(arrs.iter()).map(|(g, a)| (&**g, a.as_ref().layout())).collect();
-        let (storage, shape) = K::cat_dispatch(&views, dim)?;
+        let storage = K::cat_dispatch(&views, dim, &out_shape)?;
         drop(guards);
 
         let meta = K::Meta::on_cat(arrs, dim);
-        Ok(Self::from_storage(storage, shape, meta))
+        Ok(Self::from_storage(storage, out_shape, meta))
     }
 
     /// Flatten dims `start_dim..=end_dim` into one.

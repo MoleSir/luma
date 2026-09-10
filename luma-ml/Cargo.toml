@@ -1,0 +1,19 @@
+[package]
+name = "luma-ml"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "machine learning"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+thiserror = { workspace = true }
+thiserrorctx = { workspace = true }
+derive_builder = { workspace = true }
+rand = { workspace = true }
+rand_distr = { workspace = true }
+
+[dev-dependencies]
+luma-cpu = { workspace = true }

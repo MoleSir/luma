@@ -108,7 +108,8 @@ impl<D: Device> Linear<D> {
 mod tests {
     use super::*;
     use crate::Module;
-    use luma_tensor::{Cpu, Tensor};
+    use luma_cpu::Cpu;
+    use luma_tensor::Tensor;
 
     #[test]
     fn test_linear_with_skip_and_display() {

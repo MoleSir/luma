@@ -10,18 +10,21 @@ license = { workspace = true }
 [lib]
 name = "luma"
 
+[features]
+default = ["cpu", "io"]
+cpu = ["dep:luma-cpu"]
+cuda = ["dep:luma-cuda", "luma-nn?/cuda", "luma-compile?/cuda"]
+io = ["dep:luma-io"]
+nn = ["dep:luma-nn", "dep:luma-optim", "dep:luma-dataset"]
+compile = ["dep:luma-compile", "nn"]
+full = ["nn", "compile"]
+
 [dependencies]
 luma-tensor = { workspace = true }
+luma-cpu = { workspace = true, optional = true }
+luma-cuda = { workspace = true, optional = true }
 luma-nn = { workspace = true, optional = true }
 luma-optim = { workspace = true, optional = true }
 luma-dataset = { workspace = true, optional = true }
 luma-io = { workspace = true, optional = true }
-luma-jit = { workspace = true, optional = true }
-
-[features]
-default = ["io"]
-io = ["dep:luma-io"]
-nn = ["dep:luma-nn", "dep:luma-optim", "dep:luma-dataset"]
-jit = ["dep:luma-jit", "nn"]
-cuda = ["luma-tensor/cuda", "luma-nn?/cuda", "luma-jit?/cuda"]
-full = ["nn", "jit"]
+luma-compile = { workspace = true, optional = true }
