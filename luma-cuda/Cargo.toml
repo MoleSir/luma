@@ -8,7 +8,7 @@ keywords = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-cudarc = { workspace = true, features = ["cuda-version-from-build-system", "driver", "nvrtc", "cublas"] }
+cudarc = { workspace = true, features = ["cuda-version-from-build-system", "fallback-latest", "driver", "nvrtc", "cublas"] }
 luma-tensor = { workspace = true }
 thiserror =  { workspace = true }
 rand =  { workspace = true }
