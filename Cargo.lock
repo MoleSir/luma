@@ -998,7 +998,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "luma-compile"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "luma-cpu",
  "luma-cuda",
@@ -1011,7 +1011,7 @@ dependencies = [
 
 [[package]]
 name = "luma-cpu"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytemuck",
  "gemm",
@@ -1025,7 +1025,7 @@ dependencies = [
 
 [[package]]
 name = "luma-cuda"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bindgen_cuda",
  "bytemuck",
@@ -1039,7 +1039,7 @@ dependencies = [
 
 [[package]]
 name = "luma-dataset"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "dirs",
  "flate2",
@@ -1054,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "luma-io"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "luma-cpu",
  "luma-tensor",
@@ -1066,7 +1066,7 @@ dependencies = [
 
 [[package]]
 name = "luma-kit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "luma-compile",
  "luma-cpu",
@@ -1080,7 +1080,7 @@ dependencies = [
 
 [[package]]
 name = "luma-macros"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
@@ -1090,7 +1090,7 @@ dependencies = [
 
 [[package]]
 name = "luma-ml"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "derive_builder",
  "luma-cpu",
@@ -1103,7 +1103,7 @@ dependencies = [
 
 [[package]]
 name = "luma-nn"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "luma-cpu",
  "luma-cuda",
@@ -1116,7 +1116,7 @@ dependencies = [
 
 [[package]]
 name = "luma-onnx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "luma-compile",
  "luma-nn",
@@ -1127,7 +1127,7 @@ dependencies = [
 
 [[package]]
 name = "luma-optim"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "luma-io",
  "luma-tensor",
@@ -1137,7 +1137,7 @@ dependencies = [
 
 [[package]]
 name = "luma-tensor"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bytemuck",
  "num_cpus",

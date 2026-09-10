@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 repository = "https://github.com/MoleSir/luma.git"
 description = "A tiny ML framework"
@@ -23,17 +23,17 @@ keywords = ["machine-learning", "auto-grad"]
 license = "MIT"
 
 [workspace.dependencies]
-luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.1.0" }
-luma-cpu = { path = "./luma-cpu", package = "luma-cpu", version = "0.1.0" }
-luma-cuda = { path = "./luma-cuda", package = "luma-cuda", version = "0.1.0" }
-luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.1.0" }
-luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.1.0" }
-luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.1.0" }
-luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.1.0" }
-luma-io = { path = "./luma-io", package = "luma-io", version = "0.1.0" }
-luma-compile = { path = "./luma-compile", package = "luma-compile", version = "0.1.0" }
-luma-onnx = { path = "./luma-onnx", package = "luma-onnx", version = "0.1.0" }
-luma-ml = { path = "./luma-ml", package = "luma-ml", version = "0.1.0" }
+luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.2.0" }
+luma-cpu = { path = "./luma-cpu", package = "luma-cpu", version = "0.2.0" }
+luma-cuda = { path = "./luma-cuda", package = "luma-cuda", version = "0.2.0" }
+luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.2.0" }
+luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.2.0" }
+luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.2.0" }
+luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.2.0" }
+luma-io = { path = "./luma-io", package = "luma-io", version = "0.2.0" }
+luma-compile = { path = "./luma-compile", package = "luma-compile", version = "0.2.0" }
+luma-onnx = { path = "./luma-onnx", package = "luma-onnx", version = "0.2.0" }
+luma-ml = { path = "./luma-ml", package = "luma-ml", version = "0.2.0" }
 
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
