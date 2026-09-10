@@ -3,7 +3,7 @@ name = "luma-onnx"
 version = { workspace = true }
 edition = { workspace = true }
 repository = { workspace = true }
-description = ""
+description = "onnx export / parse in luma"
 keywords = { workspace = true }
 license = { workspace = true }
 
