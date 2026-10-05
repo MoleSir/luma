@@ -163,6 +163,80 @@ macro_rules! impl_cpu_float {
 impl_cpu_float!(f32, libm::erff);
 impl_cpu_float!(f64, libm::erf);
 
+// ---- f16 / bf16 ----
+// Native half storage/arithmetic; transcendentals widen to f32, apply the f32
+// kernel, then narrow back (matches the CUDA backend's policy).
+macro_rules! impl_cpu_half {
+    ($t:ty) => {
+        impl CpuDType for $t {
+            const ZERO: Self = <$t>::ZERO;
+            const ONE: Self = <$t>::ONE;
+        }
+
+        impl CpuNum for $t {
+            fn from_f64(v: f64) -> Self {
+                <$t>::from_f64(v)
+            }
+            fn to_f64(self) -> f64 {
+                self.to_f64()
+            }
+            fn from_usize(v: usize) -> Self {
+                <$t>::from_f32(v as f32)
+            }
+            fn to_usize(self) -> usize {
+                self.to_f32() as usize
+            }
+            fn abs(self) -> Self {
+                <$t>::from_f32(self.to_f32().abs())
+            }
+            fn signum(self) -> Self {
+                <$t>::from_f32(self.to_f32().signum())
+            }
+        }
+        impl CpuFloat for $t {
+            fn exp(self) -> Self {
+                <$t>::from_f32(self.to_f32().exp())
+            }
+            fn ln(self) -> Self {
+                <$t>::from_f32(self.to_f32().ln())
+            }
+            fn sin(self) -> Self {
+                <$t>::from_f32(self.to_f32().sin())
+            }
+            fn cos(self) -> Self {
+                <$t>::from_f32(self.to_f32().cos())
+            }
+            fn tanh(self) -> Self {
+                <$t>::from_f32(self.to_f32().tanh())
+            }
+            fn sqrt(self) -> Self {
+                <$t>::from_f32(self.to_f32().sqrt())
+            }
+            fn floor(self) -> Self {
+                <$t>::from_f32(self.to_f32().floor())
+            }
+            fn ceil(self) -> Self {
+                <$t>::from_f32(self.to_f32().ceil())
+            }
+            fn round(self) -> Self {
+                <$t>::from_f32(self.to_f32().round())
+            }
+            fn powf(self, e: Self) -> Self {
+                <$t>::from_f32(self.to_f32().powf(e.to_f32()))
+            }
+            fn recip(self) -> Self {
+                <$t>::from_f32(self.to_f32().recip())
+            }
+            fn erf(self) -> Self {
+                <$t>::from_f32(libm::erff(self.to_f32()))
+            }
+        }
+    };
+}
+
+impl_cpu_half!(half::f16);
+impl_cpu_half!(half::bf16);
+
 // ---- i32 / u32 / u8 ----
 macro_rules! impl_cpu_int {
     ($t:ty) => {

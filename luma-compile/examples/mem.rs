@@ -33,6 +33,7 @@ fn elem_bytes(dt: DType) -> usize {
     match dt {
         DType::F32 | DType::I32 | DType::U32 => 4,
         DType::F64 => 8,
+        DType::F16 | DType::BF16 => 2,
         DType::U8 | DType::Bool => 1,
     }
 }

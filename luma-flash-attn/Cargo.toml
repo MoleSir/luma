@@ -1,0 +1,18 @@
+[package]
+name = "luma-flash-attn"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "luma flash attn"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+luma-cuda = { workspace = true }
+cudarc = { workspace = true, features = ["cuda-version-from-build-system", "fallback-latest", "driver"] }
+half = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+luma-cpu = { workspace = true }

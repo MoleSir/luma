@@ -85,6 +85,18 @@ REDUCE_KERNEL(prod, uint8_t, u8, (uint8_t)1, ACCUM_PROD)
 REDUCE_KERNEL(all, uint8_t, u8, (uint8_t)0xFF, ACCUM_ALL)
 REDUCE_KERNEL(any, uint8_t, u8, (uint8_t)0, ACCUM_ANY)
 
+// ---- f16 ----
+REDUCE_KERNEL(sum, __half, f16, 0.0f, ACCUM_SUM)
+REDUCE_KERNEL(min, __half, f16, INFINITY, ACCUM_MIN)
+REDUCE_KERNEL(max, __half, f16, -INFINITY, ACCUM_MAX)
+REDUCE_KERNEL(prod, __half, f16, 1.0f, ACCUM_PROD)
+
+// ---- bf16 ----
+REDUCE_KERNEL(sum, __nv_bfloat16, bf16, 0.0f, ACCUM_SUM)
+REDUCE_KERNEL(min, __nv_bfloat16, bf16, INFINITY, ACCUM_MIN)
+REDUCE_KERNEL(max, __nv_bfloat16, bf16, -INFINITY, ACCUM_MAX)
+REDUCE_KERNEL(prod, __nv_bfloat16, bf16, 1.0f, ACCUM_PROD)
+
 #define ARG_REDUCE_KERNEL(NAME, TYPE, DType, INIT, CMP_) \
 extern "C" __global__ void s##NAME##_##DType( \
     const size_t reduce_size, \
@@ -150,3 +162,11 @@ ARG_REDUCE_KERNEL(argmin, double, f64,  INFINITY, CMP_ARGMIN)
 // ---- i32 argmax / argmin ----
 ARG_REDUCE_KERNEL(argmax, int32_t, i32, INT32_MIN, CMP_ARGMAX)
 ARG_REDUCE_KERNEL(argmin, int32_t, i32, INT32_MAX, CMP_ARGMIN)
+
+// ---- f16 argmax / argmin ----
+ARG_REDUCE_KERNEL(argmax, __half, f16, -INFINITY, CMP_ARGMAX)
+ARG_REDUCE_KERNEL(argmin, __half, f16,  INFINITY, CMP_ARGMIN)
+
+// ---- bf16 argmax / argmin ----
+ARG_REDUCE_KERNEL(argmax, __nv_bfloat16, bf16, -INFINITY, CMP_ARGMAX)
+ARG_REDUCE_KERNEL(argmin, __nv_bfloat16, bf16,  INFINITY, CMP_ARGMIN)

@@ -9,6 +9,8 @@ impl Storage<Cuda, Float> for CudaFloatStorage {
         match &self.slice {
             CudaFloatSlice::F32(_) => FloatDType::F32,
             CudaFloatSlice::F64(_) => FloatDType::F64,
+            CudaFloatSlice::F16(_) => FloatDType::F16,
+            CudaFloatSlice::BF16(_) => FloatDType::BF16,
         }
     }
 
@@ -22,6 +24,8 @@ impl CudaFloatStorage {
         match &self.slice {
             CudaFloatSlice::F32(_) => DType::F32,
             CudaFloatSlice::F64(_) => DType::F64,
+            CudaFloatSlice::F16(_) => DType::F16,
+            CudaFloatSlice::BF16(_) => DType::BF16,
         }
     }
 
@@ -29,6 +33,8 @@ impl CudaFloatStorage {
         match &self.slice {
             CudaFloatSlice::F32(s) => s.len(),
             CudaFloatSlice::F64(s) => s.len(),
+            CudaFloatSlice::F16(s) => s.len(),
+            CudaFloatSlice::BF16(s) => s.len(),
         }
     }
 
@@ -105,6 +111,8 @@ pub struct CudaFloatStorage {
 pub enum CudaFloatSlice {
     F32(CudaSlice<f32>),
     F64(CudaSlice<f64>),
+    F16(CudaSlice<half::f16>),
+    BF16(CudaSlice<half::bf16>),
 }
 
 impl CudaFloatSlice {
@@ -112,6 +120,8 @@ impl CudaFloatSlice {
         match self {
             Self::F32(_) => DType::F32,
             Self::F64(_) => DType::F64,
+            Self::F16(_) => DType::F16,
+            Self::BF16(_) => DType::BF16,
         }
     }
 }

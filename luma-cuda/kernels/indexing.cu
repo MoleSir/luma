@@ -305,3 +305,29 @@ SCATTER_OP(double, uint32_t, s_u32_f64)
 SCATTER_OP(uint8_t, uint32_t, s_u32_u8)
 SCATTER_OP(int32_t, uint32_t, s_u32_i32)
 SCATTER_OP(uint32_t, uint32_t, s_u32_u32)
+
+// ---- half-precision values ----
+INDEX_SELECT_OP(__half, int32_t, is_i32_f16)
+INDEX_SELECT_OP(__half, uint32_t, is_u32_f16)
+INDEX_SELECT_OP(__nv_bfloat16, int32_t, is_i32_bf16)
+INDEX_SELECT_OP(__nv_bfloat16, uint32_t, is_u32_bf16)
+
+GATHER_OP(__half, int32_t, gather_i32_f16)
+GATHER_OP(__half, uint32_t, gather_u32_f16)
+GATHER_OP(__nv_bfloat16, int32_t, gather_i32_bf16)
+GATHER_OP(__nv_bfloat16, uint32_t, gather_u32_bf16)
+
+INDEX_ADD_OP(__half, int32_t, ia_i32_f16)
+INDEX_ADD_OP(__half, uint32_t, ia_u32_f16)
+INDEX_ADD_OP(__nv_bfloat16, int32_t, ia_i32_bf16)
+INDEX_ADD_OP(__nv_bfloat16, uint32_t, ia_u32_bf16)
+
+SCATTER_ADD_OP(__half, int32_t, sa_i32_f16)
+SCATTER_ADD_OP(__half, uint32_t, sa_u32_f16)
+SCATTER_ADD_OP(__nv_bfloat16, int32_t, sa_i32_bf16)
+SCATTER_ADD_OP(__nv_bfloat16, uint32_t, sa_u32_bf16)
+
+SCATTER_OP(__half, int32_t, s_i32_f16)
+SCATTER_OP(__half, uint32_t, s_u32_f16)
+SCATTER_OP(__nv_bfloat16, int32_t, s_i32_bf16)
+SCATTER_OP(__nv_bfloat16, uint32_t, s_u32_bf16)

@@ -264,6 +264,8 @@ fn dtype_to_str(dt: luma_tensor::DType) -> &'static str {
     match dt {
         DType::F32 => "F32",
         DType::F64 => "F64",
+        DType::F16 => "F16",
+        DType::BF16 => "BF16",
         DType::I32 => "I32",
         DType::U32 => "U32",
         DType::U8 => "U8",
@@ -276,6 +278,8 @@ fn dtype_from_str(s: &str) -> Result<luma_tensor::DType, LumaPackError> {
     match s {
         "F32" => Ok(DType::F32),
         "F64" => Ok(DType::F64),
+        "F16" => Ok(DType::F16),
+        "BF16" => Ok(DType::BF16),
         "I32" => Ok(DType::I32),
         "U32" => Ok(DType::U32),
         "U8" => Ok(DType::U8),
@@ -289,6 +293,8 @@ fn scalar_to_json(s: &Scalar) -> serde_json::Value {
     match s {
         Scalar::F32(v) => json!({"dtype": "F32", "value": v}),
         Scalar::F64(v) => json!({"dtype": "F64", "value": v}),
+        Scalar::F16(v) => json!({"dtype": "F16", "value": v.to_f32()}),
+        Scalar::BF16(v) => json!({"dtype": "BF16", "value": v.to_f32()}),
         Scalar::I32(v) => json!({"dtype": "I32", "value": v}),
         Scalar::U32(v) => json!({"dtype": "U32", "value": v}),
         Scalar::U8(v) => json!({"dtype": "U8",  "value": v}),
@@ -303,6 +309,12 @@ fn scalar_from_json(v: &serde_json::Value) -> Result<Scalar, LumaPackError> {
     match dtype {
         "F32" => Ok(Scalar::F32(val.as_f64().ok_or_else(|| LumaPackError::MissingScalarValue("F32".into()))? as f32)),
         "F64" => Ok(Scalar::F64(val.as_f64().ok_or_else(|| LumaPackError::MissingScalarValue("F64".into()))?)),
+        "F16" => Ok(Scalar::F16(luma_tensor::f16::from_f32(
+            val.as_f64().ok_or_else(|| LumaPackError::MissingScalarValue("F16".into()))? as f32,
+        ))),
+        "BF16" => Ok(Scalar::BF16(luma_tensor::bf16::from_f32(
+            val.as_f64().ok_or_else(|| LumaPackError::MissingScalarValue("BF16".into()))? as f32,
+        ))),
         "I32" => Ok(Scalar::I32(val.as_i64().ok_or_else(|| LumaPackError::MissingScalarValue("I32".into()))? as i32)),
         "U32" => Ok(Scalar::U32(val.as_i64().ok_or_else(|| LumaPackError::MissingScalarValue("U32".into()))? as u32)),
         "U8" => Ok(Scalar::U8(val.as_i64().ok_or_else(|| LumaPackError::MissingScalarValue("U8".into()))? as u8)),

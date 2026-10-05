@@ -1,25 +1,25 @@
 use crate::{
-    BinaryOp, Bool, DTypeKind, Device, Float, FloatUnaryOp, Int, Op, ReduceOp, Tensor, TensorId, TensorImpl, UnaryOp, is_grad_enabled,
+    BinaryOp, Bool, CustomOp, CustomOp1, CustomOp2, CustomOp3, DTypeKind, Device, Float, FloatUnaryOp, Int, Op, ReduceOp, Tensor, TensorId, TensorImpl, UnaryOp, is_grad_enabled
 };
 use std::sync::{Arc, RwLock};
 
 /// Trait for metadata that knows how to construct itself when a tensor operation is performed.
 pub trait TensorMeta<D: Device, K: DTypeKind<D> + Sized>: Default + Send + Sync {
-    // ---- Binary operations ----
+    // Binary operations
     fn on_binary(lhs: &Tensor<D, K>, rhs: &Tensor<D, K>, op: BinaryOp) -> Self;
     fn on_binary_scalar(lhs: &Tensor<D, K>, rhs: K::Scalar, op: BinaryOp) -> Self;
 
-    // ---- Unary operations ----
+    // Unary operations
     fn on_unary(t: &Tensor<D, K>, op: UnaryOp<K::Scalar>) -> Self;
     fn on_float_unary(t: &Tensor<D, K>, op: FloatUnaryOp) -> Self;
 
-    // ---- Reductions ----
+    // Reductions
     fn on_reduce(t: &Tensor<D, K>, dims: &[usize], op: ReduceOp) -> Self;
 
-    // ---- Matrix operations ----
+    // Matrix operations
     fn on_matmul(lhs: &Tensor<D, K>, rhs: &Tensor<D, K>) -> Self;
 
-    // ---- Shape operations ----
+    // Shape operations
     fn on_broadcast(t: &Tensor<D, K>) -> Self;
     fn on_narrow(t: &Tensor<D, K>, dim: usize, start: usize, len: usize) -> Self;
     fn on_slice(t: &Tensor<D, K>, dim: usize, start: usize, end: usize, step: usize) -> Self;
@@ -29,21 +29,27 @@ pub trait TensorMeta<D: Device, K: DTypeKind<D> + Sized>: Default + Send + Sync 
     fn on_cat<A: AsRef<Tensor<D, K>>>(args: &[A], dim: usize) -> Self;
     fn on_copy(t: &Tensor<D, K>) -> Self;
 
-    // ---- Type conversions ----
+    // Type conversions
     fn on_cast(t: &Tensor<D, K>) -> Self;
 
-    // ---- Indexing operations ----
+    // Indexing operations
     fn on_index_select(t: &Tensor<D, K>, idx: &Tensor<D, Int>, dim: usize) -> Self;
     fn on_gather(src: &Tensor<D, K>, idx: &Tensor<D, Int>, dim: usize) -> Self;
     fn on_index_add(init: &Tensor<D, K>, idx: &Tensor<D, Int>, src: &Tensor<D, K>, dim: usize) -> Self;
     fn on_scatter_add(init: &Tensor<D, K>, idx: &Tensor<D, Int>, src: &Tensor<D, K>, dim: usize) -> Self;
 
-    // ---- Conditional operations ----
+    // Conditional operations
     fn on_pick(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, K>>, fv: Option<&Tensor<D, K>>) -> Self;
 
-    // ---- NN operations (Float-specific, but included for completeness) ----
+    // NN operations (Float-specific, but included for completeness)
     fn on_rms_norm(input: &Tensor<D, K>, weight: &Tensor<D, K>, eps: f64) -> Self;
     fn on_softmax(input: &Tensor<D, K>, dim: usize) -> Self;
+
+    // CustomOp
+    fn on_custom_op1(arg: &Tensor<D, K>, op: Box<dyn CustomOp1<D> + Send + Sync>) -> Self;
+    fn on_custom_op2(arg1: &Tensor<D, K>, arg2: &Tensor<D, K>, op: Box<dyn CustomOp2<D> + Send + Sync>) -> Self;
+    fn on_custom_op3(arg1: &Tensor<D, K>, arg2: &Tensor<D, K>, arg3: &Tensor<D, K>, op: Box<dyn CustomOp3<D> + Send + Sync>) -> Self;
+    fn on_custom_op(args: &[Tensor<D, K>], op: Box<dyn CustomOp<D> + Send + Sync>) -> Self;
 }
 
 pub struct FloatMeta<D: Device> {
@@ -190,6 +196,23 @@ impl<D: Device> FloatMeta<D> {
     pub fn on_softmax(input: &Tensor<D, Float>, dim: usize) -> Self {
         Self::record(input.requires_grad(), || Op::Softmax(input.clone(), dim))
     }
+
+    pub fn on_custom_op1(arg: &Tensor<D, Float>, op: Box<dyn CustomOp1<D> + Send + Sync>) -> Self {
+        Self::record(arg.requires_grad(), || Op::CustomOp1(arg.clone(), op))
+    }
+
+    pub fn on_custom_op2(arg1: &Tensor<D, Float>, arg2: &Tensor<D, Float>, op: Box<dyn CustomOp2<D> + Send + Sync>) -> Self {
+        Self::record(arg1.requires_grad() || arg2.requires_grad(), || Op::CustomOp2(arg1.clone(), arg2.clone(), op))
+    }
+
+    pub fn on_custom_op3(arg1: &Tensor<D, Float>, arg2: &Tensor<D, Float>, arg3: &Tensor<D, Float>, op: Box<dyn CustomOp3<D> + Send + Sync>) -> Self {
+        Self::record(arg1.requires_grad() || arg2.requires_grad() || arg3.requires_grad(), || Op::CustomOp3(arg1.clone(), arg2.clone(), arg3.clone(), op))
+    }
+
+    pub fn on_custom_op(args: &[Tensor<D, Float>], op: Box<dyn CustomOp<D> + Send + Sync>) -> Self {
+        let should_record = args.iter().any(|arg| arg.requires_grad());
+        Self::record(should_record, || Op::CustomOp(args.to_vec(), op))
+    }
 }
 
 /// Convenience accessors on a `Float` tensor for its autograd state.
@@ -318,6 +341,22 @@ impl<D: Device> TensorMeta<D, Float> for FloatMeta<D> {
     fn on_softmax(input: &Tensor<D, Float>, dim: usize) -> Self {
         FloatMeta::on_softmax(input, dim)
     }
+
+    fn on_custom_op1(arg: &Tensor<D, Float>, op: Box<dyn CustomOp1<D> + Send + Sync>) -> Self {
+        FloatMeta::on_custom_op1(arg, op)
+    }
+
+    fn on_custom_op2(arg1: &Tensor<D, Float>, arg2: &Tensor<D, Float>, op: Box<dyn CustomOp2<D> + Send + Sync>) -> Self {
+        FloatMeta::on_custom_op2(arg1, arg2, op)
+    }
+
+    fn on_custom_op3(arg1: &Tensor<D, Float>, arg2: &Tensor<D, Float>, arg3: &Tensor<D, Float>, op: Box<dyn CustomOp3<D> + Send + Sync>) -> Self {
+        FloatMeta::on_custom_op3(arg1, arg2, arg3, op)
+    }
+
+    fn on_custom_op(args: &[Tensor<D, Float>], op: Box<dyn CustomOp<D> + Send + Sync>) -> Self {
+        FloatMeta::on_custom_op(args, op)
+    }
 }
 
 // ============================================================================
@@ -347,4 +386,8 @@ impl<D: Device, K: crate::DTypeKind<D>> TensorMeta<D, K> for () {
     fn on_pick(_: &Tensor<D, Bool>, _: Option<&Tensor<D, K>>, _: Option<&Tensor<D, K>>) -> Self {}
     fn on_rms_norm(_: &Tensor<D, K>, _: &Tensor<D, K>, _: f64) -> Self {}
     fn on_softmax(_: &Tensor<D, K>, _: usize) -> Self {}
+    fn on_custom_op1(_: &Tensor<D, K>, _: Box<dyn CustomOp1<D> + Send + Sync>) -> Self {}
+    fn on_custom_op2(_: &Tensor<D, K>, _: &Tensor<D, K>, _: Box<dyn CustomOp2<D> + Send + Sync>) -> Self {}
+    fn on_custom_op3(_: &Tensor<D, K>, _: &Tensor<D, K>, _: &Tensor<D, K>, _: Box<dyn CustomOp3<D> + Send + Sync>) -> Self {}
+    fn on_custom_op(_: &[Tensor<D, K>], _: Box<dyn CustomOp<D> + Send + Sync>) -> Self {}
 }

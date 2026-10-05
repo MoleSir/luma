@@ -130,6 +130,14 @@ impl IntOps<Cpu> for Cpu {
                 dispatch_int_raw!(x, |d| x.device().collect_alloc(layout.storage_indices().map(|i| d[i] as f64))),
                 x.device().clone(),
             ),
+            FloatDType::F16 => CpuFloatStorage::F16(
+                dispatch_int_raw!(x, |d| x.device().collect_alloc(layout.storage_indices().map(|i| half::f16::from_f32(d[i] as f32)))),
+                x.device().clone(),
+            ),
+            FloatDType::BF16 => CpuFloatStorage::BF16(
+                dispatch_int_raw!(x, |d| x.device().collect_alloc(layout.storage_indices().map(|i| half::bf16::from_f32(d[i] as f32)))),
+                x.device().clone(),
+            ),
         };
         Ok(s)
     }

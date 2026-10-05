@@ -18,8 +18,12 @@ fn main() {
     ];
 
     if cuda_available() {
+        // f16 needs >= sm_53 and bf16 needs >= sm_80; default to 80 so both
+        // work while still running on Ampere+ GPUs. Override with
+        // `CUDA_COMPUTE_CAP` when targeting a specific architecture.
+        let compute_cap: usize = env::var("CUDA_COMPUTE_CAP").ok().and_then(|v| v.parse().ok()).unwrap_or(80);
         let builder = bindgen_cuda::Builder::default()
-            .compute_cap(52)
+            .compute_cap(compute_cap)
             .include_paths(vec!["./kernels/utils.cuh"])
             .kernel_paths(kernels.iter().map(|(name, _)| format!("./kernels/{name}.cu")).collect());
         println!("cargo:info={builder:?}");

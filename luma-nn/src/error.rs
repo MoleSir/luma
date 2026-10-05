@@ -31,4 +31,18 @@ pub enum NnError {
 
     #[error("unsuppor activate {0}")]
     UnsupportActivate(String),
+
+    #[error("scaled_dot_product_attention(Flash) requires a CUDA device")]
+    FlashAttentionRequiresCuda,
+
+    #[error("scaled_dot_product_attention(Flash) unsupported: {0}")]
+    FlashAttentionUnsupported(String),
+
+    #[cfg(feature = "cuda")]
+    #[error(transparent)]
+    FlashAttention(#[from] luma_flash_attn::FlashAttnError),
+
+    #[cfg(feature = "cuda")]
+    #[error(transparent)]
+    Cuda(#[from] luma_cuda::CudaError),
 }

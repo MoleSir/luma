@@ -66,3 +66,37 @@ CAST_OP(float,    uint8_t, ucast_f32_to_bool, (uint8_t)(x != 0.0f))
 CAST_OP(double,   uint8_t, ucast_f64_to_bool, (uint8_t)(x != 0.0))
 CAST_OP(int32_t,  uint8_t, ucast_i32_to_bool, (uint8_t)(x != 0))
 CAST_OP(uint32_t, uint8_t, ucast_u32_to_bool, (uint8_t)(x != 0u))
+
+// ---- half-precision ----
+CAST_OP(__half, __half, ucast_f16_to_f16, x)
+CAST_OP(__nv_bfloat16, __nv_bfloat16, ucast_bf16_to_bf16, x)
+
+CAST_OP(float,  __half, ucast_f32_to_f16, __float2half_rn(x))
+CAST_OP(double, __half, ucast_f64_to_f16, __float2half_rn((float)(x)))
+CAST_OP(__half, float,  ucast_f16_to_f32, __half2float(x))
+CAST_OP(__half, double, ucast_f16_to_f64, (double)__half2float(x))
+
+CAST_OP(float,  __nv_bfloat16, ucast_f32_to_bf16, __float2bfloat16_rn(x))
+CAST_OP(double, __nv_bfloat16, ucast_f64_to_bf16, __float2bfloat16_rn((float)(x)))
+CAST_OP(__nv_bfloat16, float,  ucast_bf16_to_f32, __bfloat162float(x))
+CAST_OP(__nv_bfloat16, double, ucast_bf16_to_f64, (double)__bfloat162float(x))
+
+CAST_OP(__half, __nv_bfloat16, ucast_f16_to_bf16, __float2bfloat16_rn(__half2float(x)))
+CAST_OP(__nv_bfloat16, __half, ucast_bf16_to_f16, __float2half_rn(__bfloat162float(x)))
+
+CAST_OP(int32_t,  __half, ucast_i32_to_f16, __float2half_rn((float)(x)))
+CAST_OP(uint32_t, __half, ucast_u32_to_f16, __float2half_rn((float)(x)))
+CAST_OP(uint8_t,  __half, ucast_u8_to_f16,  __float2half_rn((float)(x)))
+CAST_OP(int32_t,  __nv_bfloat16, ucast_i32_to_bf16, __float2bfloat16_rn((float)(x)))
+CAST_OP(uint32_t, __nv_bfloat16, ucast_u32_to_bf16, __float2bfloat16_rn((float)(x)))
+CAST_OP(uint8_t,  __nv_bfloat16, ucast_u8_to_bf16,  __float2bfloat16_rn((float)(x)))
+
+CAST_OP(__half, int32_t,  ucast_f16_to_i32, (int32_t)__half2float(x))
+CAST_OP(__half, uint32_t, ucast_f16_to_u32, (uint32_t)__half2float(x))
+CAST_OP(__half, uint8_t,  ucast_f16_to_u8,  (uint8_t)__half2float(x))
+CAST_OP(__nv_bfloat16, int32_t,  ucast_bf16_to_i32, (int32_t)__bfloat162float(x))
+CAST_OP(__nv_bfloat16, uint32_t, ucast_bf16_to_u32, (uint32_t)__bfloat162float(x))
+CAST_OP(__nv_bfloat16, uint8_t,  ucast_bf16_to_u8,  (uint8_t)__bfloat162float(x))
+
+CAST_OP(__half,        uint8_t, ucast_f16_to_bool,  (uint8_t)(__half2float(x) != 0.0f))
+CAST_OP(__nv_bfloat16, uint8_t, ucast_bf16_to_bool, (uint8_t)(__bfloat162float(x) != 0.0f))

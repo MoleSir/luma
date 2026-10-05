@@ -27,6 +27,8 @@ pub enum DType {
     // Float kind
     F32,
     F64,
+    F16,
+    BF16,
     // Int kind
     I32,
     U8,
@@ -37,7 +39,7 @@ pub enum DType {
 
 impl DType {
     pub fn is_float(&self) -> bool {
-        matches!(self, DType::F32 | DType::F64)
+        matches!(self, DType::F32 | DType::F64 | DType::F16 | DType::BF16)
     }
 
     pub fn is_int(&self) -> bool {
@@ -51,7 +53,7 @@ impl DType {
     /// The tensor kind this dtype belongs to.
     pub fn kind(&self) -> KindTag {
         match self {
-            DType::F32 | DType::F64 => KindTag::Float,
+            DType::F32 | DType::F64 | DType::F16 | DType::BF16 => KindTag::Float,
             DType::I32 | DType::U8 | DType::U32 => KindTag::Int,
             DType::Bool => KindTag::Bool,
         }
@@ -62,6 +64,8 @@ impl DType {
         match self {
             DType::F32 => 4,
             DType::F64 => 8,
+            DType::F16 => 2,
+            DType::BF16 => 2,
             DType::I32 => 4,
             DType::U8 => 1,
             DType::U32 => 4,
@@ -74,6 +78,8 @@ impl DType {
         match self {
             DType::F32 => FloatDType::F32,
             DType::F64 => FloatDType::F64,
+            DType::F16 => FloatDType::F16,
+            DType::BF16 => FloatDType::BF16,
             _ => panic!("DType::{:?} is not a float dtype", self),
         }
     }
@@ -132,6 +138,8 @@ pub enum FloatDType {
     #[default]
     F32,
     F64,
+    F16,
+    BF16,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -153,6 +161,8 @@ impl Into<DType> for FloatDType {
         match self {
             FloatDType::F32 => DType::F32,
             FloatDType::F64 => DType::F64,
+            FloatDType::F16 => DType::F16,
+            FloatDType::BF16 => DType::BF16,
         }
     }
 }

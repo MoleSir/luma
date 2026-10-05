@@ -126,6 +126,8 @@ impl<D: Device> std::fmt::Display for Tensor<D, Float> {
         let dtype_str = match self.dtype() {
             FloatDType::F32 => "f32",
             FloatDType::F64 => "f64",
+            FloatDType::F16 => "f16",
+            FloatDType::BF16 => "bf16",
         };
         let mut buf = format!("Tensor<{}>(", dtype_str);
         let indent = buf.len();

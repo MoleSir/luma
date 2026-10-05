@@ -20,3 +20,4 @@ rand_distr = { workspace = true }
 num_cpus = { workspace = true }
 paste = { workspace = true }
 bytemuck = { workspace = true }
+half = { workspace = true }

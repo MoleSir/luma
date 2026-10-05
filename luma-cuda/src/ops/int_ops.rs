@@ -264,6 +264,30 @@ impl IntOps<Cuda> for Cuda {
                 let out = launch::launch_cast(device, "u8", "f64", &kernel::CAST, data, layout)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
             }
+            (CudaIntSlice::I32(data), FloatDType::F16) => {
+                let out = launch::launch_cast(device, "i32", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaIntSlice::I32(data), FloatDType::BF16) => {
+                let out = launch::launch_cast(device, "i32", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaIntSlice::U32(data), FloatDType::F16) => {
+                let out = launch::launch_cast(device, "u32", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaIntSlice::U32(data), FloatDType::BF16) => {
+                let out = launch::launch_cast(device, "u32", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaIntSlice::U8(data), FloatDType::F16) => {
+                let out = launch::launch_cast(device, "u8", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaIntSlice::U8(data), FloatDType::BF16) => {
+                let out = launch::launch_cast(device, "u8", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
         }
     }
 

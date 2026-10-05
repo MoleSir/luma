@@ -29,6 +29,12 @@ impl FloatOps<Trace> for Trace {
     fn f_from_f32<'a>(_data: impl Into<Cow<'a, [f32]>>, device: &Trace) -> Result<TraceFloatStorage> {
         Ok(device.float_leaf(FloatDType::F32, &Shape::from(())))
     }
+    fn f_from_f16<'a>(_data: impl Into<Cow<'a, [luma_tensor::f16]>>, device: &Trace) -> Result<TraceFloatStorage> {
+        Ok(device.float_leaf(FloatDType::F16, &Shape::from(())))
+    }
+    fn f_from_bf16<'a>(_data: impl Into<Cow<'a, [luma_tensor::bf16]>>, device: &Trace) -> Result<TraceFloatStorage> {
+        Ok(device.float_leaf(FloatDType::BF16, &Shape::from(())))
+    }
     fn f_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, shape: &Shape, device: &Trace, dtype: FloatDType) -> Result<TraceFloatStorage> {
         // Captured data becomes a constant leaf in the graph (state saving).
         Ok(device.float_const(dtype, shape, bytes.into().into_owned()))

@@ -32,6 +32,22 @@ macro_rules! _float_select {
                 let out = launch::$launch_fn(&$x.device, "u32", "f64", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: $x.device.clone() })
             }
+            (CudaIntSlice::I32(ids), CudaFloatSlice::F16(v)) => {
+                let out = launch::$launch_fn(&$x.device, "i32", "f16", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: $x.device.clone() })
+            }
+            (CudaIntSlice::I32(ids), CudaFloatSlice::BF16(v)) => {
+                let out = launch::$launch_fn(&$x.device, "i32", "bf16", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: $x.device.clone() })
+            }
+            (CudaIntSlice::U32(ids), CudaFloatSlice::F16(v)) => {
+                let out = launch::$launch_fn(&$x.device, "u32", "f16", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: $x.device.clone() })
+            }
+            (CudaIntSlice::U32(ids), CudaFloatSlice::BF16(v)) => {
+                let out = launch::$launch_fn(&$x.device, "u32", "bf16", &kernel::INDEXING, v, $x_l, ids, $idx_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: $x.device.clone() })
+            }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: $x.slice.dtype(), rhs: $idx.slice.dtype(), op: $op }),
         }
     };
@@ -56,6 +72,22 @@ macro_rules! _float_add {
                 let out = launch::$launch_fn(&$init.device, "u32", "f64", &kernel::INDEXING, d, $init_l, ids, $idx_l, s, $src_l, $dim)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: $init.device.clone() })
             }
+            (CudaIntSlice::I32(ids), CudaFloatSlice::F16(s), CudaFloatSlice::F16(d)) => {
+                let out = launch::$launch_fn(&$init.device, "i32", "f16", &kernel::INDEXING, d, $init_l, ids, $idx_l, s, $src_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: $init.device.clone() })
+            }
+            (CudaIntSlice::I32(ids), CudaFloatSlice::BF16(s), CudaFloatSlice::BF16(d)) => {
+                let out = launch::$launch_fn(&$init.device, "i32", "bf16", &kernel::INDEXING, d, $init_l, ids, $idx_l, s, $src_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: $init.device.clone() })
+            }
+            (CudaIntSlice::U32(ids), CudaFloatSlice::F16(s), CudaFloatSlice::F16(d)) => {
+                let out = launch::$launch_fn(&$init.device, "u32", "f16", &kernel::INDEXING, d, $init_l, ids, $idx_l, s, $src_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: $init.device.clone() })
+            }
+            (CudaIntSlice::U32(ids), CudaFloatSlice::BF16(s), CudaFloatSlice::BF16(d)) => {
+                let out = launch::$launch_fn(&$init.device, "u32", "bf16", &kernel::INDEXING, d, $init_l, ids, $idx_l, s, $src_l, $dim)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: $init.device.clone() })
+            }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: $init.slice.dtype(), rhs: $src.slice.dtype(), op: $op }),
         }
     };
@@ -73,6 +105,14 @@ impl FloatOps<Cuda> for Cuda {
                 let data = device.alloc_zeros::<f64>(elem_count)?;
                 Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F64(data) })
             }
+            FloatDType::F16 => {
+                let data = device.alloc_zeros::<half::f16>(elem_count)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F16(data) })
+            }
+            FloatDType::BF16 => {
+                let data = device.alloc_zeros::<half::bf16>(elem_count)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::BF16(data) })
+            }
         }
     }
 
@@ -88,6 +128,16 @@ impl FloatOps<Cuda> for Cuda {
                 let host = vec![1.0f64; elem_count];
                 let data = device.memcpy_stod(&host)?;
                 Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F64(data) })
+            }
+            FloatDType::F16 => {
+                let host = vec![half::f16::ONE; elem_count];
+                let data = device.memcpy_stod(&host)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F16(data) })
+            }
+            FloatDType::BF16 => {
+                let host = vec![half::bf16::ONE; elem_count];
+                let data = device.memcpy_stod(&host)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::BF16(data) })
             }
         }
     }
@@ -105,6 +155,16 @@ impl FloatOps<Cuda> for Cuda {
                 let data = device.memcpy_stod(&host)?;
                 Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F64(data) })
             }
+            FloatDType::F16 => {
+                let host = vec![half::f16::from_f64(value); elem_count];
+                let data = device.memcpy_stod(&host)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F16(data) })
+            }
+            FloatDType::BF16 => {
+                let host = vec![half::bf16::from_f64(value); elem_count];
+                let data = device.memcpy_stod(&host)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::BF16(data) })
+            }
         }
     }
 
@@ -120,6 +180,18 @@ impl FloatOps<Cuda> for Cuda {
         Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F32(slice) })
     }
 
+    fn f_from_f16<'a>(data: impl Into<Cow<'a, [half::f16]>>, device: &Cuda) -> Result<CudaFloatStorage> {
+        let data = data.into();
+        let slice = device.memcpy_stod(&*data)?;
+        Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F16(slice) })
+    }
+
+    fn f_from_bf16<'a>(data: impl Into<Cow<'a, [half::bf16]>>, device: &Cuda) -> Result<CudaFloatStorage> {
+        let data = data.into();
+        let slice = device.memcpy_stod(&*data)?;
+        Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::BF16(slice) })
+    }
+
     fn f_from_bytes<'a>(bytes: impl Into<Cow<'a, [u8]>>, _shape: &Shape, device: &Cuda, dtype: FloatDType) -> Result<CudaFloatStorage> {
         let bytes = bytes.into();
         match dtype {
@@ -132,6 +204,16 @@ impl FloatOps<Cuda> for Cuda {
                 let host: Vec<f64> = bytes.chunks_exact(8).map(|c| f64::from_le_bytes(c.try_into().unwrap())).collect();
                 let slice = device.memcpy_stod(&host)?;
                 Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F64(slice) })
+            }
+            FloatDType::F16 => {
+                let host: Vec<half::f16> = bytes.chunks_exact(2).map(|c| half::f16::from_le_bytes(c.try_into().unwrap())).collect();
+                let slice = device.memcpy_stod(&host)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F16(slice) })
+            }
+            FloatDType::BF16 => {
+                let host: Vec<half::bf16> = bytes.chunks_exact(2).map(|c| half::bf16::from_le_bytes(c.try_into().unwrap())).collect();
+                let slice = device.memcpy_stod(&host)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::BF16(slice) })
             }
         }
     }
@@ -153,6 +235,20 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_affine(device, "f64", &kernel::UNARY, &data, &contig, hi - lo, lo)?;
                 Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F64(out) })
             }
+            FloatDType::F16 => {
+                let mut data = device.alloc::<f32>(elem_count)?;
+                curand.fill_with_uniform(&mut data).map_err(CudaError::Curand)?;
+                let scaled = launch::launch_affine(device, "f32", &kernel::UNARY, &data, &contig, (hi - lo) as f32, lo as f32)?;
+                let out = launch::launch_cast(device, "f32", "f16", &kernel::CAST, &scaled, &contig)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F16(out) })
+            }
+            FloatDType::BF16 => {
+                let mut data = device.alloc::<f32>(elem_count)?;
+                curand.fill_with_uniform(&mut data).map_err(CudaError::Curand)?;
+                let scaled = launch::launch_affine(device, "f32", &kernel::UNARY, &data, &contig, (hi - lo) as f32, lo as f32)?;
+                let out = launch::launch_cast(device, "f32", "bf16", &kernel::CAST, &scaled, &contig)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::BF16(out) })
+            }
         }
     }
 
@@ -170,6 +266,20 @@ impl FloatOps<Cuda> for Cuda {
                 curand.fill_with_normal(&mut data, mean, std).map_err(CudaError::Curand)?;
                 Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F64(data) })
             }
+            FloatDType::F16 => {
+                let mut data = device.alloc::<f32>(elem_count)?;
+                curand.fill_with_normal(&mut data, mean as f32, std as f32).map_err(CudaError::Curand)?;
+                let contig = Layout::contiguous(shape.clone());
+                let out = launch::launch_cast(device, "f32", "f16", &kernel::CAST, &data, &contig)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::F16(out) })
+            }
+            FloatDType::BF16 => {
+                let mut data = device.alloc::<f32>(elem_count)?;
+                curand.fill_with_normal(&mut data, mean as f32, std as f32).map_err(CudaError::Curand)?;
+                let contig = Layout::contiguous(shape.clone());
+                let out = launch::launch_cast(device, "f32", "bf16", &kernel::CAST, &data, &contig)?;
+                Ok(CudaFloatStorage { device: device.clone(), slice: CudaFloatSlice::BF16(out) })
+            }
         }
     }
 
@@ -182,6 +292,14 @@ impl FloatOps<Cuda> for Cuda {
             CudaFloatSlice::F64(data) => {
                 let out = launch::launch_cast(&x.device, "f64", "f64", &kernel::CAST, data, layout)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: x.device.clone() })
+            }
+            CudaFloatSlice::F16(data) => {
+                let out = launch::launch_cast(&x.device, "f16", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: x.device.clone() })
+            }
+            CudaFloatSlice::BF16(data) => {
+                let out = launch::launch_cast(&x.device, "bf16", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: x.device.clone() })
             }
         }
     }
@@ -197,6 +315,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_cast(device, "f32", "f64", &kernel::CAST, data, layout)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
             }
+            (CudaFloatSlice::F32(data), FloatDType::F16) => {
+                let out = launch::launch_cast(device, "f32", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F32(data), FloatDType::BF16) => {
+                let out = launch::launch_cast(device, "f32", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
             (CudaFloatSlice::F64(data), FloatDType::F32) => {
                 let out = launch::launch_cast(device, "f64", "f32", &kernel::CAST, data, layout)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: device.clone() })
@@ -204,6 +330,46 @@ impl FloatOps<Cuda> for Cuda {
             (CudaFloatSlice::F64(data), FloatDType::F64) => {
                 let out = launch::launch_cast(device, "f64", "f64", &kernel::CAST, data, layout)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F64(data), FloatDType::F16) => {
+                let out = launch::launch_cast(device, "f64", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F64(data), FloatDType::BF16) => {
+                let out = launch::launch_cast(device, "f64", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), FloatDType::F32) => {
+                let out = launch::launch_cast(device, "f16", "f32", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), FloatDType::F64) => {
+                let out = launch::launch_cast(device, "f16", "f64", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), FloatDType::F16) => {
+                let out = launch::launch_cast(device, "f16", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), FloatDType::BF16) => {
+                let out = launch::launch_cast(device, "f16", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), FloatDType::F32) => {
+                let out = launch::launch_cast(device, "bf16", "f32", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), FloatDType::F64) => {
+                let out = launch::launch_cast(device, "bf16", "f64", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), FloatDType::F16) => {
+                let out = launch::launch_cast(device, "bf16", "f16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), FloatDType::BF16) => {
+                let out = launch::launch_cast(device, "bf16", "bf16", &kernel::CAST, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
             }
         }
     }
@@ -235,6 +401,30 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_cast(device, "f64", "u8", &kernel::CAST, data, layout)?;
                 Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
             }
+            (CudaFloatSlice::F16(data), IntDType::I32) => {
+                let out = launch::launch_cast(device, "f16", "i32", &kernel::CAST, data, layout)?;
+                Ok(CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), IntDType::U32) => {
+                let out = launch::launch_cast(device, "f16", "u32", &kernel::CAST, data, layout)?;
+                Ok(CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), IntDType::U8) => {
+                let out = launch::launch_cast(device, "f16", "u8", &kernel::CAST, data, layout)?;
+                Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), IntDType::I32) => {
+                let out = launch::launch_cast(device, "bf16", "i32", &kernel::CAST, data, layout)?;
+                Ok(CudaIntStorage { slice: CudaIntSlice::I32(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), IntDType::U32) => {
+                let out = launch::launch_cast(device, "bf16", "u32", &kernel::CAST, data, layout)?;
+                Ok(CudaIntStorage { slice: CudaIntSlice::U32(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), IntDType::U8) => {
+                let out = launch::launch_cast(device, "bf16", "u8", &kernel::CAST, data, layout)?;
+                Ok(CudaIntStorage { slice: CudaIntSlice::U8(out), device: device.clone() })
+            }
         }
     }
 
@@ -249,6 +439,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_cast(device, "f64", "bool", &kernel::CAST, data, layout)?;
                 Ok(CudaBoolStorage { slice: out, device: device.clone() })
             }
+            CudaFloatSlice::F16(data) => {
+                let out = launch::launch_cast(device, "f16", "bool", &kernel::CAST, data, layout)?;
+                Ok(CudaBoolStorage { slice: out, device: device.clone() })
+            }
+            CudaFloatSlice::BF16(data) => {
+                let out = launch::launch_cast(device, "bf16", "bool", &kernel::CAST, data, layout)?;
+                Ok(CudaBoolStorage { slice: out, device: device.clone() })
+            }
         }
     }
 
@@ -261,6 +459,14 @@ impl FloatOps<Cuda> for Cuda {
             CudaFloatSlice::F64(data) => {
                 let raw = x.device.memcpy_dtov(data)?;
                 Ok(layout.storage_indices().map(|i| raw[i]).collect())
+            }
+            CudaFloatSlice::F16(data) => {
+                let raw = x.device.memcpy_dtov(data)?;
+                Ok(layout.storage_indices().map(|i| raw[i].to_f64()).collect())
+            }
+            CudaFloatSlice::BF16(data) => {
+                let raw = x.device.memcpy_dtov(data)?;
+                Ok(layout.storage_indices().map(|i| raw[i].to_f64()).collect())
             }
         }
     }
@@ -285,6 +491,24 @@ impl FloatOps<Cuda> for Cuda {
                     Ok(Cow::Owned(bytemuck::cast_slice(&gathered).to_vec()))
                 }
             }
+            CudaFloatSlice::F16(data) => {
+                let raw = x.device.memcpy_dtov(data)?;
+                if layout.is_contiguous() {
+                    Ok(Cow::Owned(bytemuck::cast_slice(&raw).to_vec()))
+                } else {
+                    let gathered: Vec<half::f16> = layout.storage_indices().map(|i| raw[i]).collect();
+                    Ok(Cow::Owned(bytemuck::cast_slice(&gathered).to_vec()))
+                }
+            }
+            CudaFloatSlice::BF16(data) => {
+                let raw = x.device.memcpy_dtov(data)?;
+                if layout.is_contiguous() {
+                    Ok(Cow::Owned(bytemuck::cast_slice(&raw).to_vec()))
+                } else {
+                    let gathered: Vec<half::bf16> = layout.storage_indices().map(|i| raw[i]).collect();
+                    Ok(Cow::Owned(bytemuck::cast_slice(&gathered).to_vec()))
+                }
+            }
         }
     }
 
@@ -298,6 +522,14 @@ impl FloatOps<Cuda> for Cuda {
             (CudaFloatSlice::F64(l), CudaFloatSlice::F64(r)) => {
                 let out = launch::launch_binary(&lhs.device, op, "f64", &kernel::BINARY, l, r, lhs_l, rhs_l)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: lhs.device.clone() })
+            }
+            (CudaFloatSlice::F16(l), CudaFloatSlice::F16(r)) => {
+                let out = launch::launch_binary(&lhs.device, op, "f16", &kernel::BINARY, l, r, lhs_l, rhs_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: lhs.device.clone() })
+            }
+            (CudaFloatSlice::BF16(l), CudaFloatSlice::BF16(r)) => {
+                let out = launch::launch_binary(&lhs.device, op, "bf16", &kernel::BINARY, l, r, lhs_l, rhs_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: lhs.device.clone() })
             }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: lhs.dtype(), rhs: rhs.dtype(), op: "binary" }),
         }
@@ -313,6 +545,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_binary_scalar(&lhs.device, op, "f64", &kernel::BINARY_SCALAR, data, lhs_l, rhs)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: lhs.device.clone() })
             }
+            CudaFloatSlice::F16(data) => {
+                let out = launch::launch_binary_scalar(&lhs.device, op, "f16", &kernel::BINARY_SCALAR, data, lhs_l, half::f16::from_f64(rhs))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: lhs.device.clone() })
+            }
+            CudaFloatSlice::BF16(data) => {
+                let out = launch::launch_binary_scalar(&lhs.device, op, "bf16", &kernel::BINARY_SCALAR, data, lhs_l, half::bf16::from_f64(rhs))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: lhs.device.clone() })
+            }
         }
     }
 
@@ -324,6 +564,14 @@ impl FloatOps<Cuda> for Cuda {
             }
             CudaFloatSlice::F64(data) => {
                 launch::launch_binary_scalar_inplace(&dst.device, op, "f64", &kernel::BINARY_SCALAR, data, dst_l, rhs)?;
+                Ok(())
+            }
+            CudaFloatSlice::F16(data) => {
+                launch::launch_binary_scalar_inplace(&dst.device, op, "f16", &kernel::BINARY_SCALAR, data, dst_l, half::f16::from_f64(rhs))?;
+                Ok(())
+            }
+            CudaFloatSlice::BF16(data) => {
+                launch::launch_binary_scalar_inplace(&dst.device, op, "bf16", &kernel::BINARY_SCALAR, data, dst_l, half::bf16::from_f64(rhs))?;
                 Ok(())
             }
         }
@@ -338,6 +586,14 @@ impl FloatOps<Cuda> for Cuda {
             CudaFloatSlice::F64(data) => {
                 let out = launch::launch_binary_scalar_lhs(&rhs.device, op, "f64", &kernel::BINARY_SCALAR, scalar, data, rhs_l)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: rhs.device.clone() })
+            }
+            CudaFloatSlice::F16(data) => {
+                let out = launch::launch_binary_scalar_lhs(&rhs.device, op, "f16", &kernel::BINARY_SCALAR, half::f16::from_f64(scalar), data, rhs_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: rhs.device.clone() })
+            }
+            CudaFloatSlice::BF16(data) => {
+                let out = launch::launch_binary_scalar_lhs(&rhs.device, op, "bf16", &kernel::BINARY_SCALAR, half::bf16::from_f64(scalar), data, rhs_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: rhs.device.clone() })
             }
         }
     }
@@ -397,6 +653,58 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_clamp(device, "f64", &kernel::UNARY, data, layout, has_min, min_val, has_max, max_val)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
             }
+            (CudaFloatSlice::F16(data), UnaryOp::Neg) => {
+                let out = launch::launch_unary_raw_by_kernel_name(device, "uneg_f16", &kernel::UNARY, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Abs) => {
+                let out = launch::launch_unary_raw_by_kernel_name(device, "uabs_f16", &kernel::UNARY, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Sign) => {
+                let out = launch::launch_unary_raw_by_kernel_name(device, "usign_f16", &kernel::UNARY, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Affine(mul, add)) => {
+                let out = launch::launch_affine(device, "f16", &kernel::UNARY, data, layout, half::f16::from_f64(mul), half::f16::from_f64(add))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Pow(exp)) => {
+                let out = launch::launch_pow(device, "f16", &kernel::UNARY, data, layout, half::f16::from_f64(exp))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Clamp(min, max)) => {
+                let (has_min, min_val) = min.map_or((false, half::f16::ZERO), |v| (true, half::f16::from_f64(v)));
+                let (has_max, max_val) = max.map_or((false, half::f16::ZERO), |v| (true, half::f16::from_f64(v)));
+                let out = launch::launch_clamp(device, "f16", &kernel::UNARY, data, layout, has_min, min_val, has_max, max_val)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Neg) => {
+                let out = launch::launch_unary_raw_by_kernel_name(device, "uneg_bf16", &kernel::UNARY, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Abs) => {
+                let out = launch::launch_unary_raw_by_kernel_name(device, "uabs_bf16", &kernel::UNARY, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Sign) => {
+                let out = launch::launch_unary_raw_by_kernel_name(device, "usign_bf16", &kernel::UNARY, data, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Affine(mul, add)) => {
+                let out = launch::launch_affine(device, "bf16", &kernel::UNARY, data, layout, half::bf16::from_f64(mul), half::bf16::from_f64(add))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Pow(exp)) => {
+                let out = launch::launch_pow(device, "bf16", &kernel::UNARY, data, layout, half::bf16::from_f64(exp))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Clamp(min, max)) => {
+                let (has_min, min_val) = min.map_or((false, half::bf16::ZERO), |v| (true, half::bf16::from_f64(v)));
+                let (has_max, max_val) = max.map_or((false, half::bf16::ZERO), |v| (true, half::bf16::from_f64(v)));
+                let out = launch::launch_clamp(device, "bf16", &kernel::UNARY, data, layout, has_min, min_val, has_max, max_val)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
         }
     }
 
@@ -421,6 +729,26 @@ impl FloatOps<Cuda> for Cuda {
                 _ => {
                     let out = launch::launch_float_unary(device, op, "f64", &kernel::UNARY, data, layout)?;
                     Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
+                }
+            },
+            CudaFloatSlice::F16(data) => match op {
+                FloatUnaryOp::LeakyRelu(a) => {
+                    let out = launch::launch_unary_param1(device, op, "f16", &kernel::UNARY, data, layout, half::f16::from_f64(a))?;
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+                }
+                _ => {
+                    let out = launch::launch_float_unary(device, op, "f16", &kernel::UNARY, data, layout)?;
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+                }
+            },
+            CudaFloatSlice::BF16(data) => match op {
+                FloatUnaryOp::LeakyRelu(a) => {
+                    let out = launch::launch_unary_param1(device, op, "bf16", &kernel::UNARY, data, layout, half::bf16::from_f64(a))?;
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+                }
+                _ => {
+                    let out = launch::launch_float_unary(device, op, "bf16", &kernel::UNARY, data, layout)?;
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
                 }
             },
         }
@@ -481,6 +809,58 @@ impl FloatOps<Cuda> for Cuda {
                 launch::launch_clamp_inplace(device, "f64", &kernel::UNARY, data, dst_l, has_min, min_val, has_max, max_val)?;
                 Ok(())
             }
+            (CudaFloatSlice::F16(data), UnaryOp::Neg) => {
+                launch::launch_unary_raw_inplace(device, "uneg_f16", &kernel::UNARY, data, dst_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Abs) => {
+                launch::launch_unary_raw_inplace(device, "uabs_f16", &kernel::UNARY, data, dst_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Sign) => {
+                launch::launch_unary_raw_inplace(device, "usign_f16", &kernel::UNARY, data, dst_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Affine(mul, add)) => {
+                launch::launch_affine_inplace(device, "f16", &kernel::UNARY, data, dst_l, half::f16::from_f64(mul), half::f16::from_f64(add))?;
+                Ok(())
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Pow(exp)) => {
+                launch::launch_pow_inplace(device, "f16", &kernel::UNARY, data, dst_l, half::f16::from_f64(exp))?;
+                Ok(())
+            }
+            (CudaFloatSlice::F16(data), UnaryOp::Clamp(min, max)) => {
+                let (has_min, min_val) = min.map_or((false, half::f16::ZERO), |v| (true, half::f16::from_f64(v)));
+                let (has_max, max_val) = max.map_or((false, half::f16::ZERO), |v| (true, half::f16::from_f64(v)));
+                launch::launch_clamp_inplace(device, "f16", &kernel::UNARY, data, dst_l, has_min, min_val, has_max, max_val)?;
+                Ok(())
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Neg) => {
+                launch::launch_unary_raw_inplace(device, "uneg_bf16", &kernel::UNARY, data, dst_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Abs) => {
+                launch::launch_unary_raw_inplace(device, "uabs_bf16", &kernel::UNARY, data, dst_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Sign) => {
+                launch::launch_unary_raw_inplace(device, "usign_bf16", &kernel::UNARY, data, dst_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Affine(mul, add)) => {
+                launch::launch_affine_inplace(device, "bf16", &kernel::UNARY, data, dst_l, half::bf16::from_f64(mul), half::bf16::from_f64(add))?;
+                Ok(())
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Pow(exp)) => {
+                launch::launch_pow_inplace(device, "bf16", &kernel::UNARY, data, dst_l, half::bf16::from_f64(exp))?;
+                Ok(())
+            }
+            (CudaFloatSlice::BF16(data), UnaryOp::Clamp(min, max)) => {
+                let (has_min, min_val) = min.map_or((false, half::bf16::ZERO), |v| (true, half::bf16::from_f64(v)));
+                let (has_max, max_val) = max.map_or((false, half::bf16::ZERO), |v| (true, half::bf16::from_f64(v)));
+                launch::launch_clamp_inplace(device, "bf16", &kernel::UNARY, data, dst_l, has_min, min_val, has_max, max_val)?;
+                Ok(())
+            }
         }
     }
 
@@ -507,6 +887,26 @@ impl FloatOps<Cuda> for Cuda {
                     Ok(())
                 }
             },
+            CudaFloatSlice::F16(data) => match op {
+                FloatUnaryOp::LeakyRelu(a) => {
+                    launch::launch_unary_param1_inplace(device, op, "f16", &kernel::UNARY, data, dst_l, half::f16::from_f64(a))?;
+                    Ok(())
+                }
+                _ => {
+                    launch::launch_float_unary_inplace(device, op, "f16", &kernel::UNARY, data, dst_l)?;
+                    Ok(())
+                }
+            },
+            CudaFloatSlice::BF16(data) => match op {
+                FloatUnaryOp::LeakyRelu(a) => {
+                    launch::launch_unary_param1_inplace(device, op, "bf16", &kernel::UNARY, data, dst_l, half::bf16::from_f64(a))?;
+                    Ok(())
+                }
+                _ => {
+                    launch::launch_float_unary_inplace(device, op, "bf16", &kernel::UNARY, data, dst_l)?;
+                    Ok(())
+                }
+            },
         }
     }
 
@@ -521,6 +921,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_cmp(&lhs.device, op, "f64", &kernel::BINARY, l, r, lhs_l, rhs_l)?;
                 Ok(CudaBoolStorage { slice: out, device: lhs.device.clone() })
             }
+            (CudaFloatSlice::F16(l), CudaFloatSlice::F16(r)) => {
+                let out = launch::launch_cmp(&lhs.device, op, "f16", &kernel::BINARY, l, r, lhs_l, rhs_l)?;
+                Ok(CudaBoolStorage { slice: out, device: lhs.device.clone() })
+            }
+            (CudaFloatSlice::BF16(l), CudaFloatSlice::BF16(r)) => {
+                let out = launch::launch_cmp(&lhs.device, op, "bf16", &kernel::BINARY, l, r, lhs_l, rhs_l)?;
+                Ok(CudaBoolStorage { slice: out, device: lhs.device.clone() })
+            }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: lhs.dtype(), rhs: rhs.dtype(), op: "cmp" }),
         }
     }
@@ -533,6 +941,14 @@ impl FloatOps<Cuda> for Cuda {
             }
             CudaFloatSlice::F64(data) => {
                 let out = launch::launch_cmp_scalar(&lhs.device, op, "f64", &kernel::BINARY, data, lhs_l, rhs)?;
+                Ok(CudaBoolStorage { slice: out, device: lhs.device.clone() })
+            }
+            CudaFloatSlice::F16(data) => {
+                let out = launch::launch_cmp_scalar(&lhs.device, op, "f16", &kernel::BINARY, data, lhs_l, half::f16::from_f64(rhs))?;
+                Ok(CudaBoolStorage { slice: out, device: lhs.device.clone() })
+            }
+            CudaFloatSlice::BF16(data) => {
+                let out = launch::launch_cmp_scalar(&lhs.device, op, "bf16", &kernel::BINARY, data, lhs_l, half::bf16::from_f64(rhs))?;
                 Ok(CudaBoolStorage { slice: out, device: lhs.device.clone() })
             }
         }
@@ -581,6 +997,32 @@ impl FloatOps<Cuda> for Cuda {
                 };
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(final_out), device: device.clone() })
             }
+            CudaFloatSlice::F16(data) => {
+                let (out, shape) =
+                    launch::launch_multi_reduce::<half::f16>(device, kernel_op, "f16", &kernel::REDUCE, data, layout, dims, keepdim)?;
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda f_reduce shape must match the layer");
+                let final_out = if is_mean {
+                    let aff_layout = Layout::contiguous(shape.clone());
+                    let mul = half::f16::from_f64(1.0 / total_factor);
+                    launch::launch_affine(device, "f16", &kernel::UNARY, &out, &aff_layout, mul, half::f16::ZERO)?
+                } else {
+                    out
+                };
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(final_out), device: device.clone() })
+            }
+            CudaFloatSlice::BF16(data) => {
+                let (out, shape) =
+                    launch::launch_multi_reduce::<half::bf16>(device, kernel_op, "bf16", &kernel::REDUCE, data, layout, dims, keepdim)?;
+                debug_assert_eq!(shape.dims(), out_shape.dims(), "cuda f_reduce shape must match the layer");
+                let final_out = if is_mean {
+                    let aff_layout = Layout::contiguous(shape.clone());
+                    let mul = half::bf16::from_f64(1.0 / total_factor);
+                    launch::launch_affine(device, "bf16", &kernel::UNARY, &out, &aff_layout, mul, half::bf16::ZERO)?
+                } else {
+                    out
+                };
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(final_out), device: device.clone() })
+            }
         }
     }
 
@@ -615,6 +1057,36 @@ impl FloatOps<Cuda> for Cuda {
             }
             CudaFloatSlice::F64(s) => {
                 let kn = launch::arg_reduce_kernel_name(take_max, "f64");
+                launch::launch_arg_reduce(
+                    &x.device,
+                    &kn,
+                    &kernel::REDUCE,
+                    s,
+                    layout.start_offset(),
+                    &dims,
+                    &strides,
+                    dim,
+                    reduce_size,
+                    output_block_count,
+                )?
+            }
+            CudaFloatSlice::F16(s) => {
+                let kn = launch::arg_reduce_kernel_name(take_max, "f16");
+                launch::launch_arg_reduce(
+                    &x.device,
+                    &kn,
+                    &kernel::REDUCE,
+                    s,
+                    layout.start_offset(),
+                    &dims,
+                    &strides,
+                    dim,
+                    reduce_size,
+                    output_block_count,
+                )?
+            }
+            CudaFloatSlice::BF16(s) => {
+                let kn = launch::arg_reduce_kernel_name(take_max, "bf16");
                 launch::launch_arg_reduce(
                     &x.device,
                     &kn,
@@ -674,6 +1146,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_matmul(&lhs.device, 1.0f64, 0.0f64, (b, m, n, k), l, lhs_l, r, rhs_l)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: lhs.device.clone() })
             }
+            (CudaFloatSlice::F16(l), CudaFloatSlice::F16(r)) => {
+                let out = launch::launch_matmul(&lhs.device, half::f16::ONE, half::f16::ZERO, (b, m, n, k), l, lhs_l, r, rhs_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: lhs.device.clone() })
+            }
+            (CudaFloatSlice::BF16(l), CudaFloatSlice::BF16(r)) => {
+                let out = launch::launch_matmul(&lhs.device, half::bf16::ONE, half::bf16::ZERO, (b, m, n, k), l, lhs_l, r, rhs_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: lhs.device.clone() })
+            }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: lhs.dtype(), rhs: rhs.dtype(), op: "matmul" }),
         }
     }
@@ -717,6 +1197,12 @@ impl FloatOps<Cuda> for Cuda {
             (CudaFloatSlice::F64(d), CudaFloatSlice::F64(l), CudaFloatSlice::F64(r)) => {
                 launch::launch_add_matmul_(&lhs.device, 1.0f64, 1.0f64, d, _dst_l, l, lhs_l, r, rhs_l, (b, m, n, k))?;
             }
+            (CudaFloatSlice::F16(d), CudaFloatSlice::F16(l), CudaFloatSlice::F16(r)) => {
+                launch::launch_add_matmul_(&lhs.device, half::f16::ONE, half::f16::ONE, d, _dst_l, l, lhs_l, r, rhs_l, (b, m, n, k))?;
+            }
+            (CudaFloatSlice::BF16(d), CudaFloatSlice::BF16(l), CudaFloatSlice::BF16(r)) => {
+                launch::launch_add_matmul_(&lhs.device, half::bf16::ONE, half::bf16::ONE, d, _dst_l, l, lhs_l, r, rhs_l, (b, m, n, k))?;
+            }
             _ => return Err(luma_tensor::Error::DTypeMismatch { lhs: dst.dtype(), rhs: lhs.dtype(), op: "add_matmul" }),
         }
         Ok(())
@@ -731,6 +1217,14 @@ impl FloatOps<Cuda> for Cuda {
             }
             (CudaFloatSlice::F64(d), CudaFloatSlice::F64(s)) => {
                 launch::launch_binary_inplace(&dst.device, op, "f64", &kernel::BINARY, d, s, dst_l, src_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::F16(d), CudaFloatSlice::F16(s)) => {
+                launch::launch_binary_inplace(&dst.device, op, "f16", &kernel::BINARY, d, s, dst_l, src_l)?;
+                Ok(())
+            }
+            (CudaFloatSlice::BF16(d), CudaFloatSlice::BF16(s)) => {
+                launch::launch_binary_inplace(&dst.device, op, "bf16", &kernel::BINARY, d, s, dst_l, src_l)?;
                 Ok(())
             }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: dst.dtype(), rhs: src.dtype(), op: "binary_inplace" }),
@@ -832,6 +1326,26 @@ impl FloatOps<Cuda> for Cuda {
                     }
                     Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
                 }
+                CudaFloatSlice::F16(_) => {
+                    let mut out = device.alloc::<half::f16>(out_shape.element_count())?;
+                    let mut offset = 0usize;
+                    for (storage, layout) in srcs {
+                        let CudaFloatSlice::F16(data) = &storage.slice else { unreachable!() };
+                        launch::launch_copy_offset(device, "ucopy_f16", &kernel::COPY, data, layout, &out, offset)?;
+                        offset += layout.shape().element_count();
+                    }
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+                }
+                CudaFloatSlice::BF16(_) => {
+                    let mut out = device.alloc::<half::bf16>(out_shape.element_count())?;
+                    let mut offset = 0usize;
+                    for (storage, layout) in srcs {
+                        let CudaFloatSlice::BF16(data) = &storage.slice else { unreachable!() };
+                        launch::launch_copy_offset(device, "ucopy_bf16", &kernel::COPY, data, layout, &out, offset)?;
+                        offset += layout.shape().element_count();
+                    }
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+                }
             }
         } else {
             match &srcs[0].0.slice {
@@ -905,6 +1419,76 @@ impl FloatOps<Cuda> for Cuda {
                     }
                     Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
                 }
+                CudaFloatSlice::F16(_) => {
+                    let cat_size = out_shape.dims()[dim];
+                    let d1: usize = out_shape.dims()[..dim].iter().product();
+                    let block: usize = out_shape.dims()[dim + 1..].iter().product();
+                    let dst_s = block * cat_size;
+                    let mut out = device.alloc::<half::f16>(out_shape.element_count())?;
+                    let mut saved: Vec<CudaSlice<half::f16>> = Vec::new();
+                    let mut offset = 0usize;
+                    for (storage, layout) in srcs {
+                        let CudaFloatSlice::F16(data) = &storage.slice else { unreachable!() };
+                        let cat_dim_sz = layout.dims()[dim];
+                        let d2 = block * cat_dim_sz;
+                        if layout.is_contiguous() {
+                            launch::launch_copy2d(
+                                device,
+                                "ucopy2d_f16",
+                                &kernel::COPY,
+                                d1,
+                                d2,
+                                d2,
+                                dst_s,
+                                data,
+                                layout.start_offset(),
+                                &out,
+                                offset,
+                            )?;
+                        } else {
+                            let contig = launch::launch_cast(device, "f16", "f16", &kernel::CAST, data, layout)?;
+                            launch::launch_copy2d(device, "ucopy2d_f16", &kernel::COPY, d1, d2, d2, dst_s, &contig, 0, &out, offset)?;
+                            saved.push(contig);
+                        }
+                        offset += d2;
+                    }
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+                }
+                CudaFloatSlice::BF16(_) => {
+                    let cat_size = out_shape.dims()[dim];
+                    let d1: usize = out_shape.dims()[..dim].iter().product();
+                    let block: usize = out_shape.dims()[dim + 1..].iter().product();
+                    let dst_s = block * cat_size;
+                    let mut out = device.alloc::<half::bf16>(out_shape.element_count())?;
+                    let mut saved: Vec<CudaSlice<half::bf16>> = Vec::new();
+                    let mut offset = 0usize;
+                    for (storage, layout) in srcs {
+                        let CudaFloatSlice::BF16(data) = &storage.slice else { unreachable!() };
+                        let cat_dim_sz = layout.dims()[dim];
+                        let d2 = block * cat_dim_sz;
+                        if layout.is_contiguous() {
+                            launch::launch_copy2d(
+                                device,
+                                "ucopy2d_bf16",
+                                &kernel::COPY,
+                                d1,
+                                d2,
+                                d2,
+                                dst_s,
+                                data,
+                                layout.start_offset(),
+                                &out,
+                                offset,
+                            )?;
+                        } else {
+                            let contig = launch::launch_cast(device, "bf16", "bf16", &kernel::CAST, data, layout)?;
+                            launch::launch_copy2d(device, "ucopy2d_bf16", &kernel::COPY, d1, d2, d2, dst_s, &contig, 0, &out, offset)?;
+                            saved.push(contig);
+                        }
+                        offset += d2;
+                    }
+                    Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+                }
             }
         }
     }
@@ -941,18 +1525,34 @@ impl FloatOps<Cuda> for Cuda {
                     let v: Vec<f32> = out.iter().map(|&x| x as f32).collect();
                     Cuda::f_from_f32(&v, &x.device)?
                 }
+                FloatDType::F16 => {
+                    let v: Vec<half::f16> = out.iter().map(|&x| half::f16::from_f64(x)).collect();
+                    Cuda::f_from_f16(&v, &x.device)?
+                }
+                FloatDType::BF16 => {
+                    let v: Vec<half::bf16> = out.iter().map(|&x| half::bf16::from_f64(x)).collect();
+                    Cuda::f_from_bf16(&v, &x.device)?
+                }
             };
             return Ok(storage);
         }
         let device = &x.device;
         match &x.slice {
             CudaFloatSlice::F32(data) => {
-                let slice = launch::launch_softmax_f32(device, data, layout, dim)?;
+                let slice = launch::launch_softmax(device, data, layout, dim, "softmax_f32")?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(slice), device: device.clone() })
             }
             CudaFloatSlice::F64(data) => {
-                let slice = launch::launch_softmax_f64(device, data, layout, dim)?;
+                let slice = launch::launch_softmax(device, data, layout, dim, "softmax_f64")?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(slice), device: device.clone() })
+            }
+            CudaFloatSlice::F16(data) => {
+                let slice = launch::launch_softmax(device, data, layout, dim, "softmax_f16")?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(slice), device: device.clone() })
+            }
+            CudaFloatSlice::BF16(data) => {
+                let slice = launch::launch_softmax(device, data, layout, dim, "softmax_bf16")?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(slice), device: device.clone() })
             }
         }
     }
@@ -965,12 +1565,22 @@ impl FloatOps<Cuda> for Cuda {
         let device = &x.device;
         match (&x.slice, &weight.slice) {
             (CudaFloatSlice::F32(xs), CudaFloatSlice::F32(ws)) => {
-                let slice = launch::launch_rms_norm_f32(device, xs, ws, x_l, weight_l, eps as f32)?;
+                let slice = launch::launch_rms_norm(device, xs, ws, x_l, weight_l, eps as f32, "rms_norm_f32")?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F32(slice), device: device.clone() })
             }
             (CudaFloatSlice::F64(xs), CudaFloatSlice::F64(ws)) => {
-                let slice = launch::launch_rms_norm_f64(device, xs, ws, x_l, weight_l, eps)?;
+                let slice = launch::launch_rms_norm(device, xs, ws, x_l, weight_l, eps, "rms_norm_f64")?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(slice), device: device.clone() })
+            }
+            (CudaFloatSlice::F16(xs), CudaFloatSlice::F16(ws)) => {
+                let slice =
+                    launch::launch_rms_norm(device, xs, ws, x_l, weight_l, half::f16::from_f64(eps), "rms_norm_f16")?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(slice), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(xs), CudaFloatSlice::BF16(ws)) => {
+                let slice =
+                    launch::launch_rms_norm(device, xs, ws, x_l, weight_l, half::bf16::from_f64(eps), "rms_norm_bf16")?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(slice), device: device.clone() })
             }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: x.dtype(), rhs: weight.dtype(), op: "rms_norm" }),
         }
@@ -996,6 +1606,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_pick(device, "f64", &kernel::PICK, &mask.slice, mask_l, t, true_l, f, false_l)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
             }
+            (CudaFloatSlice::F16(t), CudaFloatSlice::F16(f)) => {
+                let out = launch::launch_pick(device, "f16", &kernel::PICK, &mask.slice, mask_l, t, true_l, f, false_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            (CudaFloatSlice::BF16(t), CudaFloatSlice::BF16(f)) => {
+                let out = launch::launch_pick(device, "bf16", &kernel::PICK, &mask.slice, mask_l, t, true_l, f, false_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: on_true.dtype(), rhs: on_false.dtype(), op: "pick" }),
         }
     }
@@ -1018,6 +1636,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_pick_true(device, "f64", &kernel::PICK, &mask.slice, mask_l, value, f, false_l)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
             }
+            CudaFloatSlice::F16(f) => {
+                let out = launch::launch_pick_true(device, "f16", &kernel::PICK, &mask.slice, mask_l, half::f16::from_f64(value), f, false_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            CudaFloatSlice::BF16(f) => {
+                let out = launch::launch_pick_true(device, "bf16", &kernel::PICK, &mask.slice, mask_l, half::bf16::from_f64(value), f, false_l)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
         }
     }
 
@@ -1039,6 +1665,14 @@ impl FloatOps<Cuda> for Cuda {
                 let out = launch::launch_pick_false(device, "f64", &kernel::PICK, &mask.slice, mask_l, t, true_l, value)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
             }
+            CudaFloatSlice::F16(t) => {
+                let out = launch::launch_pick_false(device, "f16", &kernel::PICK, &mask.slice, mask_l, t, true_l, half::f16::from_f64(value))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            CudaFloatSlice::BF16(t) => {
+                let out = launch::launch_pick_false(device, "bf16", &kernel::PICK, &mask.slice, mask_l, t, true_l, half::bf16::from_f64(value))?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
         }
     }
 
@@ -1051,6 +1685,26 @@ impl FloatOps<Cuda> for Cuda {
             (CudaFloatSlice::F64(ai), CudaFloatSlice::F64(bi)) => {
                 Ok(launch::launch_allclose_float(&a.device, "f64", ai, a_l, bi, b_l, rtol, atol)?)
             }
+            (CudaFloatSlice::F16(ai), CudaFloatSlice::F16(bi)) => Ok(launch::launch_allclose_float(
+                &a.device,
+                "f16",
+                ai,
+                a_l,
+                bi,
+                b_l,
+                half::f16::from_f64(rtol),
+                half::f16::from_f64(atol),
+            )?),
+            (CudaFloatSlice::BF16(ai), CudaFloatSlice::BF16(bi)) => Ok(launch::launch_allclose_float(
+                &a.device,
+                "bf16",
+                ai,
+                a_l,
+                bi,
+                b_l,
+                half::bf16::from_f64(rtol),
+                half::bf16::from_f64(atol),
+            )?),
             _ => Err(luma_tensor::Error::DTypeMismatch { lhs: a.dtype(), rhs: b.dtype(), op: "allclose" }),
         }
     }

@@ -148,3 +148,46 @@ extern "C" __global__ void pick_f64(
         out[i] = ids[i] ? t[i] : f[i];
     }
 }
+
+// ---- half-precision arithmetic ----
+BINARY_OP(__half,        badd_f16,  x + y)
+BINARY_OP(__nv_bfloat16, badd_bf16, x + y)
+BINARY_OP(__half,        bsub_f16,  x - y)
+BINARY_OP(__nv_bfloat16, bsub_bf16, x - y)
+BINARY_OP(__half,        bmul_f16,  x * y)
+BINARY_OP(__nv_bfloat16, bmul_bf16, x * y)
+BINARY_OP(__half,        bdiv_f16,  x / y)
+BINARY_OP(__nv_bfloat16, bdiv_bf16, x / y)
+BINARY_OP(__half,        bmin_f16,  ming(x, y))
+BINARY_OP(__nv_bfloat16, bmin_bf16, ming(x, y))
+BINARY_OP(__half,        bmax_f16,  maxg(x, y))
+BINARY_OP(__nv_bfloat16, bmax_bf16, maxg(x, y))
+
+// ---- half-precision comparison (output uint8_t) ----
+BINARY_OP_OUT(__half,        uint8_t, beq_f16,  (uint8_t)(x == y))
+BINARY_OP_OUT(__nv_bfloat16, uint8_t, beq_bf16, (uint8_t)(x == y))
+BINARY_OP_OUT(__half,        uint8_t, bne_f16,  (uint8_t)(x != y))
+BINARY_OP_OUT(__nv_bfloat16, uint8_t, bne_bf16, (uint8_t)(x != y))
+BINARY_OP_OUT(__half,        uint8_t, blt_f16,  (uint8_t)(x < y))
+BINARY_OP_OUT(__nv_bfloat16, uint8_t, blt_bf16, (uint8_t)(x < y))
+BINARY_OP_OUT(__half,        uint8_t, ble_f16,  (uint8_t)(x <= y))
+BINARY_OP_OUT(__nv_bfloat16, uint8_t, ble_bf16, (uint8_t)(x <= y))
+BINARY_OP_OUT(__half,        uint8_t, bgt_f16,  (uint8_t)(x > y))
+BINARY_OP_OUT(__nv_bfloat16, uint8_t, bgt_bf16, (uint8_t)(x > y))
+BINARY_OP_OUT(__half,        uint8_t, bge_f16,  (uint8_t)(x >= y))
+BINARY_OP_OUT(__nv_bfloat16, uint8_t, bge_bf16, (uint8_t)(x >= y))
+
+#define PICK_HALF(TYPENAME, FN_NAME) \
+extern "C" __global__ void FN_NAME( \
+    const size_t numel, const size_t num_dims, \
+    const size_t *dims, const size_t *mask_strides, const size_t *val_strides, \
+    const uint8_t *ids, const TYPENAME *t, const TYPENAME *f, TYPENAME *out \
+) { \
+    for (size_t i = blockIdx.x * blockDim.x + threadIdx.x; \
+         i < numel; i += blockDim.x * gridDim.x) { \
+        out[i] = ids[i] ? t[i] : f[i]; \
+    } \
+}
+
+PICK_HALF(__half, pick_f16)
+PICK_HALF(__nv_bfloat16, pick_bf16)

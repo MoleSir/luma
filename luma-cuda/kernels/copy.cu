@@ -29,6 +29,8 @@ COPY_STRIDED_OFFSET(double,   ucopy_f64)
 COPY_STRIDED_OFFSET(int32_t,  ucopy_i32)
 COPY_STRIDED_OFFSET(uint32_t, ucopy_u32)
 COPY_STRIDED_OFFSET(uint8_t,  ucopy_u8)
+COPY_STRIDED_OFFSET(__half,        ucopy_f16)
+COPY_STRIDED_OFFSET(__nv_bfloat16, ucopy_bf16)
 
 #define COPY2D(TYPE, FN_NAME) \
 extern "C" __global__ void FN_NAME( \
@@ -54,3 +56,5 @@ COPY2D(double,   ucopy2d_f64)
 COPY2D(int32_t,  ucopy2d_i32)
 COPY2D(uint32_t, ucopy2d_u32)
 COPY2D(uint8_t,  ucopy2d_u8)
+COPY2D(__half,        ucopy2d_f16)
+COPY2D(__nv_bfloat16, ucopy2d_bf16)

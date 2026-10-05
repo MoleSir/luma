@@ -23,7 +23,10 @@ pub use dtype::{Bool, BoolDType, DType, DTypeKind, Float, FloatDType, Int, IntDT
 pub use dynamic::DynTensor;
 pub use error::{Error, Result};
 pub use grad::{FloatMeta, GradStore, NoGradGuard, TensorMeta, is_grad_enabled, set_grad_enabled};
-pub use ops::{BinaryOp, CmpOp, FloatUnaryOp, Op, ReduceOp, TransferDTypeKind, UnaryOp, ViewOp};
+pub use ops::{BinaryOp, CmpOp, FloatUnaryOp, Op, ReduceOp, TransferDTypeKind, UnaryOp, ViewOp, CustomOp1, CustomOp2, CustomOp3, CustomOp, CustomOpError};
 pub use ops::{IndexOp, Indexer, Slice};
 pub use scalar::Scalar;
 pub use tensor::{D, Dim, Dims, Layout, Shape, StorageIndices, Tensor, TensorId, TensorImpl};
+
+/// Half-precision scalar types backing [`FloatDType::F16`] / [`FloatDType::BF16`].
+pub use half::{bf16, f16};

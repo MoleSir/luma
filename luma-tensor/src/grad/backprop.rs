@@ -2,7 +2,7 @@
 //! graph in reverse-topological order, and accumulates gradients into a
 //! [`GradStore`]. Only `Float` tensors participate.
 
-use crate::{BinaryOp, Device, Float, FloatUnaryOp, GradStore, Op, ReduceOp, Shape, Tensor, TensorId, UnaryOp, no_grad};
+use crate::{BinaryOp, CustomOpError, Device, Float, FloatUnaryOp, GradStore, Op, ReduceOp, Shape, Tensor, TensorId, UnaryOp, no_grad};
 use std::collections::HashMap;
 
 impl<D: Device> Tensor<D, Float> {
@@ -79,7 +79,9 @@ impl<D: Device> Tensor<D, Float> {
 /// Float inputs of an op that gradient can flow through.
 fn op_inputs<D: Device>(op: &Op<D>) -> Vec<&Tensor<D, Float>> {
     match op {
-        Op::Binary(a, b, _) | Op::Matmul(a, b) => vec![a, b],
+        Op::Binary(a, b, _) 
+        | Op::Matmul(a, b) 
+        | Op::CustomOp2(a, b, _) => vec![a, b],
         Op::BinaryScalarRhs(a, _, _) | Op::BinaryScalarLhs(_, a, _) => vec![a],
         Op::FloatUnary(a, _)
         | Op::Unary(a, _)
@@ -94,10 +96,13 @@ fn op_inputs<D: Device>(op: &Op<D>) -> Vec<&Tensor<D, Float>> {
         | Op::Cast(a)
         | Op::IndexSelect(a, _, _)
         | Op::Gather(a, _, _)
-        | Op::Softmax(a, _) => vec![a],
+        | Op::Softmax(a, _) 
+        | Op::CustomOp1(a, _) => vec![a],
         Op::IndexAdd(a, _, b, _) | Op::ScatterAdd(a, _, b, _) | Op::RmsNorm(a, b, _) => vec![a, b],
         Op::Cat(args, _) => args.iter().collect(),
         Op::Pick(_, tv, fv) => tv.iter().chain(fv.iter()).collect(),
+        Op::CustomOp3(a, b, c, _) => vec![a, b, c],
+        Op::CustomOp(args, _) => args.iter().collect(),
     }
 }
 
@@ -342,6 +347,31 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
 
         // ---- not yet wired ----
         Op::RmsNorm(..) => return Err(crate::Error::BackwardNotSupported("rms_norm")),
+
+        Op::CustomOp1(arg, cop) => {
+            let arg_grad = cop.backward(arg, node, grad)?;
+            grads.or_insert(arg)?.impl_add_(&arg_grad)?;
+        },
+        Op::CustomOp2(arg1, arg2, cop) => {
+            let (arg1_grad, arg2_grad) = cop.backward(arg1, arg2, node, grad)?;
+            grads.or_insert(arg1)?.impl_add_(&arg1_grad)?;
+            grads.or_insert(arg2)?.impl_add_(&arg2_grad)?;
+        },
+        Op::CustomOp3(arg1, arg2, arg3, cop) => {
+            let (arg1_grad, arg2_grad, arg3_grad) = cop.backward(arg1, arg2, arg3, node, grad)?;
+            grads.or_insert(arg1)?.impl_add_(&arg1_grad)?;
+            grads.or_insert(arg2)?.impl_add_(&arg2_grad)?;
+            grads.or_insert(arg3)?.impl_add_(&arg3_grad)?;
+        },
+        Op::CustomOp(args, cop) => {
+            let args_grad = cop.backward(args, node, grad)?;
+            if args.len() != args_grad.len() {
+                Err(CustomOpError::msg(format!("args count {} != args grad count {}", args.len(), args_grad.len())))?
+            } 
+            for (arg, arg_grad) in args.iter().zip(args_grad.iter()) {
+                grads.or_insert(arg)?.impl_add_(&arg_grad)?;
+            }
+        }
     }
     Ok(())
 }

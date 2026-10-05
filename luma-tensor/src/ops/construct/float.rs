@@ -25,6 +25,18 @@ impl<D: Device> Tensor<D, Float> {
         Ok(Self::from_storage(storage, shape, FloatMeta::val()))
     }
 
+    pub fn from_vec_f16<'a, S: Into<Shape>>(data: impl Into<Cow<'a, [half::f16]>>, shape: S, device: &D) -> Result<Self> {
+        let shape = shape.into();
+        let storage = D::f_from_f16(data, device)?;
+        Ok(Self::from_storage(storage, shape, FloatMeta::val()))
+    }
+
+    pub fn from_vec_bf16<'a, S: Into<Shape>>(data: impl Into<Cow<'a, [half::bf16]>>, shape: S, device: &D) -> Result<Self> {
+        let shape = shape.into();
+        let storage = D::f_from_bf16(data, device)?;
+        Ok(Self::from_storage(storage, shape, FloatMeta::val()))
+    }
+
     pub fn from_slice<S: Into<Shape>>(data: &[f64], shape: S, options: impl Into<TensorCreationOptions<D, Float>>) -> Result<Self> {
         let options: TensorCreationOptions<D, Float> = options.into();
         let shape = shape.into();
@@ -36,6 +48,14 @@ impl<D: Device> Tensor<D, Float> {
             FloatDType::F32 => {
                 let v: Vec<f32> = data.iter().map(|&x| x as f32).collect();
                 D::f_from_f32(&v, &options.device)?
+            }
+            FloatDType::F16 => {
+                let v: Vec<half::f16> = data.iter().map(|&x| half::f16::from_f64(x)).collect();
+                D::f_from_f16(&v, &options.device)?
+            }
+            FloatDType::BF16 => {
+                let v: Vec<half::bf16> = data.iter().map(|&x| half::bf16::from_f64(x)).collect();
+                D::f_from_bf16(&v, &options.device)?
             }
         };
         Ok(Self::from_storage(storage, shape, FloatMeta::val()))
@@ -72,6 +92,8 @@ impl<D: Device> Tensor<D, Float> {
         match options.dtype {
             FloatDType::F64 => Self::new(helpers::fill_eye::<f64>(n), &options.device),
             FloatDType::F32 => Self::new(helpers::fill_eye::<f32>(n), &options.device),
+            FloatDType::F16 => Self::new(helpers::fill_eye::<half::f16>(n), &options.device),
+            FloatDType::BF16 => Self::new(helpers::fill_eye::<half::bf16>(n), &options.device),
         }
     }
 
@@ -93,6 +115,20 @@ impl<D: Device> Tensor<D, Float> {
                 }
                 Self::new(v, &options.device)
             }
+            FloatDType::F16 => {
+                let mut v = vec![half::f16::ZERO; n * n];
+                for i in 0..n {
+                    v[i * n + i] = half::f16::from_f64(diag[i]);
+                }
+                Self::new(v, &options.device)
+            }
+            FloatDType::BF16 => {
+                let mut v = vec![half::bf16::ZERO; n * n];
+                for i in 0..n {
+                    v[i * n + i] = half::bf16::from_f64(diag[i]);
+                }
+                Self::new(v, &options.device)
+            }
         }
     }
 
@@ -101,6 +137,8 @@ impl<D: Device> Tensor<D, Float> {
         match options.dtype {
             FloatDType::F64 => Self::new(helpers::fill_tril::<f64>(n, diagonal), &options.device),
             FloatDType::F32 => Self::new(helpers::fill_tril::<f32>(n, diagonal), &options.device),
+            FloatDType::F16 => Self::new(helpers::fill_tril::<half::f16>(n, diagonal), &options.device),
+            FloatDType::BF16 => Self::new(helpers::fill_tril::<half::bf16>(n, diagonal), &options.device),
         }
     }
 
@@ -109,6 +147,8 @@ impl<D: Device> Tensor<D, Float> {
         match options.dtype {
             FloatDType::F64 => Self::new(helpers::fill_triu::<f64>(n, diagonal), &options.device),
             FloatDType::F32 => Self::new(helpers::fill_triu::<f32>(n, diagonal), &options.device),
+            FloatDType::F16 => Self::new(helpers::fill_triu::<half::f16>(n, diagonal), &options.device),
+            FloatDType::BF16 => Self::new(helpers::fill_triu::<half::bf16>(n, diagonal), &options.device),
         }
     }
 
@@ -122,6 +162,14 @@ impl<D: Device> Tensor<D, Float> {
             }
             FloatDType::F32 => {
                 let v: Vec<f32> = (0..n).map(|i| (start + step * i as f64) as f32).collect();
+                Self::new(v, &options.device)
+            }
+            FloatDType::F16 => {
+                let v: Vec<half::f16> = (0..n).map(|i| half::f16::from_f64(start + step * i as f64)).collect();
+                Self::new(v, &options.device)
+            }
+            FloatDType::BF16 => {
+                let v: Vec<half::bf16> = (0..n).map(|i| half::bf16::from_f64(start + step * i as f64)).collect();
                 Self::new(v, &options.device)
             }
         }

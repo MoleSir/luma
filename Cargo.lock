@@ -196,6 +196,7 @@ version = "0.19.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42310153e06cf4cd532901f7096beb27504d681736a29ee90728ae4e2d93b2a8"
 dependencies = [
+ "half",
  "libloading",
 ]
 
@@ -646,6 +647,8 @@ dependencies = [
  "cfg-if",
  "crunchy",
  "num-traits",
+ "rand",
+ "rand_distr",
  "zerocopy",
 ]
 
@@ -1015,6 +1018,7 @@ version = "0.2.0"
 dependencies = [
  "bytemuck",
  "gemm",
+ "half",
  "libm",
  "luma-tensor",
  "num_cpus",
@@ -1030,6 +1034,7 @@ dependencies = [
  "bindgen_cuda",
  "bytemuck",
  "cudarc",
+ "half",
  "luma-cpu",
  "luma-tensor",
  "rand",
@@ -1049,6 +1054,18 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "thiserror 2.0.19",
+]
+
+[[package]]
+name = "luma-flash-attn"
+version = "0.2.0"
+dependencies = [
+ "cudarc",
+ "half",
+ "luma-cpu",
+ "luma-cuda",
+ "luma-tensor",
  "thiserror 2.0.19",
 ]
 
@@ -1107,6 +1124,7 @@ version = "0.2.0"
 dependencies = [
  "luma-cpu",
  "luma-cuda",
+ "luma-flash-attn",
  "luma-io",
  "luma-macros",
  "luma-tensor",
@@ -1140,6 +1158,7 @@ name = "luma-tensor"
 version = "0.2.0"
 dependencies = [
  "bytemuck",
+ "half",
  "num_cpus",
  "paste",
  "rand",

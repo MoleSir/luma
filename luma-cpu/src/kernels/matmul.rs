@@ -53,7 +53,11 @@ fn matmul_dims(lhs_l: &Layout, rhs_l: &Layout) -> Result<(usize, usize, usize, u
 }
 
 fn is_gemm_type<T: 'static>() -> bool {
-    TypeId::of::<T>() == TypeId::of::<f32>() || TypeId::of::<T>() == TypeId::of::<f64>()
+    TypeId::of::<T>() == TypeId::of::<f32>()
+        || TypeId::of::<T>() == TypeId::of::<f64>()
+        // `gemm` has an f16 backend (via `gemm-f16`); bf16 is not supported and
+        // takes the naive triple-loop path below.
+        || TypeId::of::<T>() == TypeId::of::<half::f16>()
 }
 
 /// `dst = lhs @ rhs` (batched). Returns the output buffer and shape.

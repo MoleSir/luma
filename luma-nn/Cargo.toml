@@ -8,11 +8,12 @@ keywords = { workspace = true }
 license = { workspace = true }
 
 [features]
-cuda = ["dep:luma-cuda"]
+cuda = ["dep:luma-cuda", "dep:luma-flash-attn"]
 
 [dependencies]
 luma-tensor = { workspace = true }
 luma-cuda = { workspace = true, optional = true }
+luma-flash-attn = { workspace = true, optional = true }
 luma-macros = { workspace = true }
 luma-io = { workspace = true }
 thiserror = { workspace = true }

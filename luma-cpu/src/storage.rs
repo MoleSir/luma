@@ -19,6 +19,8 @@ use super::Cpu;
 pub enum CpuFloatStorage {
     F32(Vec<f32>, Cpu),
     F64(Vec<f64>, Cpu),
+    F16(Vec<half::f16>, Cpu),
+    BF16(Vec<half::bf16>, Cpu),
 }
 
 impl Storage<Cpu, Float> for CpuFloatStorage {
@@ -26,6 +28,8 @@ impl Storage<Cpu, Float> for CpuFloatStorage {
         match self {
             Self::F32(_, _) => FloatDType::F32,
             Self::F64(_, _) => FloatDType::F64,
+            Self::F16(_, _) => FloatDType::F16,
+            Self::BF16(_, _) => FloatDType::BF16,
         }
     }
 
@@ -33,6 +37,8 @@ impl Storage<Cpu, Float> for CpuFloatStorage {
         match self {
             Self::F32(_, device) => device,
             Self::F64(_, device) => device,
+            Self::F16(_, device) => device,
+            Self::BF16(_, device) => device,
         }
     }
 }
@@ -43,12 +49,16 @@ impl Drop for CpuFloatStorage {
         // 池化下 = 复用），原位留下零分配空 Vec——对象释放时 drop 只跑一次，
         // 空占位不会二次分配，也没有递归。
         let alloc = match self {
-            CpuFloatStorage::F32(_, d) | CpuFloatStorage::F64(_, d) => d.allocator().clone(),
+            CpuFloatStorage::F32(_, d) | CpuFloatStorage::F64(_, d) | CpuFloatStorage::F16(_, d) | CpuFloatStorage::BF16(_, d) => {
+                d.allocator().clone()
+            }
         };
         let alloc = alloc.read().expect("allocator poisoned");
         match self {
             CpuFloatStorage::F32(v, _) => alloc.dealloc_f32(std::mem::replace(v, Vec::new())),
             CpuFloatStorage::F64(v, _) => alloc.dealloc_f64(std::mem::replace(v, Vec::new())),
+            CpuFloatStorage::F16(v, _) => alloc.dealloc_f16(std::mem::replace(v, Vec::new())),
+            CpuFloatStorage::BF16(v, _) => alloc.dealloc_bf16(std::mem::replace(v, Vec::new())),
         }
     }
 }
@@ -58,6 +68,8 @@ impl CpuFloatStorage {
         match self {
             CpuFloatStorage::F32(_, _) => DType::F32,
             CpuFloatStorage::F64(_, _) => DType::F64,
+            CpuFloatStorage::F16(_, _) => DType::F16,
+            CpuFloatStorage::BF16(_, _) => DType::BF16,
         }
     }
 
@@ -65,6 +77,8 @@ impl CpuFloatStorage {
         match self {
             CpuFloatStorage::F32(v, _) => v.len(),
             CpuFloatStorage::F64(v, _) => v.len(),
+            CpuFloatStorage::F16(v, _) => v.len(),
+            CpuFloatStorage::BF16(v, _) => v.len(),
         }
     }
 

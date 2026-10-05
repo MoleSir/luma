@@ -45,6 +45,10 @@ impl Cuda {
         })))
     }
 
+    pub fn stream(&self) -> Arc<CudaStream> {
+        self.0.stream.clone()
+    } 
+
     pub fn same_ordinal(&self, other: &Self, op: impl ToString) -> CudaResult<()> {
         if self.0.ordinal != other.0.ordinal {
             Err(CudaError::DiffCuda(self.name(), other.name(), op.to_string()))?;

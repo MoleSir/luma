@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "./utils.cuh"
 
 // ============================================================
 //  nn kernels: softmax + rms_norm (one block per row, last dim)
@@ -71,6 +72,8 @@ extern "C" __global__ void FN_NAME( \
 
 SOFTMAX_KERNEL(float,  softmax_f32, expf, fmaxf, -1e30f)
 SOFTMAX_KERNEL(double, softmax_f64, exp,  fmax,  -1e300)
+SOFTMAX_KERNEL(__half,        softmax_f16,  expg, maxg, ((__half)(-INFINITY)))
+SOFTMAX_KERNEL(__nv_bfloat16, softmax_bf16, expg, maxg, ((__nv_bfloat16)(-INFINITY)))
 
 
 // ============================================================
@@ -118,3 +121,5 @@ extern "C" __global__ void FN_NAME( \
 
 RMS_NORM_KERNEL(float,  rms_norm_f32, rsqrtf)
 RMS_NORM_KERNEL(double, rms_norm_f64, rsqrt)
+RMS_NORM_KERNEL(__half,        rms_norm_f16,  rsqrtg)
+RMS_NORM_KERNEL(__nv_bfloat16, rms_norm_bf16, rsqrtg)

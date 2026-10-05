@@ -100,3 +100,11 @@ PICK_FALSE_OP(double, pick_false_f64)
 PICK_FALSE_OP(uint8_t, pick_false_u8)
 PICK_FALSE_OP(uint32_t, pick_false_u32)
 PICK_FALSE_OP(int32_t, pick_false_i32)
+
+// ---- half-precision ----
+PICK_OP(__half, pick_f16)
+PICK_OP(__nv_bfloat16, pick_bf16)
+PICK_TRUE_OP(__half, pick_true_f16)
+PICK_TRUE_OP(__nv_bfloat16, pick_true_bf16)
+PICK_FALSE_OP(__half, pick_false_f16)
+PICK_FALSE_OP(__nv_bfloat16, pick_false_bf16)

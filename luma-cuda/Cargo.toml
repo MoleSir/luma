@@ -8,12 +8,13 @@ keywords = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-cudarc = { workspace = true, features = ["cuda-version-from-build-system", "fallback-latest", "driver", "nvrtc", "cublas"] }
+cudarc = { workspace = true, features = ["cuda-version-from-build-system", "fallback-latest", "driver", "nvrtc", "cublas", "f16"] }
 luma-tensor = { workspace = true }
 thiserror =  { workspace = true }
 rand =  { workspace = true }
-rand_distr = { workspace = true }
+rand_distr =  { workspace = true }
 bytemuck = { workspace = true }
+half = { workspace = true }
 
 [build-dependencies]
 bindgen_cuda = "0.1.1"

@@ -20,6 +20,7 @@ mod shape;
 mod shape_infer;
 mod to;
 mod transfer;
+mod custom;
 
 use boolean::PickDTypeKind;
 use cast::CastDTypeKind;
@@ -33,7 +34,7 @@ use shape::ShapeDTypeKind;
 
 pub use indexer::{IndexOp, Indexer, Slice};
 pub use transfer::TransferDTypeKind;
-
+pub use custom::{CustomOp1, CustomOp2, CustomOp3, CustomOp, CustomOpError};
 use crate::{Bool, DTypeKind, Device, Float, Int, Tensor};
 
 /// A node in the (implicit) computation graph: the operation that produced a
@@ -68,6 +69,11 @@ pub enum Op<D: Device> {
     /// Precision cast within the float kind (e.g. f32 -> f64). Records the input
     /// so the gradient can be cast back — the key capability the old design lacked.
     Cast(Tensor<D, Float>),
+
+    CustomOp1(Tensor<D>, Box<dyn CustomOp1<D> + Send + Sync>),
+    CustomOp2(Tensor<D>, Tensor<D>, Box<dyn CustomOp2<D> + Send + Sync>),
+    CustomOp3(Tensor<D>, Tensor<D>, Tensor<D>, Box<dyn CustomOp3<D> + Send + Sync>),
+    CustomOp(Vec<Tensor<D>>, Box<dyn CustomOp<D> + Send + Sync>),
 }
 
 /// A *view* operation: it shares the source tensor's storage under a new

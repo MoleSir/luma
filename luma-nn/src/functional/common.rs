@@ -3,9 +3,9 @@ use luma_tensor::{Device, Dim, Float, Int, Tensor};
 
 /// Applies a linear transformation: `input @ weight^T + bias`.
 ///
-/// `input` shape: `(..., in_features)`
-/// `weight` shape: `(out_features, in_features)`
-/// `bias` shape: `(out_features,)`
+/// - `input` shape: `(..., in_features)`
+/// - `weight` shape: `(out_features, in_features)`
+/// - `bias` shape: `(out_features,)`
 pub fn linear<D: Device>(
     input: &Tensor<D, Float>,
     weight: &Tensor<D, Float>,

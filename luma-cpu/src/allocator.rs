@@ -25,6 +25,16 @@ impl AllocVec for f64 {
         alloc.alloc_f64(n)
     }
 }
+impl AllocVec for half::f16 {
+    fn alloc_vec(alloc: &dyn CpuAllocator, n: usize) -> Vec<Self> {
+        alloc.alloc_f16(n)
+    }
+}
+impl AllocVec for half::bf16 {
+    fn alloc_vec(alloc: &dyn CpuAllocator, n: usize) -> Vec<Self> {
+        alloc.alloc_bf16(n)
+    }
+}
 impl AllocVec for i32 {
     fn alloc_vec(alloc: &dyn CpuAllocator, n: usize) -> Vec<Self> {
         alloc.alloc_i32(n)
@@ -83,6 +93,8 @@ pub trait CpuAllocator: Send + Sync + 'static {
 
     fn alloc_f32(&self, n: usize) -> Vec<f32>;
     fn alloc_f64(&self, n: usize) -> Vec<f64>;
+    fn alloc_f16(&self, n: usize) -> Vec<half::f16>;
+    fn alloc_bf16(&self, n: usize) -> Vec<half::bf16>;
     fn alloc_i32(&self, n: usize) -> Vec<i32>;
     fn alloc_u32(&self, n: usize) -> Vec<u32>;
     fn alloc_u8(&self, n: usize) -> Vec<u8>;
@@ -92,6 +104,8 @@ pub trait CpuAllocator: Send + Sync + 'static {
 
     fn dealloc_f32(&self, v: Vec<f32>);
     fn dealloc_f64(&self, v: Vec<f64>);
+    fn dealloc_f16(&self, v: Vec<half::f16>);
+    fn dealloc_bf16(&self, v: Vec<half::bf16>);
     fn dealloc_i32(&self, v: Vec<i32>);
     fn dealloc_u32(&self, v: Vec<u32>);
     fn dealloc_u8(&self, v: Vec<u8>);
@@ -118,6 +132,12 @@ impl CpuAllocator for SystemAllocator {
     fn alloc_f64(&self, n: usize) -> Vec<f64> {
         Vec::with_capacity(n)
     }
+    fn alloc_f16(&self, n: usize) -> Vec<half::f16> {
+        Vec::with_capacity(n)
+    }
+    fn alloc_bf16(&self, n: usize) -> Vec<half::bf16> {
+        Vec::with_capacity(n)
+    }
     fn alloc_i32(&self, n: usize) -> Vec<i32> {
         Vec::with_capacity(n)
     }
@@ -139,6 +159,8 @@ impl CpuAllocator for SystemAllocator {
 
     fn dealloc_f32(&self, _v: Vec<f32>) {}
     fn dealloc_f64(&self, _v: Vec<f64>) {}
+    fn dealloc_f16(&self, _v: Vec<half::f16>) {}
+    fn dealloc_bf16(&self, _v: Vec<half::bf16>) {}
     fn dealloc_i32(&self, _v: Vec<i32>) {}
     fn dealloc_u32(&self, _v: Vec<u32>) {}
     fn dealloc_u8(&self, _v: Vec<u8>) {}
@@ -157,6 +179,8 @@ impl CpuAllocator for SystemAllocator {
 pub struct PoolAllocator {
     f32: std::sync::Mutex<HashMap<usize, Vec<Vec<f32>>>>,
     f64: std::sync::Mutex<HashMap<usize, Vec<Vec<f64>>>>,
+    f16: std::sync::Mutex<HashMap<usize, Vec<Vec<half::f16>>>>,
+    bf16: std::sync::Mutex<HashMap<usize, Vec<Vec<half::bf16>>>>,
     i32: std::sync::Mutex<HashMap<usize, Vec<Vec<i32>>>>,
     u32: std::sync::Mutex<HashMap<usize, Vec<Vec<u32>>>>,
     u8: std::sync::Mutex<HashMap<usize, Vec<Vec<u8>>>>,
@@ -232,6 +256,8 @@ macro_rules! pool_alloc {
 pool_alloc! {
     f32: f32 => alloc_f32 / dealloc_f32,
     f64: f64 => alloc_f64 / dealloc_f64,
+    f16: half::f16 => alloc_f16 / dealloc_f16,
+    bf16: half::bf16 => alloc_bf16 / dealloc_bf16,
     i32: i32 => alloc_i32 / dealloc_i32,
     u32: u32 => alloc_u32 / dealloc_u32,
     u8: u8 => alloc_u8 / dealloc_u8,

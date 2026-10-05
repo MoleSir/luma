@@ -37,6 +37,10 @@ pub enum SafeTensorsDType {
     F32,
     #[serde(rename = "F64")]
     F64,
+    #[serde(rename = "F16")]
+    F16,
+    #[serde(rename = "BF16")]
+    BF16,
 }
 
 impl TryFrom<SafeTensorsDType> for DType {
@@ -50,6 +54,8 @@ impl TryFrom<SafeTensorsDType> for DType {
             SafeTensorsDType::U32 => Ok(DType::U32),
             SafeTensorsDType::F32 => Ok(DType::F32),
             SafeTensorsDType::F64 => Ok(DType::F64),
+            SafeTensorsDType::F16 => Ok(DType::F16),
+            SafeTensorsDType::BF16 => Ok(DType::BF16),
         }
     }
 }
@@ -63,6 +69,8 @@ impl From<DType> for SafeTensorsDType {
             DType::U32 => Self::U32,
             DType::F32 => Self::F32,
             DType::F64 => Self::F64,
+            DType::F16 => Self::F16,
+            DType::BF16 => Self::BF16,
         }
     }
 }

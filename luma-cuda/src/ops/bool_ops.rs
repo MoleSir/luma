@@ -49,6 +49,14 @@ impl BoolOps<Cuda> for Cuda {
                 let out = launch::launch_cast(device, "u8", "f64", &kernel::CAST, &x.slice, layout)?;
                 Ok(CudaFloatStorage { slice: CudaFloatSlice::F64(out), device: device.clone() })
             }
+            FloatDType::F16 => {
+                let out = launch::launch_cast(device, "u8", "f16", &kernel::CAST, &x.slice, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::F16(out), device: device.clone() })
+            }
+            FloatDType::BF16 => {
+                let out = launch::launch_cast(device, "u8", "bf16", &kernel::CAST, &x.slice, layout)?;
+                Ok(CudaFloatStorage { slice: CudaFloatSlice::BF16(out), device: device.clone() })
+            }
         }
     }
 

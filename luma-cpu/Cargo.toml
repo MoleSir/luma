@@ -16,6 +16,7 @@ gemm =  { workspace = true }
 libm =  { workspace = true }
 num_cpus =  { workspace = true }
 bytemuck = { workspace = true }
+half = { workspace = true }
 
 [dev-dependencies]
 luma-tensor = { workspace = true, features = ["test-utils"] }

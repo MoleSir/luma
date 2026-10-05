@@ -12,6 +12,8 @@ use crate::DType;
 pub enum Scalar {
     F32(f32),
     F64(f64),
+    F16(half::f16),
+    BF16(half::bf16),
     I32(i32),
     U32(u32),
     U8(u8),
@@ -24,6 +26,8 @@ impl Scalar {
         match self {
             Scalar::F32(_) => DType::F32,
             Scalar::F64(_) => DType::F64,
+            Scalar::F16(_) => DType::F16,
+            Scalar::BF16(_) => DType::BF16,
             Scalar::I32(_) => DType::I32,
             Scalar::U32(_) => DType::U32,
             Scalar::U8(_) => DType::U8,
@@ -36,6 +40,8 @@ impl Scalar {
         match self {
             Scalar::F32(v) => Some(*v as f64),
             Scalar::F64(v) => Some(*v),
+            Scalar::F16(v) => Some(v.to_f64()),
+            Scalar::BF16(v) => Some(v.to_f64()),
             _ => None,
         }
     }
@@ -73,6 +79,18 @@ impl From<f32> for Scalar {
     }
 }
 
+impl From<half::f16> for Scalar {
+    fn from(v: half::f16) -> Self {
+        Scalar::F16(v)
+    }
+}
+
+impl From<half::bf16> for Scalar {
+    fn from(v: half::bf16) -> Self {
+        Scalar::BF16(v)
+    }
+}
+
 impl From<i64> for Scalar {
     fn from(v: i64) -> Self {
         Scalar::I32(v as i32)
@@ -96,6 +114,8 @@ impl std::fmt::Display for Scalar {
         match self {
             Scalar::F32(v) => write!(f, "{}", v),
             Scalar::F64(v) => write!(f, "{}", v),
+            Scalar::F16(v) => write!(f, "{}", v),
+            Scalar::BF16(v) => write!(f, "{}", v),
             Scalar::I32(v) => write!(f, "{}", v),
             Scalar::U32(v) => write!(f, "{}", v),
             Scalar::U8(v) => write!(f, "{}", v),

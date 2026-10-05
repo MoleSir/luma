@@ -24,6 +24,7 @@ pub mod dtype;
 pub mod error;
 pub mod f64;
 pub mod grad;
+pub mod half_precision;
 pub mod indexing;
 pub mod matmul;
 pub mod nn;
@@ -60,6 +61,16 @@ pub fn tensor_u32_dev<D: Device, S: Into<Shape>>(data: &[i64], shape: S, device:
 /// Create a Float tensor (f64) on a specific device.
 pub fn tensor_f64_dev<D: Device, S: Into<Shape>>(data: &[f64], shape: S, device: &D) -> Tensor<D> {
     Tensor::<D>::from_slice(data, shape, (device, FloatDType::F64)).unwrap()
+}
+
+/// Create a Float tensor (f16) on a specific device.
+pub fn tensor_f16_dev<D: Device, S: Into<Shape>>(data: &[f64], shape: S, device: &D) -> Tensor<D> {
+    Tensor::<D>::from_slice(data, shape, (device, FloatDType::F16)).unwrap()
+}
+
+/// Create a Float tensor (bf16) on a specific device.
+pub fn tensor_bf16_dev<D: Device, S: Into<Shape>>(data: &[f64], shape: S, device: &D) -> Tensor<D> {
+    Tensor::<D>::from_slice(data, shape, (device, FloatDType::BF16)).unwrap()
 }
 
 /// Assert two f64 slices match elementwise within tolerance.

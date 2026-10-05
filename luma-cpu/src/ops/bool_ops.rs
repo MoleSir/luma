@@ -49,6 +49,14 @@ impl BoolOps<Cpu> for Cpu {
                 x.device().collect_alloc(layout.storage_indices().map(|i| if x.0[i] { 1.0 } else { 0.0 })),
                 x.device().clone(),
             ),
+            FloatDType::F16 => CpuFloatStorage::F16(
+                x.device().collect_alloc(layout.storage_indices().map(|i| half::f16::from_f32(if x.0[i] { 1.0 } else { 0.0 }))),
+                x.device().clone(),
+            ),
+            FloatDType::BF16 => CpuFloatStorage::BF16(
+                x.device().collect_alloc(layout.storage_indices().map(|i| half::bf16::from_f32(if x.0[i] { 1.0 } else { 0.0 }))),
+                x.device().clone(),
+            ),
         };
         Ok(s)
     }

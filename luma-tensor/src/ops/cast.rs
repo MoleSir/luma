@@ -4,8 +4,7 @@
 //! its gradient flows back — the capability the old typed design could not express.
 
 use crate::{
-    Bool, DTypeKind, Device, Float, FloatMeta, Int, Tensor,
-    dtype::{BoolDType, FloatDType, IntDType},
+    Bool, DTypeKind, Device, Float, FloatMeta, Int, Tensor, dtype::{BoolDType, FloatDType, IntDType}
 };
 
 pub trait Cast<D: Device, K: DTypeKind<D>> {

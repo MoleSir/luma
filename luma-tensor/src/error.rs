@@ -1,6 +1,5 @@
 use std::str::Utf8Error;
-
-use crate::{DType, Shape};
+use crate::{DType, Shape, ops::CustomOpError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -117,6 +116,9 @@ pub enum Error {
 
     #[error(transparent)]
     Utf8(#[from] Utf8Error),
+
+    #[error(transparent)]
+    CustomOp(#[from] CustomOpError),
 
     /// Storage error
     #[error("visit a meta tensor!")]

@@ -20,7 +20,7 @@ pub(crate) use cmp::{launch_cmp, launch_cmp_scalar};
 pub(crate) use copy::{launch_copy_offset, launch_copy2d};
 pub(crate) use indexing::{launch_gather, launch_index_add, launch_index_select, launch_scatter_add};
 pub(crate) use matmul::{launch_add_matmul_, launch_matmul};
-pub(crate) use nn::{launch_rms_norm_f32, launch_rms_norm_f64, launch_softmax_f32, launch_softmax_f64};
+pub(crate) use nn::{launch_rms_norm, launch_softmax};
 pub(crate) use pick::{launch_pick, launch_pick_false, launch_pick_true};
 pub(crate) use reduce::{arg_reduce_kernel_name, launch_arg_reduce, launch_multi_reduce, launch_multi_reduce_by_kernel_name};
 pub(crate) use unary::{

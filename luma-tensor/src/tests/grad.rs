@@ -1,5 +1,5 @@
 use super::*;
-use crate::Device;
+use crate::{BinaryOp, Device, FloatOps, Layout, Shape};
 
 #[allow(dead_code)]
 pub fn test_grad_add(device: &impl Device) {
@@ -195,4 +195,68 @@ pub fn test_no_grad_disabled(device: &impl Device) {
     let _guard = crate::NoGradGuard::new();
     let y = x.mul_scalar(2.0).unwrap();
     assert!(!y.requires_grad());
+}
+
+// ---------------------------------------------------------------------------
+// Custom ops: `Tensor::custom_op*` runs the op's `forward` (as a black box) and
+// records it for backward. All inputs must receive their gradients.
+// ---------------------------------------------------------------------------
+
+struct Mul3Op;
+
+impl<Dev: Device> crate::CustomOp3<Dev> for Mul3Op {
+    fn name(&self) -> String {
+        "mul3".to_string()
+    }
+
+    fn forward(&self, a: &Tensor<Dev>, b: &Tensor<Dev>, c: &Tensor<Dev>) -> Result<(Dev::FloatStorage, Shape), crate::CustomOpError> {
+        // A custom op returns raw `Storage` + `Shape`; the framework assembles
+        // the output tensor. Here we just use the device's elementwise mul.
+        let a_g = a.storage_read()?;
+        let b_g = b.storage_read()?;
+        let c_g = c.storage_read()?;
+        let ab = <Dev as FloatOps<Dev>>::f_binary(&*a_g, a.layout(), &*b_g, b.layout(), BinaryOp::Mul)?;
+        let ab_layout = Layout::contiguous(a.shape().clone());
+        let abc = <Dev as FloatOps<Dev>>::f_binary(&ab, &ab_layout, &*c_g, c.layout(), BinaryOp::Mul)?;
+        Ok((abc, a.shape().clone()))
+    }
+
+    fn backward(
+        &self,
+        a: &Tensor<Dev>,
+        b: &Tensor<Dev>,
+        c: &Tensor<Dev>,
+        _ret: &Tensor<Dev>,
+        g: &Tensor<Dev>,
+    ) -> Result<(Tensor<Dev>, Tensor<Dev>, Tensor<Dev>), crate::CustomOpError> {
+        // y = a*b*c  =>  da = g*b*c, db = g*a*c, dc = g*a*b
+        let ga = g.mul(b)?.mul(c)?;
+        let gb = g.mul(a)?.mul(c)?;
+        let gc = g.mul(a)?.mul(b)?;
+        Ok((ga, gb, gc))
+    }
+}
+
+#[allow(dead_code)]
+pub fn test_custom_op3_forward_backward(device: &impl Device) {
+    let a = tensor_f32_dev(&[1.0, 2.0], (2,), device);
+    let b = tensor_f32_dev(&[3.0, 4.0], (2,), device);
+    let c = tensor_f32_dev(&[5.0, 6.0], (2,), device);
+    a.set_requires_grad(true);
+    b.set_requires_grad(true);
+    c.set_requires_grad(true);
+
+    let y = a.custom_op3(&b, &c, Box::new(Mul3Op)).unwrap();
+    assert!(y.requires_grad());
+    assert_eq!(y.shape().dims(), &[2]);
+
+    // forward actually ran
+    assert_close(&y.to_vec().unwrap(), &[15.0, 48.0], 1e-5, 1e-5);
+
+    // backward routes gradients to all three inputs (arg3 included)
+    let loss = y.sum_all().unwrap();
+    let grads = loss.backward().unwrap();
+    assert_close(&grads.get(&a).unwrap().to_vec().unwrap(), &[15.0, 24.0], 1e-4, 1e-4);
+    assert_close(&grads.get(&b).unwrap().to_vec().unwrap(), &[5.0, 12.0], 1e-4, 1e-4);
+    assert_close(&grads.get(&c).unwrap().to_vec().unwrap(), &[3.0, 8.0], 1e-4, 1e-4);
 }

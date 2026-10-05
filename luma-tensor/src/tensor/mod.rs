@@ -113,17 +113,17 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     }
 
     /// Read-lock the storage, erroring on a meta tensor.
-    pub(crate) fn storage_read(&self) -> crate::Result<std::sync::RwLockReadGuard<'_, K::Storage>> {
+    pub fn storage_read(&self) -> crate::Result<std::sync::RwLockReadGuard<'_, K::Storage>> {
         Ok(self.storage()?.read().expect("storage read lock"))
     }
 
     /// Write-lock the storage, erroring on a meta tensor.
-    pub(crate) fn storage_write(&self) -> crate::Result<std::sync::RwLockWriteGuard<'_, K::Storage>> {
+    pub fn storage_write(&self) -> crate::Result<std::sync::RwLockWriteGuard<'_, K::Storage>> {
         Ok(self.storage()?.write().expect("storage write lock"))
     }
 
     /// Verify `self` and `rhs` have the same shape; return a reference to it.
-    pub(crate) fn same_shape(&self, rhs: &Self, op: &'static str) -> crate::Result<&Shape> {
+    pub fn same_shape(&self, rhs: &Self, op: &'static str) -> crate::Result<&Shape> {
         if self.shape() != rhs.shape() {
             return Err(crate::Error::ShapeMismatchBinaryOp { lhs: self.shape().clone(), rhs: rhs.shape().clone(), op });
         }
@@ -131,7 +131,7 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     }
 
     /// Build a tensor from a freshly-computed storage + layout + autograd meta.
-    pub(crate) fn from_storage<L: Into<Layout>>(storage: K::Storage, layout: L, meta: K::Meta) -> Self {
+    pub fn from_storage<L: Into<Layout>>(storage: K::Storage, layout: L, meta: K::Meta) -> Self {
         let device = storage.device().clone();
         Tensor(Arc::new(TensorImpl {
             id: TensorId::new(),

@@ -23,6 +23,22 @@ impl MatrixFill for f32 {
         1.0_f32
     }
 }
+impl MatrixFill for half::f16 {
+    fn zero_val() -> Self {
+        half::f16::ZERO
+    }
+    fn one_val() -> Self {
+        half::f16::ONE
+    }
+}
+impl MatrixFill for half::bf16 {
+    fn zero_val() -> Self {
+        half::bf16::ZERO
+    }
+    fn one_val() -> Self {
+        half::bf16::ONE
+    }
+}
 impl MatrixFill for i64 {
     fn zero_val() -> Self {
         0
@@ -77,6 +93,18 @@ impl FloatFrom for f64 {
 impl FloatFrom for f32 {
     fn into_storage<'a, D: Device>(data: impl Into<Cow<'a, [Self]>>, device: &D) -> Result<D::FloatStorage> {
         D::f_from_f32(data, device)
+    }
+}
+
+impl FloatFrom for half::f16 {
+    fn into_storage<'a, D: Device>(data: impl Into<Cow<'a, [Self]>>, device: &D) -> Result<D::FloatStorage> {
+        D::f_from_f16(data, device)
+    }
+}
+
+impl FloatFrom for half::bf16 {
+    fn into_storage<'a, D: Device>(data: impl Into<Cow<'a, [Self]>>, device: &D) -> Result<D::FloatStorage> {
+        D::f_from_bf16(data, device)
     }
 }
 

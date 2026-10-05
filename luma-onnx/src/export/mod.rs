@@ -70,6 +70,8 @@ pub(crate) fn to_onnx_data_type(dtype: DType) -> tensor_proto::DataType {
     match dtype {
         DType::F32 => tensor_proto::DataType::Float,
         DType::F64 => tensor_proto::DataType::Double,
+        DType::F16 => tensor_proto::DataType::Float16,
+        DType::BF16 => tensor_proto::DataType::Bfloat16,
         DType::U32 => tensor_proto::DataType::Uint32,
         DType::I32 => tensor_proto::DataType::Int32,
         DType::U8 => tensor_proto::DataType::Uint8,

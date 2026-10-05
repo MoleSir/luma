@@ -293,6 +293,7 @@ fn test_grad() {
     grad::test_grad_transpose(&Cpu::default());
     grad::test_grad_accumulate(&Cpu::default());
     grad::test_no_grad_disabled(&Cpu::default());
+    grad::test_custom_op3_forward_backward(&Cpu::default());
 }
 
 #[test]
@@ -340,6 +341,40 @@ fn test_f64() {
     f64::test_f64_max_all(&Cpu::default());
     f64::test_f64_grad_add(&Cpu::default());
     f64::test_f64_grad_mul(&Cpu::default());
+}
+
+#[test]
+fn test_f16() {
+    let dev = Cpu::default();
+    let dt = FloatDType::F16;
+    let tol = 2e-2;
+    half_precision::test_half_binary(&dev, dt, tol);
+    half_precision::test_half_unary(&dev, dt, tol);
+    half_precision::test_half_cmp(&dev, dt, tol);
+    half_precision::test_half_scalar(&dev, dt, tol);
+    half_precision::test_half_reduce(&dev, dt, tol);
+    half_precision::test_half_softmax(&dev, dt, tol);
+    half_precision::test_half_rms_norm(&dev, dt, tol);
+    half_precision::test_half_matmul(&dev, dt, tol);
+    half_precision::test_half_cast(&dev, dt, tol);
+    half_precision::test_half_grad(&dev, dt, tol);
+}
+
+#[test]
+fn test_bf16() {
+    let dev = Cpu::default();
+    let dt = FloatDType::BF16;
+    let tol = 5e-2;
+    half_precision::test_half_binary(&dev, dt, tol);
+    half_precision::test_half_unary(&dev, dt, tol);
+    half_precision::test_half_cmp(&dev, dt, tol);
+    half_precision::test_half_scalar(&dev, dt, tol);
+    half_precision::test_half_reduce(&dev, dt, tol);
+    half_precision::test_half_softmax(&dev, dt, tol);
+    half_precision::test_half_rms_norm(&dev, dt, tol);
+    half_precision::test_half_matmul(&dev, dt, tol);
+    half_precision::test_half_cast(&dev, dt, tol);
+    half_precision::test_half_grad(&dev, dt, tol);
 }
 
 // ---- truly CPU-only (no device-generic API available) ----

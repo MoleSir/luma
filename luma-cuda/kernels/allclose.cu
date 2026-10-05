@@ -55,6 +55,8 @@ extern "C" __global__ void FN_NAME( \
 
 ALLCLOSE_FLOAT_KERNEL(float,  allclose_f32, (void))
 ALLCLOSE_FLOAT_KERNEL(double, allclose_f64, (void))
+ALLCLOSE_FLOAT_KERNEL(__half,        allclose_f16,  (void))
+ALLCLOSE_FLOAT_KERNEL(__nv_bfloat16, allclose_bf16, (void))
 ALLCLOSE_INT_KERNEL(int32_t,  allclose_i32)
 ALLCLOSE_INT_KERNEL(uint32_t, allclose_u32)
 ALLCLOSE_INT_KERNEL(uint8_t,  allclose_u8)

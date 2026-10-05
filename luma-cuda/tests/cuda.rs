@@ -232,6 +232,41 @@ fn cuda_f64() {
 }
 
 #[test]
+fn cuda_f16() {
+    let dev = &*CUDA;
+    let dt = FloatDType::F16;
+    let tol = 2e-2;
+    half_precision::test_half_binary(dev, dt, tol);
+    half_precision::test_half_unary(dev, dt, tol);
+    half_precision::test_half_cmp(dev, dt, tol);
+    half_precision::test_half_scalar(dev, dt, tol);
+    half_precision::test_half_reduce(dev, dt, tol);
+    half_precision::test_half_softmax(dev, dt, tol);
+    half_precision::test_half_rms_norm(dev, dt, tol);
+    half_precision::test_half_matmul(dev, dt, tol);
+    half_precision::test_half_cast(dev, dt, tol);
+    half_precision::test_half_grad(dev, dt, tol);
+}
+
+#[test]
+fn cuda_bf16() {
+    let dev = &*CUDA;
+    let dt = FloatDType::BF16;
+    // bf16 has ~3 decimal digits of mantissa; keep tolerances loose.
+    let tol = 1e-1;
+    half_precision::test_half_binary(dev, dt, tol);
+    half_precision::test_half_unary(dev, dt, tol);
+    half_precision::test_half_cmp(dev, dt, tol);
+    half_precision::test_half_scalar(dev, dt, tol);
+    half_precision::test_half_reduce(dev, dt, tol);
+    half_precision::test_half_softmax(dev, dt, tol);
+    half_precision::test_half_rms_norm(dev, dt, tol);
+    half_precision::test_half_matmul(dev, dt, tol);
+    half_precision::test_half_cast(dev, dt, tol);
+    half_precision::test_half_grad(dev, dt, tol);
+}
+
+#[test]
 fn cuda_display() {
     let dev = &*CUDA;
     display::test_display_scalar(dev);
@@ -317,6 +352,7 @@ fn cuda_grad() {
     grad::test_grad_matmul(dev);
     grad::test_grad_accumulate(dev);
     grad::test_no_grad_disabled(dev);
+    grad::test_custom_op3_forward_backward(dev);
 }
 
 #[test]
@@ -427,6 +463,19 @@ fn cuda_to_device() {
     assert_eq!(gpu64.dtype(), FloatDType::F64);
     let back64 = gpu64.to_device(&Cpu::default()).unwrap();
     assert_close(&back64.to_vec().unwrap(), &[1.5, 2.5, 3.5], 1e-5, 1e-5);
+
+    // f16 / bf16 roundtrips — the raw-bytes path must be 2-byte aware.
+    let src16 = tensor_f16_dev(&[1.0, 2.0, 3.0], (3,), &Cpu::default());
+    let gpu16 = src16.to_device(dev).unwrap();
+    assert_eq!(gpu16.dtype(), FloatDType::F16, "f16 dtype preserved across devices");
+    let back16 = gpu16.to_device(&Cpu::default()).unwrap();
+    assert_close(&back16.to_vec().unwrap(), &[1.0, 2.0, 3.0], 1e-2, 1e-2);
+
+    let srcbf = tensor_bf16_dev(&[1.0, 2.0, 3.0], (3,), &Cpu::default());
+    let gpubf = srcbf.to_device(dev).unwrap();
+    assert_eq!(gpubf.dtype(), FloatDType::BF16, "bf16 dtype preserved across devices");
+    let backbf = gpubf.to_device(&Cpu::default()).unwrap();
+    assert_close(&backbf.to_vec().unwrap(), &[1.0, 2.0, 3.0], 5e-2, 5e-2);
 
     // Int roundtrip.
     let srci = tensor_i32(&[1, 2, 3, 4], (4,));

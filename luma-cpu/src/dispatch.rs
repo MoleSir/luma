@@ -18,6 +18,8 @@ macro_rules! dispatch_float {
         match $storage {
             $crate::CpuFloatStorage::F32($data, _) => $crate::CpuFloatStorage::F32($body, $storage.device().clone()),
             $crate::CpuFloatStorage::F64($data, _) => $crate::CpuFloatStorage::F64($body, $storage.device().clone()),
+            $crate::CpuFloatStorage::F16($data, _) => $crate::CpuFloatStorage::F16($body, $storage.device().clone()),
+            $crate::CpuFloatStorage::BF16($data, _) => $crate::CpuFloatStorage::BF16($body, $storage.device().clone()),
         }
     };
 }
@@ -29,6 +31,8 @@ macro_rules! dispatch_float_raw {
         match $storage {
             $crate::CpuFloatStorage::F32($data, _) => $body,
             $crate::CpuFloatStorage::F64($data, _) => $body,
+            $crate::CpuFloatStorage::F16($data, _) => $body,
+            $crate::CpuFloatStorage::BF16($data, _) => $body,
         }
     };
 }
@@ -46,6 +50,12 @@ macro_rules! dispatch_float2 {
             ($crate::CpuFloatStorage::F64($a, _), $crate::CpuFloatStorage::F64($b, _)) => {
                 Ok($crate::CpuFloatStorage::F64($body, $lhs.device().clone()))
             }
+            ($crate::CpuFloatStorage::F16($a, _), $crate::CpuFloatStorage::F16($b, _)) => {
+                Ok($crate::CpuFloatStorage::F16($body, $lhs.device().clone()))
+            }
+            ($crate::CpuFloatStorage::BF16($a, _), $crate::CpuFloatStorage::BF16($b, _)) => {
+                Ok($crate::CpuFloatStorage::BF16($body, $lhs.device().clone()))
+            }
             (l, r) => Err(luma_tensor::Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: $op }),
         }
     };
@@ -58,6 +68,8 @@ macro_rules! dispatch_float2_raw {
         match ($lhs, $rhs) {
             ($crate::CpuFloatStorage::F32($a, _), $crate::CpuFloatStorage::F32($b, _)) => Ok($body),
             ($crate::CpuFloatStorage::F64($a, _), $crate::CpuFloatStorage::F64($b, _)) => Ok($body),
+            ($crate::CpuFloatStorage::F16($a, _), $crate::CpuFloatStorage::F16($b, _)) => Ok($body),
+            ($crate::CpuFloatStorage::BF16($a, _), $crate::CpuFloatStorage::BF16($b, _)) => Ok($body),
             (l, r) => Err(luma_tensor::Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: $op }),
         }
     };
