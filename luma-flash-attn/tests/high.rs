@@ -128,12 +128,30 @@ fn func_matches_reference() {
         let k = f32_tensor(&dev, &kd, (b, skv, hkv, d));
         let v = f32_tensor(&dev, &vd, (b, skv, hkv, d));
 
-        let out = flash_attn_func(&q, &k, &v, None, true).unwrap();
+        let out = flash_attn_func(&q, &k, &v, None, true, 0).unwrap();
         assert_eq!(out.dims(), &[b, sq, hq, d]);
         let scale = 1.0 / (d as f64).sqrt();
         let want = ref_attention(&qd, &kd, &vd, b, sq, skv, hq, hkv, d, scale, 0);
         assert_close(&out.to_vec().unwrap(), &want, 3e-3, "flash_attn_func");
     }
+}
+
+#[test]
+fn func_decode_with_start_pos() {
+    let dev = Cuda::new(0).unwrap();
+    let (b, l, hq, hkv, d) = (2usize, 7usize, 4usize, 2usize, 64usize);
+    let (qd, kd, vd) = (data(b * hq * d, 201), data(b * l * hkv * d, 202), data(b * l * hkv * d, 203));
+    // One new query token per sequence, attending the whole history (which
+    // includes the new token).
+    let q = f32_tensor(&dev, &qd, (b, 1, hq, d));
+    let k = f32_tensor(&dev, &kd, (b, l, hkv, d));
+    let v = f32_tensor(&dev, &vd, (b, l, hkv, d));
+
+    let out = flash_attn_func(&q, &k, &v, None, true, l - 1).unwrap();
+    assert_eq!(out.dims(), &[b, 1, hq, d]);
+    let scale = 1.0 / (d as f64).sqrt();
+    let want = ref_attention(&qd, &kd, &vd, b, 1, l, hq, hkv, d, scale, l - 1);
+    assert_close(&out.to_vec().unwrap(), &want, 3e-3, "flash_attn_func decode");
 }
 
 #[test]
@@ -146,7 +164,7 @@ fn func_custom_scale() {
     let v = f32_tensor(&dev, &vd, (b, skv, hkv, d));
 
     let scale = 0.7;
-    let out = flash_attn_func(&q, &k, &v, Some(scale), true).unwrap();
+    let out = flash_attn_func(&q, &k, &v, Some(scale), true, 0).unwrap();
     let want = ref_attention(&qd, &kd, &vd, b, sq, skv, hq, hkv, d, scale, 0);
     assert_close(&out.to_vec().unwrap(), &want, 3e-3, "flash_attn_func custom scale");
 }
@@ -157,7 +175,7 @@ fn func_non_causal_errors() {
     let q = f32_tensor(&dev, &data(2 * 4 * 2 * 32, 1), (2, 4, 2, 32));
     let k = f32_tensor(&dev, &data(2 * 4 * 32, 2), (2, 4, 1, 32));
     let v = f32_tensor(&dev, &data(2 * 4 * 32, 3), (2, 4, 1, 32));
-    assert!(flash_attn_func(&q, &k, &v, None, false).is_err());
+    assert!(flash_attn_func(&q, &k, &v, None, false, 0).is_err());
 }
 
 #[test]
@@ -166,7 +184,7 @@ fn func_rejects_f64() {
     let q = Tensor::<Cuda>::from_slice(&data(2 * 4 * 2 * 32, 1), (2, 4, 2, 32), (&dev, FloatDType::F64)).unwrap();
     let k = Tensor::<Cuda>::from_slice(&data(2 * 4 * 32, 2), (2, 4, 1, 32), (&dev, FloatDType::F64)).unwrap();
     let v = Tensor::<Cuda>::from_slice(&data(2 * 4 * 32, 3), (2, 4, 1, 32), (&dev, FloatDType::F64)).unwrap();
-    assert!(flash_attn_func(&q, &k, &v, None, true).is_err());
+    assert!(flash_attn_func(&q, &k, &v, None, true, 0).is_err());
 }
 
 #[test]
@@ -177,7 +195,7 @@ fn func_backward_not_implemented() {
     let k = f32_tensor(&dev, &data(b * sq * hkv * d, 2), (b, sq, hkv, d));
     let v = f32_tensor(&dev, &data(b * sq * hkv * d, 3), (b, sq, hkv, d));
     q.set_requires_grad(true);
-    let out = flash_attn_func(&q, &k, &v, None, true).unwrap();
+    let out = flash_attn_func(&q, &k, &v, None, true, 0).unwrap();
     assert!(out.requires_grad());
     assert!(out.sum_all().unwrap().backward().is_err());
 }
@@ -206,7 +224,7 @@ fn varlen_matches_reference() {
     let v = f32_tensor(&dev, &vd, (total, hkv, d));
     let cu_t = IntTensor::<Cuda>::from_vec_i32(cu.clone(), (cu.len(),), &dev).unwrap();
 
-    let out = flash_attn_varlen_func(&q, &k, &v, &cu_t, &cu_t, 5, 5, None, true).unwrap();
+    let out = flash_attn_varlen_func(&q, &k, &v, &cu_t, &cu_t, 5, 5, None, true, None).unwrap();
     assert_eq!(out.dims(), &[total, hq, d]);
     let got = out.to_vec().unwrap();
 
@@ -245,7 +263,7 @@ fn varlen_prefix_kv_matches_reference() {
     let cu_q_t = IntTensor::<Cuda>::from_vec_i32(cu_q.to_vec(), (3,), &dev).unwrap();
     let cu_k_t = IntTensor::<Cuda>::from_vec_i32(cu_k.to_vec(), (3,), &dev).unwrap();
 
-    let out = flash_attn_varlen_func(&q, &k, &v, &cu_q_t, &cu_k_t, 4, 5, None, true).unwrap();
+    let out = flash_attn_varlen_func(&q, &k, &v, &cu_q_t, &cu_k_t, 4, 5, None, true, None).unwrap();
     let got = out.to_vec().unwrap();
 
     let scale = 1.0 / (d as f64).sqrt();
@@ -264,6 +282,100 @@ fn varlen_prefix_kv_matches_reference() {
         o_off += ql;
     }
     assert_close(&got, &want, 3e-3, "flash_attn_varlen_func prefix");
+}
+
+#[test]
+fn varlen_paged_matches_reference() {
+    let dev = Cuda::new(0).unwrap();
+    let (batch, block_size, blocks_per_seq) = (2usize, 4usize, 2usize);
+    let num_blocks = batch * blocks_per_seq;
+    let (hq, hkv, d) = (4usize, 2usize, 64usize);
+    let q_lens = [2usize, 3usize];
+    let k_lens = [6usize, 7usize]; // per-seq cached length (incl. the q tokens)
+
+    let mut cu_q = vec![0i32];
+    for &l in &q_lens {
+        cu_q.push(cu_q.last().unwrap() + l as i32);
+    }
+    let mut cu_k = vec![0i32];
+    for &l in &k_lens {
+        cu_k.push(cu_k.last().unwrap() + l as i32);
+    }
+    let total_q: usize = q_lens.iter().sum();
+
+    let mut block_table = Vec::with_capacity(batch * blocks_per_seq);
+    for s in 0..batch {
+        for blk in 0..blocks_per_seq {
+            block_table.push((s * blocks_per_seq + blk) as i32);
+        }
+    }
+
+    let qd = data(total_q * hq * d, 111);
+    let kd = data(num_blocks * block_size * hkv * d, 112);
+    let vd = data(num_blocks * block_size * hkv * d, 113);
+    let q = f32_tensor(&dev, &qd, (total_q, hq, d));
+    let k = f32_tensor(&dev, &kd, (num_blocks, block_size, hkv, d));
+    let v = f32_tensor(&dev, &vd, (num_blocks, block_size, hkv, d));
+    let cu_q_t = IntTensor::<Cuda>::from_vec_i32(cu_q.clone(), (cu_q.len(),), &dev).unwrap();
+    let cu_k_t = IntTensor::<Cuda>::from_vec_i32(cu_k.clone(), (cu_k.len(),), &dev).unwrap();
+    let bt = IntTensor::<Cuda>::from_vec_i32(block_table.clone(), (batch, blocks_per_seq), &dev).unwrap();
+
+    let max_q = *q_lens.iter().max().unwrap();
+    let max_k = *k_lens.iter().max().unwrap();
+    let out = flash_attn_varlen_func(&q, &k, &v, &cu_q_t, &cu_k_t, max_q, max_k, None, true, Some(&bt)).unwrap();
+    assert_eq!(out.dims(), &[total_q, hq, d]);
+    let got = out.to_vec().unwrap();
+
+    let scale = 1.0 / (d as f64).sqrt();
+    let group = hq / hkv;
+    let mut want = vec![0.0f64; total_q * hq * d];
+    let (mut q_off, mut o_off) = (0usize, 0usize);
+    for s in 0..batch {
+        let ql = q_lens[s];
+        let kl = k_lens[s];
+        let start = kl - ql; // bottom-right aligned
+        for h in 0..hq {
+            let kh = h / group;
+            for i in 0..ql {
+                let g = start + i;
+                let qi = (q_off + i) * hq * d + h * d;
+                let mut scores = Vec::new();
+                let mut max = f64::NEG_INFINITY;
+                for j in 0..kl {
+                    if j > g {
+                        continue;
+                    }
+                    let phys = block_table[s * blocks_per_seq + j / block_size] as usize;
+                    let slot = phys * block_size + (j % block_size);
+                    let k_off = (slot * hkv + kh) * d;
+                    let mut dot = 0.0;
+                    for x in 0..d {
+                        dot += qd[qi + x] * kd[k_off + x];
+                    }
+                    let sc = dot * scale;
+                    max = max.max(sc);
+                    scores.push((slot, sc));
+                }
+                let mut denom = 0.0;
+                let mut acc = vec![0.0f64; d];
+                for &(slot, sc) in &scores {
+                    let p = (sc - max).exp();
+                    denom += p;
+                    let v_off = (slot * hkv + kh) * d;
+                    for x in 0..d {
+                        acc[x] += p * vd[v_off + x];
+                    }
+                }
+                let oi = (o_off + i) * hq * d + h * d;
+                for x in 0..d {
+                    want[oi + x] = acc[x] / denom;
+                }
+            }
+        }
+        q_off += ql;
+        o_off += ql;
+    }
+    assert_close(&got, &want, 3e-3, "flash_attn_varlen_func paged");
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +450,86 @@ fn kvcache_matches_reference() {
     assert_close(&got, &want, 3e-3, "flash_attn_with_kvcache");
 }
 
+#[test]
+fn kvcache_prefill_matches_reference() {
+    let dev = Cuda::new(0).unwrap();
+    let (batch, block_size, blocks_per_seq) = (2usize, 4usize, 2usize);
+    let num_blocks = batch * blocks_per_seq;
+    let (hq, hkv, d) = (4usize, 2usize, 64usize);
+    let seqlen_q = 3usize;
+    // Total cached length INCLUDING the q tokens (their K/V are already in the cache).
+    let cache_seqlens = [6i32, 8i32];
+
+    let mut block_table = Vec::with_capacity(batch * blocks_per_seq);
+    for s in 0..batch {
+        for blk in 0..blocks_per_seq {
+            block_table.push((s * blocks_per_seq + blk) as i32);
+        }
+    }
+
+    let qd = data(batch * seqlen_q * hq * d, 61);
+    let kd = data(num_blocks * block_size * hkv * d, 62);
+    let vd = data(num_blocks * block_size * hkv * d, 63);
+    let q = f32_tensor(&dev, &qd, (batch, seqlen_q, hq, d));
+    let k_cache = f32_tensor(&dev, &kd, (num_blocks, block_size, hkv, d));
+    let v_cache = f32_tensor(&dev, &vd, (num_blocks, block_size, hkv, d));
+    let lens = IntTensor::<Cuda>::from_vec_i32(cache_seqlens.to_vec(), (batch,), &dev).unwrap();
+    let bt = IntTensor::<Cuda>::from_vec_i32(block_table.clone(), (batch, blocks_per_seq), &dev).unwrap();
+
+    let out = flash_attn_with_kvcache(&q, &k_cache, &v_cache, &lens, &bt, None).unwrap();
+    assert_eq!(out.dims(), &[batch, seqlen_q, hq, d]);
+    let got = out.to_vec().unwrap();
+
+    let scale = 1.0 / (d as f64).sqrt();
+    let group = hq / hkv;
+    let mut want = vec![0.0f64; batch * seqlen_q * hq * d];
+    for s in 0..batch {
+        let l = cache_seqlens[s] as usize;
+        for h in 0..hq {
+            let kh = h / group;
+            for i in 0..seqlen_q {
+                // bottom-right aligned global position of this query token
+                let g = l - seqlen_q + i;
+                let q_off = ((s * seqlen_q + i) * hq + h) * d;
+                let mut scores = Vec::new();
+                let mut max = f64::NEG_INFINITY;
+                for j in 0..l {
+                    if j > g {
+                        continue;
+                    }
+                    let phys = block_table[s * blocks_per_seq + j / block_size] as usize;
+                    let slot = phys * block_size + (j % block_size);
+                    let k_off = (slot * hkv + kh) * d;
+                    let mut dot = 0.0;
+                    for x in 0..d {
+                        dot += qd[q_off + x] * kd[k_off + x];
+                    }
+                    let sc = dot * scale;
+                    max = max.max(sc);
+                    scores.push((slot, sc));
+                }
+                if scores.is_empty() {
+                    continue;
+                }
+                let mut denom = 0.0;
+                let mut acc = vec![0.0f64; d];
+                for &(slot, sc) in &scores {
+                    let p = (sc - max).exp();
+                    denom += p;
+                    let v_off = (slot * hkv + kh) * d;
+                    for x in 0..d {
+                        acc[x] += p * vd[v_off + x];
+                    }
+                }
+                for x in 0..d {
+                    want[q_off + x] = acc[x] / denom;
+                }
+            }
+        }
+    }
+    assert_close(&got, &want, 3e-3, "flash_attn_with_kvcache prefill");
+}
+
 // ---------------------------------------------------------------------------
 // f16 / bf16
 // ---------------------------------------------------------------------------
@@ -363,7 +555,7 @@ fn func_matches_reference_half() {
             let k = tensor_dtype(&dev, &kd, (b, skv, hkv, d), dt);
             let v = tensor_dtype(&dev, &vd, (b, skv, hkv, d), dt);
 
-            let out = flash_attn_func(&q, &k, &v, None, true).unwrap();
+            let out = flash_attn_func(&q, &k, &v, None, true, 0).unwrap();
             assert_eq!(out.dtype(), dt, "output dtype not preserved ({dt:?})");
             assert_eq!(out.dims(), &[b, sq, hq, d]);
             let scale = 1.0 / (d as f64).sqrt();
@@ -402,7 +594,7 @@ fn varlen_matches_reference_half() {
         let q = tensor_dtype(&dev, &qd, (total, hq, d), dt);
         let k = tensor_dtype(&dev, &kd, (total, hkv, d), dt);
         let v = tensor_dtype(&dev, &vd, (total, hkv, d), dt);
-        let out = flash_attn_varlen_func(&q, &k, &v, &cu_t, &cu_t, 5, 5, None, true).unwrap();
+        let out = flash_attn_varlen_func(&q, &k, &v, &cu_t, &cu_t, 5, 5, None, true, None).unwrap();
         assert_eq!(out.dtype(), dt, "output dtype not preserved ({dt:?})");
         assert_close(&out.to_vec().unwrap(), &want, tol, &format!("flash_attn_varlen_func {dt:?}"));
     }
@@ -474,5 +666,199 @@ fn kvcache_matches_reference_half() {
         let out = flash_attn_with_kvcache(&q, &k_cache, &v_cache, &lens, &bt, None).unwrap();
         assert_eq!(out.dtype(), dt, "output dtype not preserved ({dt:?})");
         assert_close(&out.to_vec().unwrap(), &want, tol, &format!("flash_attn_with_kvcache {dt:?}"));
+    }
+}
+
+#[test]
+fn kvcache_prefill_matches_reference_half() {
+    let dev = Cuda::new(0).unwrap();
+    let (batch, block_size, blocks_per_seq) = (2usize, 4usize, 2usize);
+    let num_blocks = batch * blocks_per_seq;
+    let (hq, hkv, d) = (4usize, 2usize, 64usize);
+    let seqlen_q = 3usize;
+    let cache_seqlens = [6i32, 8i32];
+
+    let mut block_table = Vec::with_capacity(batch * blocks_per_seq);
+    for s in 0..batch {
+        for blk in 0..blocks_per_seq {
+            block_table.push((s * blocks_per_seq + blk) as i32);
+        }
+    }
+
+    let qd = data(batch * seqlen_q * hq * d, 161);
+    let kd = data(num_blocks * block_size * hkv * d, 162);
+    let vd = data(num_blocks * block_size * hkv * d, 163);
+    let lens = IntTensor::<Cuda>::from_vec_i32(cache_seqlens.to_vec(), (batch,), &dev).unwrap();
+    let bt = IntTensor::<Cuda>::from_vec_i32(block_table.clone(), (batch, blocks_per_seq), &dev).unwrap();
+
+    let scale = 1.0 / (d as f64).sqrt();
+    let group = hq / hkv;
+    let mut want = vec![0.0f64; batch * seqlen_q * hq * d];
+    for s in 0..batch {
+        let l = cache_seqlens[s] as usize;
+        for h in 0..hq {
+            let kh = h / group;
+            for i in 0..seqlen_q {
+                let g = l - seqlen_q + i;
+                let q_off = ((s * seqlen_q + i) * hq + h) * d;
+                let mut scores = Vec::new();
+                let mut max = f64::NEG_INFINITY;
+                for j in 0..l {
+                    if j > g {
+                        continue;
+                    }
+                    let phys = block_table[s * blocks_per_seq + j / block_size] as usize;
+                    let slot = phys * block_size + (j % block_size);
+                    let k_off = (slot * hkv + kh) * d;
+                    let mut dot = 0.0;
+                    for x in 0..d {
+                        dot += qd[q_off + x] * kd[k_off + x];
+                    }
+                    let sc = dot * scale;
+                    max = max.max(sc);
+                    scores.push((slot, sc));
+                }
+                if scores.is_empty() {
+                    continue;
+                }
+                let mut denom = 0.0;
+                let mut acc = vec![0.0f64; d];
+                for &(slot, sc) in &scores {
+                    let p = (sc - max).exp();
+                    denom += p;
+                    let v_off = (slot * hkv + kh) * d;
+                    for x in 0..d {
+                        acc[x] += p * vd[v_off + x];
+                    }
+                }
+                for x in 0..d {
+                    want[q_off + x] = acc[x] / denom;
+                }
+            }
+        }
+    }
+
+    for (dt, tol) in HALF_CASES {
+        let q = tensor_dtype(&dev, &qd, (batch, seqlen_q, hq, d), dt);
+        let k_cache = tensor_dtype(&dev, &kd, (num_blocks, block_size, hkv, d), dt);
+        let v_cache = tensor_dtype(&dev, &vd, (num_blocks, block_size, hkv, d), dt);
+        let out = flash_attn_with_kvcache(&q, &k_cache, &v_cache, &lens, &bt, None).unwrap();
+        assert_eq!(out.dtype(), dt, "output dtype not preserved ({dt:?})");
+        assert_close(&out.to_vec().unwrap(), &want, tol, &format!("flash_attn_with_kvcache prefill {dt:?}"));
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Non-zero `start_offset` views
+// ---------------------------------------------------------------------------
+
+/// Wrap `values` in a tensor shaped like `shape` but with `pad` leading slices
+/// filled with junk, then return a strided view starting at `pad` so the view
+/// carries a non-zero `layout().start_offset()`.
+fn offset_view(dev: &Cuda, values: &[f64], shape: (usize, usize, usize, usize), pad: usize) -> Tensor<Cuda> {
+    let (n, a, b, c) = shape;
+    let mut all = data(pad * a * b * c, 0xDEAD_BEEF);
+    all.extend_from_slice(values);
+    let big = f32_tensor(dev, &all, (pad + n, a, b, c));
+    let view = big.narrow(0, pad, n).unwrap();
+    assert_eq!(view.layout().start_offset(), pad * a * b * c, "view has no offset");
+    view
+}
+
+#[test]
+fn offset_views_match_direct() {
+    let dev = Cuda::new(0).unwrap();
+
+    // flash_attn_func with offset q/k/v views.
+    {
+        let (b, sq, skv, hq, hkv, d) = (2usize, 4usize, 5usize, 4usize, 2usize, 64usize);
+        let (qd, kd, vd) = (data(b * sq * hq * d, 401), data(b * skv * hkv * d, 402), data(b * skv * hkv * d, 403));
+        let q = f32_tensor(&dev, &qd, (b, sq, hq, d));
+        let k = f32_tensor(&dev, &kd, (b, skv, hkv, d));
+        let v = f32_tensor(&dev, &vd, (b, skv, hkv, d));
+        let q_v = offset_view(&dev, &qd, (b, sq, hq, d), 3);
+        let k_v = offset_view(&dev, &kd, (b, skv, hkv, d), 3);
+        let v_v = offset_view(&dev, &vd, (b, skv, hkv, d), 3);
+
+        let direct = flash_attn_func(&q, &k, &v, None, true, 0).unwrap().to_vec().unwrap();
+        let viewed = flash_attn_func(&q_v, &k_v, &v_v, None, true, 0).unwrap().to_vec().unwrap();
+        assert_close(&viewed, &direct, 0.0, "flash_attn_func offset view");
+    }
+
+    // flash_attn_varlen_func with an offset paged cache.
+    {
+        let (batch, block_size, blocks_per_seq) = (2usize, 4usize, 2usize);
+        let num_blocks = batch * blocks_per_seq;
+        let (hq, hkv, d) = (4usize, 2usize, 64usize);
+        let q_lens = [2usize, 3usize];
+        let k_lens = [6usize, 7usize];
+        let mut cu_q = vec![0i32];
+        for &l in &q_lens {
+            cu_q.push(cu_q.last().unwrap() + l as i32);
+        }
+        let mut cu_k = vec![0i32];
+        for &l in &k_lens {
+            cu_k.push(cu_k.last().unwrap() + l as i32);
+        }
+        let total_q: usize = q_lens.iter().sum();
+        let mut block_table = Vec::new();
+        for s in 0..batch {
+            for blk in 0..blocks_per_seq {
+                block_table.push((s * blocks_per_seq + blk) as i32);
+            }
+        }
+        let qd = data(total_q * hq * d, 411);
+        let kd = data(num_blocks * block_size * hkv * d, 412);
+        let vd = data(num_blocks * block_size * hkv * d, 413);
+        let q = f32_tensor(&dev, &qd, (total_q, hq, d));
+        let k = f32_tensor(&dev, &kd, (num_blocks, block_size, hkv, d));
+        let v = f32_tensor(&dev, &vd, (num_blocks, block_size, hkv, d));
+        let cu_q_t = IntTensor::<Cuda>::from_vec_i32(cu_q, (q_lens.len() + 1,), &dev).unwrap();
+        let cu_k_t = IntTensor::<Cuda>::from_vec_i32(cu_k, (k_lens.len() + 1,), &dev).unwrap();
+        let bt = IntTensor::<Cuda>::from_vec_i32(block_table, (batch, blocks_per_seq), &dev).unwrap();
+        let max_q = *q_lens.iter().max().unwrap();
+        let max_k = *k_lens.iter().max().unwrap();
+
+        let k_v = offset_view(&dev, &kd, (num_blocks, block_size, hkv, d), 2);
+        let v_v = offset_view(&dev, &vd, (num_blocks, block_size, hkv, d), 2);
+
+        let direct = flash_attn_varlen_func(&q, &k, &v, &cu_q_t, &cu_k_t, max_q, max_k, None, true, Some(&bt))
+            .unwrap()
+            .to_vec()
+            .unwrap();
+        let viewed = flash_attn_varlen_func(&q, &k_v, &v_v, &cu_q_t, &cu_k_t, max_q, max_k, None, true, Some(&bt))
+            .unwrap()
+            .to_vec()
+            .unwrap();
+        assert_close(&viewed, &direct, 0.0, "flash_attn_varlen_func offset view");
+    }
+
+    // flash_attn_with_kvcache with an offset paged cache.
+    {
+        let (batch, block_size, blocks_per_seq) = (2usize, 4usize, 2usize);
+        let num_blocks = batch * blocks_per_seq;
+        let (hq, hkv, d) = (4usize, 2usize, 64usize);
+        let cache_seqlens = [5i32, 7i32];
+        let mut block_table = Vec::new();
+        for s in 0..batch {
+            for blk in 0..blocks_per_seq {
+                block_table.push((s * blocks_per_seq + blk) as i32);
+            }
+        }
+        let qd = data(batch * hq * d, 421);
+        let kd = data(num_blocks * block_size * hkv * d, 422);
+        let vd = data(num_blocks * block_size * hkv * d, 423);
+        let q = f32_tensor(&dev, &qd, (batch, 1, hq, d));
+        let k = f32_tensor(&dev, &kd, (num_blocks, block_size, hkv, d));
+        let v = f32_tensor(&dev, &vd, (num_blocks, block_size, hkv, d));
+        let lens = IntTensor::<Cuda>::from_vec_i32(cache_seqlens.to_vec(), (batch,), &dev).unwrap();
+        let bt = IntTensor::<Cuda>::from_vec_i32(block_table, (batch, blocks_per_seq), &dev).unwrap();
+
+        let k_v = offset_view(&dev, &kd, (num_blocks, block_size, hkv, d), 2);
+        let v_v = offset_view(&dev, &vd, (num_blocks, block_size, hkv, d), 2);
+
+        let direct = flash_attn_with_kvcache(&q, &k, &v, &lens, &bt, None).unwrap().to_vec().unwrap();
+        let viewed = flash_attn_with_kvcache(&q, &k_v, &v_v, &lens, &bt, None).unwrap().to_vec().unwrap();
+        assert_close(&viewed, &direct, 0.0, "flash_attn_with_kvcache offset view");
     }
 }

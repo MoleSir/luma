@@ -72,6 +72,7 @@ pub trait FlashDtype: DeviceRepr + Copy + 'static {
         block_tables: *const i32,
         context_lens: *const i32,
         num_seqs: i32,
+        q_seq_len: i32,
         q_heads: i32,
         kv_heads: i32,
         head_size: i32,
@@ -115,13 +116,13 @@ macro_rules! impl_flash_dtype {
             unsafe fn ffi_kvcache(
                 q: *const Self, k_cache: *const Self, v_cache: *const Self, o: *mut Self,
                 block_tables: *const i32, context_lens: *const i32,
-                num_seqs: i32, q_heads: i32, kv_heads: i32, head_size: i32,
+                num_seqs: i32, q_seq_len: i32, q_heads: i32, kv_heads: i32, head_size: i32,
                 block_size: i32, max_blocks: i32, scale: f32, stream: *mut c_void,
             ) -> i32 {
                 unsafe {
                     ffi::$kvcache(q, k_cache, v_cache, o, block_tables, context_lens,
-                                  num_seqs, q_heads, kv_heads, head_size, block_size, max_blocks,
-                                  scale, stream)
+                                  num_seqs, q_seq_len, q_heads, kv_heads, head_size,
+                                  block_size, max_blocks, scale, stream)
                 }
             }
         }
@@ -143,9 +144,9 @@ impl_flash_dtype!(bf16, FloatDType::BF16, flash_attn_bf16, flash_attn_varlen_bf1
 /// the result to observe execution-time errors.
 #[allow(clippy::too_many_arguments)]
 pub fn flash_attn<T: FlashDtype>(
-    q: &CudaSlice<T>,
-    k: &CudaSlice<T>,
-    v: &CudaSlice<T>,
+    q: &impl DevicePtr<T>,
+    k: &impl DevicePtr<T>,
+    v: &impl DevicePtr<T>,
     o: &mut CudaSlice<T>,
     batch: i32,
     q_seq_len: i32,
@@ -158,7 +159,7 @@ pub fn flash_attn<T: FlashDtype>(
     attn_mask: Option<&CudaSlice<u8>>,
     stream: &CudaStream,
 ) -> Result<(), FlashAttnError> {
-    validate(q, k, v, o, batch, q_seq_len, kv_seq_len, q_num_heads, kv_num_heads, head_size, start_pos, attn_mask)?;
+    validate(q, k, v, &*o, batch, q_seq_len, kv_seq_len, q_num_heads, kv_num_heads, head_size, start_pos, attn_mask)?;
 
     let (q_ptr, _q_guard) = q.device_ptr(stream);
     let (k_ptr, _k_guard) = k.device_ptr(stream);
@@ -198,9 +199,9 @@ pub fn flash_attn<T: FlashDtype>(
 /// `flash_attn::<f32>` convenience wrapper, retaining the historical name.
 #[allow(clippy::too_many_arguments)]
 pub fn flash_attn_f32(
-    q: &CudaSlice<f32>,
-    k: &CudaSlice<f32>,
-    v: &CudaSlice<f32>,
+    q: &impl DevicePtr<f32>,
+    k: &impl DevicePtr<f32>,
+    v: &impl DevicePtr<f32>,
     o: &mut CudaSlice<f32>,
     batch: i32,
     q_seq_len: i32,
@@ -218,17 +219,22 @@ pub fn flash_attn_f32(
 
 /// Low-level packed variable-length flash attention (causal, bottom-right aligned).
 ///
-/// `q/o` are `(total_q, q_heads, head_size)`, `k/v` are
-/// `(total_kv, kv_heads, head_size)` and `cu_seqlens_*` are `(num_seqs + 1,)`.
-/// This wrapper always uses a contiguous (non-paged) K/V.
+/// `q/o` are `(total_q, q_heads, head_size)` and `cu_seqlens_*` are
+/// `(num_seqs + 1,)`.
+///
+/// - `block_tables == None`: contiguous K/V, `k/v` are
+///   `(total_kv, kv_heads, head_size)`.
+/// - `block_tables == Some(t)`: paged K/V, `k/v` are a cache
+///   `(num_blocks, block_size, kv_heads, head_size)` addressed by `t`
+///   `(num_seqs, max_blocks)`; `max_blocks` is inferred as `t.len() / num_seqs`.
 #[allow(clippy::too_many_arguments)]
 pub fn flash_attn_varlen<T: FlashDtype>(
-    q: &CudaSlice<T>,
-    k: &CudaSlice<T>,
-    v: &CudaSlice<T>,
+    q: &impl DevicePtr<T>,
+    k: &impl DevicePtr<T>,
+    v: &impl DevicePtr<T>,
     o: &mut CudaSlice<T>,
-    cu_seqlens_q: &CudaSlice<i32>,
-    cu_seqlens_k: &CudaSlice<i32>,
+    cu_seqlens_q: &impl DevicePtr<i32>,
+    cu_seqlens_k: &impl DevicePtr<i32>,
     num_seqs: i32,
     max_seqlen_q: i32,
     max_seqlen_k: i32,
@@ -236,6 +242,8 @@ pub fn flash_attn_varlen<T: FlashDtype>(
     kv_heads: i32,
     head_size: i32,
     scale: f32,
+    block_tables: Option<&impl DevicePtr<i32>>,
+    block_size: i32,
     stream: &CudaStream,
 ) -> Result<(), FlashAttnError> {
     let (q_ptr, _q_guard) = q.device_ptr(stream);
@@ -245,6 +253,21 @@ pub fn flash_attn_varlen<T: FlashDtype>(
     let (cu_q_ptr, _cu_q_guard) = cu_seqlens_q.device_ptr(stream);
     let (cu_k_ptr, _cu_k_guard) = cu_seqlens_k.device_ptr(stream);
 
+    let mut _bt_guard = None;
+    let bt_ptr = match block_tables {
+        Some(bt) => {
+            let (p, g) = bt.device_ptr(stream);
+            _bt_guard = Some(g);
+            p as *const i32
+        }
+        None => std::ptr::null(),
+    };
+    let k_paged = if block_tables.is_some() { 1 } else { 0 };
+    let max_blocks = match block_tables {
+        Some(bt) if num_seqs > 0 => (bt.len() / num_seqs as usize) as i32,
+        _ => 0,
+    };
+
     let code = unsafe {
         T::ffi_varlen(
             q_ptr as *const T,
@@ -253,16 +276,16 @@ pub fn flash_attn_varlen<T: FlashDtype>(
             o_ptr as *mut T,
             cu_q_ptr as *const i32,
             cu_k_ptr as *const i32,
-            std::ptr::null(),
+            bt_ptr,
             num_seqs,
             max_seqlen_q,
             max_seqlen_k,
             q_heads,
             kv_heads,
             head_size,
-            1,
-            0,
-            0,
+            block_size,
+            max_blocks,
+            k_paged,
             scale,
             stream.cu_stream() as *mut c_void,
         )
@@ -271,16 +294,23 @@ pub fn flash_attn_varlen<T: FlashDtype>(
     FlashAttnError::from_status(code)
 }
 
-/// Low-level single-token decode over a paged KV cache.
+/// Low-level attention over a paged KV cache.
+///
+/// `q`/`o` are `(num_seqs, q_seq_len, q_heads, head_size)`; `q_seq_len == 1`
+/// selects the decode kernel, `> 1` the prefill kernel. `k_cache`/`v_cache` are
+/// `(num_blocks, block_size, kv_heads, head_size)`, `context_lens` is
+/// `(num_seqs,)` = total cached length (including the q tokens, which must
+/// already be present in the cache). Causal is bottom-right aligned.
 #[allow(clippy::too_many_arguments)]
 pub fn flash_attn_with_kvcache<T: FlashDtype>(
-    q: &CudaSlice<T>,
-    k_cache: &CudaSlice<T>,
-    v_cache: &CudaSlice<T>,
+    q: &impl DevicePtr<T>,
+    k_cache: &impl DevicePtr<T>,
+    v_cache: &impl DevicePtr<T>,
     o: &mut CudaSlice<T>,
-    block_tables: &CudaSlice<i32>,
-    context_lens: &CudaSlice<i32>,
+    block_tables: &impl DevicePtr<i32>,
+    context_lens: &impl DevicePtr<i32>,
     num_seqs: i32,
+    q_seq_len: i32,
     q_heads: i32,
     kv_heads: i32,
     head_size: i32,
@@ -289,6 +319,13 @@ pub fn flash_attn_with_kvcache<T: FlashDtype>(
     scale: f32,
     stream: &CudaStream,
 ) -> Result<(), FlashAttnError> {
+    if q_seq_len <= 0 {
+        return Err(FlashAttnError::InvalidShape(format!("q_seq_len={q_seq_len} must be > 0")));
+    }
+    let q_need = num_seqs as u64 * q_seq_len as u64 * q_heads as u64 * head_size as u64;
+    check_len("q", q.len(), q_need)?;
+    check_len("o", o.len(), q_need)?;
+
     let (q_ptr, _q_guard) = q.device_ptr(stream);
     let (k_ptr, _k_guard) = k_cache.device_ptr(stream);
     let (v_ptr, _v_guard) = v_cache.device_ptr(stream);
@@ -305,6 +342,7 @@ pub fn flash_attn_with_kvcache<T: FlashDtype>(
             bt_ptr as *const i32,
             lens_ptr as *const i32,
             num_seqs,
+            q_seq_len,
             q_heads,
             kv_heads,
             head_size,
@@ -320,10 +358,10 @@ pub fn flash_attn_with_kvcache<T: FlashDtype>(
 
 #[allow(clippy::too_many_arguments)]
 fn validate<T: FlashDtype>(
-    q: &CudaSlice<T>,
-    k: &CudaSlice<T>,
-    v: &CudaSlice<T>,
-    o: &CudaSlice<T>,
+    q: &impl DevicePtr<T>,
+    k: &impl DevicePtr<T>,
+    v: &impl DevicePtr<T>,
+    o: &impl DevicePtr<T>,
     batch: i32,
     q_seq_len: i32,
     kv_seq_len: i32,

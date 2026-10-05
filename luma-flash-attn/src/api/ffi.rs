@@ -131,7 +131,7 @@ unsafe extern "C" {
         stream: *mut c_void,
     ) -> i32;
 
-    /// Single-token decode reading a paged KV cache (f32).
+    /// Paged KV-cache attention (decode when `q_seq_len == 1`, prefill when `> 1`) (f32).
     pub unsafe fn flash_attn_with_kvcache_f32(
         q: *const f32,
         k_cache: *const f32,
@@ -140,6 +140,7 @@ unsafe extern "C" {
         block_tables: *const i32,
         context_lens: *const i32,
         num_seqs: i32,
+        q_seq_len: i32,
         q_heads: i32,
         kv_heads: i32,
         head_size: i32,
@@ -149,7 +150,7 @@ unsafe extern "C" {
         stream: *mut c_void,
     ) -> i32;
 
-    /// Single-token decode reading a paged KV cache (f16).
+    /// Paged KV-cache attention (decode when `q_seq_len == 1`, prefill when `> 1`) (f16).
     pub unsafe fn flash_attn_with_kvcache_f16(
         q: *const f16,
         k_cache: *const f16,
@@ -158,6 +159,7 @@ unsafe extern "C" {
         block_tables: *const i32,
         context_lens: *const i32,
         num_seqs: i32,
+        q_seq_len: i32,
         q_heads: i32,
         kv_heads: i32,
         head_size: i32,
@@ -167,7 +169,7 @@ unsafe extern "C" {
         stream: *mut c_void,
     ) -> i32;
 
-    /// Single-token decode reading a paged KV cache (bf16).
+    /// Paged KV-cache attention (decode when `q_seq_len == 1`, prefill when `> 1`) (bf16).
     pub unsafe fn flash_attn_with_kvcache_bf16(
         q: *const bf16,
         k_cache: *const bf16,
@@ -176,6 +178,7 @@ unsafe extern "C" {
         block_tables: *const i32,
         context_lens: *const i32,
         num_seqs: i32,
+        q_seq_len: i32,
         q_heads: i32,
         kv_heads: i32,
         head_size: i32,

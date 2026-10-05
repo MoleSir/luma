@@ -81,6 +81,11 @@ __device__ __forceinline__ __nv_bfloat16 f_from_float<__nv_bfloat16>(float v) {
 }
 
 // Logical KV position `j` of sequence `s` -> physical slot in the pooled cache.
+// 1. block_tables (num_seqs, max_blocks)，对每个 seq 有 max_blocks 个值表示每个逻辑块在实际块的索引
+// 2. s 表示 seq 索引
+// 3. max_blocks
+// 4. j 是 token 在 seq 中的逻辑索引，我们要的就是这个逻辑索引的真实物理索引
+// 5. block_size
 __device__ __forceinline__ int block_slot(
     const int* __restrict__ block_tables,
     int s,
@@ -88,8 +93,17 @@ __device__ __forceinline__ int block_slot(
     int j,
     int block_size
 ) {
+    // j 是在整个 seq 的逻辑 index，按照 block 划分，
+    // logical_block 是 j 的 逻辑 block 索引
+    // offset 是 j 在 block 内部的偏移（对物理/逻辑都是一致的）
     const int logical_block = j / block_size;
     const int offset = j % block_size;
+    // s * max_blocks 得到当前 seq 的起始位置
+    // logitcal_block 表示用逻辑块索引查表，
+    // 所以 block_tables[s * max_blocks + logical_block] 得到的是 j 这个索引所在物理块的 block index
+    // 大 cache 的 shape 是  (max_blocks, block_size, kv_heads, head_size)
+    // 在 token 的角度，这个 shape 是 (max_blocks, block_size)
+    // 最后返回的就是 token 相对这个的索引（token slot）
     return block_tables[s * max_blocks + logical_block] * block_size + offset;
 }
 

@@ -27,7 +27,7 @@ const char* flash_attn_last_error(void) { return g_last_error; }
 #define KVCACHE(NAME)                                                                   \
     int NAME(const void* a, const void* b, const void* c, void* d,                      \
              const void* e, const void* f,                                              \
-             int g, int h, int i, int j, int k, int l, float m, void* n) {              \
+             int g, int h, int i, int j, int k, int l, int m, float n, void* o) {       \
         return FLASH_ATTN_ERR_CUDA;                                                     \
     }
 
