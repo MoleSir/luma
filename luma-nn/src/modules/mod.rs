@@ -1,8 +1,14 @@
 pub mod activate;
+mod attention;
 mod base;
 mod common;
+mod conv;
 pub mod loss;
 mod norm;
+mod pool;
+pub use attention::*;
 pub use base::*;
 pub use common::*;
+pub use conv::*;
 pub use norm::*;
+pub use pool::*;

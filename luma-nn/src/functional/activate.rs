@@ -1,5 +1,4 @@
 use luma_tensor::{Device, Float, Tensor};
-
 use crate::NnResult;
 
 pub fn relu<D: Device>(input: &Tensor<D, Float>) -> NnResult<Tensor<D, Float>> {

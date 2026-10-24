@@ -9,13 +9,21 @@ pub trait DTypeKind<D: Device>: Sized {
     type Scalar: Send + Sync + Clone + Copy + 'static;
     type Storage: Storage<D, Self>;
     type Meta: TensorMeta<D, Self>;
-    type DType: Send + Sync + Clone + Copy + 'static + PartialEq + Eq + Debug + Default;
+    type DType: DTypeKindT;
 
     /// Runtime discriminant for this kind.
-    const KIND: KindTag;
+    const KIND: DTypeKindTag;
 }
 
-pub trait Storage<D: Device, K: DTypeKind<D>>: Send + Sync + 'static {
+pub trait DTypeKindT : 
+    Send + Sync + Clone + Copy + 'static 
+  + PartialEq + Eq + Debug + Default 
+  + Into<DType> + TryFrom<DType, Error = crate::Error> 
+{
+    fn size_of(&self) -> usize;
+}
+
+pub trait Storage<D: Device, K: DTypeKind<D>> : Send + Sync + 'static {
     fn dtype(&self) -> K::DType;
     fn device(&self) -> &D;
 }
@@ -51,11 +59,11 @@ impl DType {
     }
 
     /// The tensor kind this dtype belongs to.
-    pub fn kind(&self) -> KindTag {
+    pub fn kind(&self) -> DTypeKindTag {
         match self {
-            DType::F32 | DType::F64 | DType::F16 | DType::BF16 => KindTag::Float,
-            DType::I32 | DType::U8 | DType::U32 => KindTag::Int,
-            DType::Bool => KindTag::Bool,
+            DType::F32 | DType::F64 | DType::F16 | DType::BF16 => DTypeKindTag::Float,
+            DType::I32 | DType::U8 | DType::U32 => DTypeKindTag::Int,
+            DType::Bool => DTypeKindTag::Bool,
         }
     }
 
@@ -84,6 +92,17 @@ impl DType {
         }
     }
 
+    /// Convert to `FloatDType` if this is a float dtype
+    pub fn try_as_float(&self) -> crate::Result<FloatDType> {
+        match self {
+            DType::F32 => Ok(FloatDType::F32),
+            DType::F64 => Ok(FloatDType::F64),
+            DType::F16 => Ok(FloatDType::F16),
+            DType::BF16 => Ok(FloatDType::BF16),
+            _ => Err(crate::Error::DTypeKindMismatch { expected: DTypeKindTag::Float, got: self.kind() }),
+        }
+    }
+
     /// Convert to `IntDType` if this is an int dtype, otherwise panic.
     pub fn as_int(&self) -> IntDType {
         match self {
@@ -93,14 +112,53 @@ impl DType {
             _ => panic!("DType::{:?} is not an int dtype", self),
         }
     }
+
+    /// Convert to `IntDType` if this is an int dtype,
+    pub fn try_as_int(&self) -> crate::Result<IntDType> {
+        match self {
+            DType::I32 => Ok(IntDType::I32),
+            DType::U8 => Ok(IntDType::U8),
+            DType::U32 => Ok(IntDType::U32),
+            _ => Err(crate::Error::DTypeKindMismatch { expected: DTypeKindTag::Int, got: self.kind() }),
+        }
+    }
 }
 
 /// Runtime discriminant mirroring the compile-time kind markers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum KindTag {
+pub enum DTypeKindTag {
     Float,
     Int,
     Bool,
+}
+
+impl DTypeKindT for FloatDType {
+    fn size_of(&self) -> usize {
+        match self {
+            FloatDType::F32 => 4,
+            FloatDType::F64 => 8,
+            FloatDType::F16 => 2,
+            FloatDType::BF16 => 2,
+        }
+    }
+}
+
+impl DTypeKindT for IntDType {
+    fn size_of(&self) -> usize {
+        match self {
+            IntDType::I32 => 4,
+            IntDType::U8 => 1,
+            IntDType::U32 => 4,
+        }
+    }
+}
+
+impl DTypeKindT for BoolDType {
+    fn size_of(&self) -> usize {
+        match self {
+            BoolDType::Bool => 1,
+        }
+    }
 }
 
 /// The three tensor kinds, used only as zero-sized compile-time markers on
@@ -114,7 +172,7 @@ impl<D: Device> DTypeKind<D> for Float {
     type Storage = D::FloatStorage;
     type Meta = FloatMeta<D>;
     type DType = FloatDType;
-    const KIND: KindTag = KindTag::Float;
+    const KIND: DTypeKindTag = DTypeKindTag::Float;
 }
 
 impl<D: Device> DTypeKind<D> for Int {
@@ -122,7 +180,7 @@ impl<D: Device> DTypeKind<D> for Int {
     type Storage = D::IntStorage;
     type Meta = ();
     type DType = IntDType;
-    const KIND: KindTag = KindTag::Int;
+    const KIND: DTypeKindTag = DTypeKindTag::Int;
 }
 
 impl<D: Device> DTypeKind<D> for Bool {
@@ -130,7 +188,7 @@ impl<D: Device> DTypeKind<D> for Bool {
     type Storage = D::BoolStorage;
     type Meta = ();
     type DType = BoolDType;
-    const KIND: KindTag = KindTag::Bool;
+    const KIND: DTypeKindTag = DTypeKindTag::Bool;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -167,6 +225,19 @@ impl Into<DType> for FloatDType {
     }
 }
 
+impl TryFrom<DType> for FloatDType {
+    type Error = crate::Error;
+    fn try_from(value: DType) -> Result<Self, Self::Error> {
+        match value {
+            DType::BF16 => Ok(Self::BF16),
+            DType::F16 => Ok(Self::F16),
+            DType::F32 => Ok(Self::F32),
+            DType::F64 => Ok(Self::F64),
+            value => Err(crate::Error::DTypeKindMismatch { expected: DTypeKindTag::Float, got: value.kind() })
+        }
+    }
+}
+
 impl Into<DType> for IntDType {
     fn into(self) -> DType {
         match self {
@@ -177,10 +248,32 @@ impl Into<DType> for IntDType {
     }
 }
 
+impl TryFrom<DType> for IntDType {
+    type Error = crate::Error;
+    fn try_from(value: DType) -> Result<Self, Self::Error> {
+        match value {
+            DType::I32 => Ok(Self::I32),
+            DType::U32 => Ok(Self::U32),
+            DType::U8 => Ok(Self::U8),
+            value => Err(crate::Error::DTypeKindMismatch { expected: DTypeKindTag::Int, got: value.kind() })
+        }
+    }
+}
+
 impl Into<DType> for BoolDType {
     fn into(self) -> DType {
         match self {
             BoolDType::Bool => DType::Bool,
+        }
+    }
+}
+
+impl TryFrom<DType> for BoolDType {
+    type Error = crate::Error;
+    fn try_from(value: DType) -> Result<Self, Self::Error> {
+        match value {
+            DType::Bool => Ok(Self::Bool),
+            value => Err(crate::Error::DTypeKindMismatch { expected: DTypeKindTag::Bool, got: value.kind() })
         }
     }
 }

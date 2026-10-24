@@ -27,7 +27,7 @@ use step::Slot;
 pub use step::Step;
 
 use luma_tensor::dtype::{BoolDType, DType};
-use luma_tensor::{BinaryOp, Bool, CmpOp, Device, DynTensor, Float, Int, KindTag, Shape, Tensor};
+use luma_tensor::{BinaryOp, Bool, CmpOp, Device, DynTensor, Float, Int, DTypeKindTag, Shape, Tensor};
 
 use crate::graph::Graph;
 use crate::{CompileResult, ExecuteError};
@@ -66,17 +66,17 @@ impl<D: Device> GraphExecutor<D> {
         let mut slots: Vec<Slot> = Vec::with_capacity(graph.values.len());
         for v in &graph.values {
             let slot = match kinds[v.id] {
-                KindTag::Float => {
+                DTypeKindTag::Float => {
                     let s = Slot::F(nf);
                     nf += 1;
                     s
                 }
-                KindTag::Int => {
+                DTypeKindTag::Int => {
                     let s = Slot::I(ni);
                     ni += 1;
                     s
                 }
-                KindTag::Bool => {
+                DTypeKindTag::Bool => {
                     let s = Slot::B(nb);
                     nb += 1;
                     s
@@ -321,25 +321,25 @@ impl<D: Device> GraphExecutor<D> {
             Step::CastFromF(dt, a, o) => {
                 let t = self.floats[a.f()].as_ref().unwrap().clone();
                 match dt.kind() {
-                    KindTag::Float => self.floats[o.f()] = Some(t.cast(dt.as_float())?),
-                    KindTag::Int => self.ints[o.i()] = Some(t.cast(dt.as_int())?),
-                    KindTag::Bool => self.bools[o.b()] = Some(t.cast(BoolDType::Bool)?),
+                    DTypeKindTag::Float => self.floats[o.f()] = Some(t.cast(dt.as_float())?),
+                    DTypeKindTag::Int => self.ints[o.i()] = Some(t.cast(dt.as_int())?),
+                    DTypeKindTag::Bool => self.bools[o.b()] = Some(t.cast(BoolDType::Bool)?),
                 }
             }
             Step::CastFromI(dt, a, o) => {
                 let t = self.ints[a.i()].as_ref().unwrap().clone();
                 match dt.kind() {
-                    KindTag::Float => self.floats[o.f()] = Some(t.cast(dt.as_float())?),
-                    KindTag::Int => self.ints[o.i()] = Some(t.cast(dt.as_int())?),
-                    KindTag::Bool => self.bools[o.b()] = Some(t.cast(BoolDType::Bool)?),
+                    DTypeKindTag::Float => self.floats[o.f()] = Some(t.cast(dt.as_float())?),
+                    DTypeKindTag::Int => self.ints[o.i()] = Some(t.cast(dt.as_int())?),
+                    DTypeKindTag::Bool => self.bools[o.b()] = Some(t.cast(BoolDType::Bool)?),
                 }
             }
             Step::CastFromB(dt, a, o) => {
                 let t = self.bools[a.b()].as_ref().unwrap().clone();
                 match dt.kind() {
-                    KindTag::Float => self.floats[o.f()] = Some(t.cast(dt.as_float())?),
-                    KindTag::Int => self.ints[o.i()] = Some(t.cast(dt.as_int())?),
-                    KindTag::Bool => self.bools[o.b()] = Some(t.cast(BoolDType::Bool)?),
+                    DTypeKindTag::Float => self.floats[o.f()] = Some(t.cast(dt.as_float())?),
+                    DTypeKindTag::Int => self.ints[o.i()] = Some(t.cast(dt.as_int())?),
+                    DTypeKindTag::Bool => self.bools[o.b()] = Some(t.cast(BoolDType::Bool)?),
                 }
             }
             Step::ReduceF(op, dims, keepdim, a, o) => {
@@ -445,7 +445,7 @@ impl<D: Device> GraphExecutor<D> {
                 self.floats[o.f()] = Some(r);
             }
             Step::RmsNorm(eps, a, b, o) => {
-                let r = self.floats[a.f()].as_ref().unwrap().rms_norm(self.floats[b.f()].as_ref().unwrap(), *eps)?;
+                let r = self.floats[a.f()].as_ref().unwrap().rms_norm(Some(self.floats[b.f()].as_ref().unwrap()), None, *eps)?;
                 self.floats[o.f()] = Some(r);
             }
             Step::PickF(m, tv, fv, o) => {

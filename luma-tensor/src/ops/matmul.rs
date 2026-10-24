@@ -39,6 +39,7 @@ impl<D: Device> MatmulDTypeKind<D> for Int {
 
 impl<D: Device, K: MatmulDTypeKind<D>> Tensor<D, K> {
     pub fn matmul(&self, rhs: &Self) -> crate::Result<Self> {
+        self.ensure_same_device(rhs, "matmul")?;
         let out_shape = matmul_out_shape(self.shape(), rhs.shape())?;
         let storage = K::matmul_dispatch(&*self.storage_read()?, self.layout(), &*rhs.storage_read()?, rhs.layout(), &out_shape)?;
         let meta = K::Meta::on_matmul(self, rhs);

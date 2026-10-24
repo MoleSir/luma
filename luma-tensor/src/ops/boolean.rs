@@ -4,19 +4,22 @@ use crate::{Bool, DTypeKind, Device, Float, Int, Layout, Tensor, TensorMeta};
 
 impl<D: Device> Tensor<D, Bool> {
     pub fn and(&self, rhs: &Self) -> crate::Result<Self> {
-        let shape = self.same_shape(rhs, "and")?.clone();
+        self.ensure_same_device(rhs, "and")?;
+        let shape = self.ensure_same_shape(rhs, "and")?.clone();
         let storage = D::b_and(&*self.storage_read()?, self.layout(), &*rhs.storage_read()?, rhs.layout())?;
         Ok(Self::from_storage(storage, shape, ()))
     }
 
     pub fn or(&self, rhs: &Self) -> crate::Result<Self> {
-        let shape = self.same_shape(rhs, "or")?.clone();
+        self.ensure_same_device(rhs, "or")?;
+        let shape = self.ensure_same_shape(rhs, "or")?.clone();
         let storage = D::b_or(&*self.storage_read()?, self.layout(), &*rhs.storage_read()?, rhs.layout())?;
         Ok(Self::from_storage(storage, shape, ()))
     }
 
     pub fn xor(&self, rhs: &Self) -> crate::Result<Self> {
-        let shape = self.same_shape(rhs, "xor")?.clone();
+        self.ensure_same_device(rhs, "xor")?;
+        let shape = self.ensure_same_shape(rhs, "xor")?.clone();
         let storage = D::b_xor(&*self.storage_read()?, self.layout(), &*rhs.storage_read()?, rhs.layout())?;
         Ok(Self::from_storage(storage, shape, ()))
     }
@@ -167,6 +170,8 @@ impl<D: Device> PickDTypeKind<D> for Bool {
 
 impl<D: Device> Tensor<D, Bool> {
     pub fn pick<K: PickDTypeKind<D>>(&self, on_true: &Tensor<D, K>, on_false: &Tensor<D, K>) -> crate::Result<Tensor<D, K>> {
+        self.ensure_same_device(on_true, "pick")?;
+        self.ensure_same_device(on_false, "pick")?;
         let storage = K::pick_dispatch(
             &*self.storage_read()?,
             self.layout(),
@@ -181,6 +186,7 @@ impl<D: Device> Tensor<D, Bool> {
 
     /// `mask ? value : on_false` with a scalar true-value.
     pub fn pick_true<K: PickDTypeKind<D>>(&self, value: K::Scalar, on_false: &Tensor<D, K>) -> crate::Result<Tensor<D, K>> {
+        self.ensure_same_device(on_false, "pick_true")?;
         let storage = K::pick_true_dispatch(&*self.storage_read()?, self.layout(), value, &*on_false.storage_read()?, on_false.layout())?;
         let meta = K::Meta::on_pick(self, None, Some(on_false));
         Ok(Tensor::from_storage(storage, on_false.shape().clone(), meta))
@@ -188,6 +194,7 @@ impl<D: Device> Tensor<D, Bool> {
 
     /// `mask ? on_true : value` with a scalar false-value.
     pub fn pick_false<K: PickDTypeKind<D>>(&self, on_true: &Tensor<D, K>, value: K::Scalar) -> crate::Result<Tensor<D, K>> {
+        self.ensure_same_device(on_true, "pick_false")?;
         let storage = K::pick_false_dispatch(&*self.storage_read()?, self.layout(), &*on_true.storage_read()?, on_true.layout(), value)?;
         let meta = K::Meta::on_pick(self, Some(on_true), None);
         Ok(Tensor::from_storage(storage, on_true.shape().clone(), meta))

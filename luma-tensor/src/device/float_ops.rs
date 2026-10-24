@@ -137,11 +137,6 @@ pub trait FloatOps<D: super::Device> {
         Ok(None)
     }
 
-    // nn fused kernels
-    fn f_softmax(x: &D::FloatStorage, layout: &Layout, dim: usize) -> Result<D::FloatStorage>;
-
-    fn f_rms_norm(x: &D::FloatStorage, x_l: &Layout, weight: &D::FloatStorage, weight_l: &Layout, eps: f64) -> Result<D::FloatStorage>;
-
     // pick via a bool mask
     fn f_pick(
         mask: &D::BoolStorage,

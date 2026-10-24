@@ -1,0 +1,52 @@
+[package]
+name = "luma-dist"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "Distributed (collective communication) library for luma"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+thiserror = { workspace = true }
+luma-cuda = { workspace = true, optional = true }
+cudarc = { workspace = true, optional = true, features = ["nccl", "f16"] }
+half = { workspace = true, optional = true }
+
+[dev-dependencies]
+anyhow = "1"
+luma-cpu = { workspace = true }
+
+[features]
+nccl = ["dep:luma-cuda", "dep:cudarc", "dep:half"]
+tcp = []
+
+# Example programs that talk to NCCL; only build/run them with `--features nccl`.
+[[example]]
+name = "nccl-all_gather"
+required-features = ["nccl"]
+
+[[example]]
+name = "nccl-all_reduce"
+required-features = ["nccl"]
+
+[[example]]
+name = "nccl-broadcast"
+required-features = ["nccl"]
+
+[[example]]
+name = "nccl-reduce"
+required-features = ["nccl"]
+
+[[example]]
+name = "nccl-reduce_scatter"
+required-features = ["nccl"]
+
+[[example]]
+name = "nccl-sendrecv"
+required-features = ["nccl"]
+
+[[example]]
+name = "nccl-multiprocess"
+required-features = ["nccl"]

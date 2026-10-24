@@ -1,8 +1,6 @@
 use std::borrow::Cow;
-
 use crate::{
-    Bool, DTypeKind, Device, Float, Int, Layout, Shape, Tensor,
-    dtype::{BoolDType, FloatDType, IntDType},
+    Bool, DType, DTypeKind, Device, Float, Int, Layout, Shape, Tensor, dtype::{BoolDType, FloatDType, IntDType}
 };
 
 pub struct TensorCreationOptions<D: Device, K: DTypeKind<D>> {
@@ -19,24 +17,6 @@ impl<D: Device, K: DTypeKind<D>> From<&D> for TensorCreationOptions<D, K> {
 impl<D: Device, K: DTypeKind<D>> From<D> for TensorCreationOptions<D, K> {
     fn from(device: D) -> Self {
         Self { device, dtype: K::DType::default() }
-    }
-}
-
-impl<D: Device> From<FloatDType> for TensorCreationOptions<D, Float> {
-    fn from(dtype: FloatDType) -> Self {
-        Self { device: D::default(), dtype }
-    }
-}
-
-impl<D: Device> From<IntDType> for TensorCreationOptions<D, Int> {
-    fn from(dtype: IntDType) -> Self {
-        Self { device: D::default(), dtype }
-    }
-}
-
-impl<D: Device> From<BoolDType> for TensorCreationOptions<D, Bool> {
-    fn from(dtype: BoolDType) -> Self {
-        Self { device: D::default(), dtype }
     }
 }
 
@@ -57,6 +37,51 @@ impl<D: Device, K: DTypeKind<D>> From<(D, K::DType)> for TensorCreationOptions<D
         Self { device, dtype }
     }
 }
+
+// =================================================================================== //
+//                     Float
+// =================================================================================== //
+
+impl<D: Device> From<FloatDType> for TensorCreationOptions<D, Float> {
+    fn from(dtype: FloatDType) -> Self {
+        Self { device: D::default(), dtype }
+    }
+}
+
+impl<D: Device> From<DType> for TensorCreationOptions<D, Float> {
+    fn from(dtype: DType) -> Self {
+        Self { device: D::default(), dtype: dtype.as_float() }
+    }
+}
+
+// =================================================================================== //
+//                     Float
+// =================================================================================== //
+
+impl<D: Device> From<IntDType> for TensorCreationOptions<D, Int> {
+    fn from(dtype: IntDType) -> Self {
+        Self { device: D::default(), dtype }
+    }
+}
+
+impl<D: Device> From<DType> for TensorCreationOptions<D, Int> {
+    fn from(dtype: DType) -> Self {
+        Self { device: D::default(), dtype: dtype.as_int() }
+    }
+}
+
+// =================================================================================== //
+//                     Float
+// =================================================================================== //
+
+impl<D: Device> From<BoolDType> for TensorCreationOptions<D, Bool> {
+    fn from(dtype: BoolDType) -> Self {
+        Self { device: D::default(), dtype }
+    }
+}
+
+
+
 
 pub trait ConstructDTypeKind<D: Device>: DTypeKind<D> {
     fn zeros_dispatch(shape: &Shape, device: &D, dtype: Self::DType) -> crate::Result<Self::Storage>;

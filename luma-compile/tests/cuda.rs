@@ -153,6 +153,11 @@ fn cuda_indexing() {
 
 #[test]
 fn cuda_nn() {
+    common::nn::test_mse_loss(&*CUDA);
+    common::nn::test_cross_entropy_loss(&*CUDA);
+    common::nn::test_max_pool2d(&*CUDA);
+    common::nn::test_avg_pool2d(&*CUDA);
+    common::nn::test_adaptive_avg_pool2d(&*CUDA);
     common::nn::test_softmax(&*CUDA);
     common::nn::test_rms_norm(&*CUDA);
     common::nn::test_arange(&*CUDA);

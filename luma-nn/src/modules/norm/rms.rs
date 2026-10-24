@@ -15,11 +15,13 @@ pub struct RMSNormConfig {
     pub normalized_shape: usize,
     pub eps: f64,
     pub weight_init: Init,
+    pub bias: bool,
+    pub bias_init: Init,
 }
 
 impl RMSNormConfig {
     pub fn new(normalized_shape: usize) -> Self {
-        Self { normalized_shape, eps: 1e-5, weight_init: Init::Ones }
+        Self { normalized_shape, eps: 1e-5, weight_init: Init::Ones, bias: false, bias_init: Init::Zeros }
     }
 }
 
@@ -31,6 +33,7 @@ impl RMSNormConfig {
 #[module(display = "display")]
 pub struct RMSNorm<Dev: Device> {
     pub weight: Parameter<Dev>,
+    pub bias: Option<Parameter<Dev>>,
 
     #[module(skip)]
     pub normalized_shape: usize,
@@ -49,8 +52,13 @@ impl<Dev: Device> RMSNorm<Dev> {
         let opts = (&options.device, options.dtype);
 
         let weight = config.weight_init.init_param((config.normalized_shape,), opts)?;
+        let bias = if config.bias {
+            Some(config.bias_init.init_param((config.normalized_shape,), opts)?)
+        } else {
+            None
+        };
 
-        Ok(Self { weight, normalized_shape: config.normalized_shape, eps: config.eps })
+        Ok(Self { weight, bias, normalized_shape: config.normalized_shape, eps: config.eps })
     }
 
     pub fn display(&self) -> String {
@@ -59,6 +67,6 @@ impl<Dev: Device> RMSNorm<Dev> {
 
     #[inline]
     pub fn forward(&self, input: &Tensor<Dev>) -> NnResult<Tensor<Dev>> {
-        F::rms_norm(input, &self.weight, self.eps)
+        F::rms_norm(input, Some(&self.weight), self.bias.as_deref(), self.eps)
     }
 }

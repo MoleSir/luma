@@ -127,6 +127,132 @@ BINARY_OP(uint8_t, band_u8, x & y)
 BINARY_OP(uint8_t, bor_u8,  x | y)
 BINARY_OP(uint8_t, bxor_u8, x ^ y)
 
+// ---- in-place (dst is both the lhs and the output) ----
+#define BINARY_OP_INPLACE(TYPENAME, FN_NAME, OP) \
+extern "C" __global__ void FN_NAME( \
+    const size_t numel, \
+    const size_t num_dims, \
+    const size_t *dims, \
+    const size_t *dst_strides, \
+    const size_t *src_strides, \
+    TYPENAME *dst, \
+    const TYPENAME *src \
+) { \
+    bool dst_cont = is_contiguous(num_dims, dims, dst_strides); \
+    bool src_cont = is_contiguous(num_dims, dims, src_strides); \
+    const size_t tid = blockIdx.x * blockDim.x + threadIdx.x; \
+    const size_t tstride = blockDim.x * gridDim.x; \
+    if (dst_cont && src_cont) { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            dst[i] = dst[i] OP src[i]; \
+        } \
+    } else if (src_cont) { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            size_t di = logical_index_to_physical_index(i, num_dims, dims, dst_strides); \
+            dst[di] = dst[di] OP src[i]; \
+        } \
+    } else if (dst_cont) { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            size_t si = logical_index_to_physical_index(i, num_dims, dims, src_strides); \
+            dst[i] = dst[i] OP src[si]; \
+        } \
+    } else { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            size_t di = 0; \
+            size_t si = 0; \
+            logical_index_to_physical_index_2(i, num_dims, dims, dst_strides, src_strides, &di, &si); \
+            dst[di] = dst[di] OP src[si]; \
+        } \
+    } \
+}
+
+#define BINARY_OP_INPLACE_FN(TYPENAME, FN_NAME, FN) \
+extern "C" __global__ void FN_NAME( \
+    const size_t numel, \
+    const size_t num_dims, \
+    const size_t *dims, \
+    const size_t *dst_strides, \
+    const size_t *src_strides, \
+    TYPENAME *dst, \
+    const TYPENAME *src \
+) { \
+    bool dst_cont = is_contiguous(num_dims, dims, dst_strides); \
+    bool src_cont = is_contiguous(num_dims, dims, src_strides); \
+    const size_t tid = blockIdx.x * blockDim.x + threadIdx.x; \
+    const size_t tstride = blockDim.x * gridDim.x; \
+    if (dst_cont && src_cont) { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            dst[i] = FN(dst[i], src[i]); \
+        } \
+    } else if (src_cont) { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            size_t di = logical_index_to_physical_index(i, num_dims, dims, dst_strides); \
+            dst[di] = FN(dst[di], src[i]); \
+        } \
+    } else if (dst_cont) { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            size_t si = logical_index_to_physical_index(i, num_dims, dims, src_strides); \
+            dst[i] = FN(dst[i], src[si]); \
+        } \
+    } else { \
+        for (size_t i = tid; i < numel; i += tstride) { \
+            size_t di = 0; \
+            size_t si = 0; \
+            logical_index_to_physical_index_2(i, num_dims, dims, dst_strides, src_strides, &di, &si); \
+            dst[di] = FN(dst[di], src[si]); \
+        } \
+    } \
+}
+
+BINARY_OP_INPLACE(float,       biadd_f32, +)
+BINARY_OP_INPLACE(double,      biadd_f64, +)
+BINARY_OP_INPLACE(uint8_t,     biadd_u8,  +)
+BINARY_OP_INPLACE(uint32_t,    biadd_u32, +)
+BINARY_OP_INPLACE(int32_t,     biadd_i32, +)
+
+BINARY_OP_INPLACE(float,       bisub_f32, -)
+BINARY_OP_INPLACE(double,      bisub_f64, -)
+BINARY_OP_INPLACE(uint8_t,     bisub_u8,  -)
+BINARY_OP_INPLACE(uint32_t,    bisub_u32, -)
+BINARY_OP_INPLACE(int32_t,     bisub_i32, -)
+
+BINARY_OP_INPLACE(float,       bimul_f32, *)
+BINARY_OP_INPLACE(double,      bimul_f64, *)
+BINARY_OP_INPLACE(uint8_t,     bimul_u8,  *)
+BINARY_OP_INPLACE(uint32_t,    bimul_u32, *)
+BINARY_OP_INPLACE(int32_t,     bimul_i32, *)
+
+BINARY_OP_INPLACE(float,       bidiv_f32, /)
+BINARY_OP_INPLACE(double,      bidiv_f64, /)
+BINARY_OP_INPLACE(uint8_t,     bidiv_u8,  /)
+BINARY_OP_INPLACE(uint32_t,    bidiv_u32, /)
+BINARY_OP_INPLACE(int32_t,     bidiv_i32, /)
+
+BINARY_OP_INPLACE_FN(float,       bimin_f32, ming)
+BINARY_OP_INPLACE_FN(double,      bimin_f64, ming)
+BINARY_OP_INPLACE_FN(uint8_t,     bimin_u8,  ming)
+BINARY_OP_INPLACE_FN(uint32_t,    bimin_u32, ming)
+BINARY_OP_INPLACE_FN(int32_t,     bimin_i32, ming)
+
+BINARY_OP_INPLACE_FN(float,       bimax_f32, maxg)
+BINARY_OP_INPLACE_FN(double,      bimax_f64, maxg)
+BINARY_OP_INPLACE_FN(uint8_t,     bimax_u8,  maxg)
+BINARY_OP_INPLACE_FN(uint32_t,    bimax_u32, maxg)
+BINARY_OP_INPLACE_FN(int32_t,     bimax_i32, maxg)
+
+BINARY_OP_INPLACE(__half,        biadd_f16,  +)
+BINARY_OP_INPLACE(__nv_bfloat16, biadd_bf16, +)
+BINARY_OP_INPLACE(__half,        bisub_f16,  -)
+BINARY_OP_INPLACE(__nv_bfloat16, bisub_bf16, -)
+BINARY_OP_INPLACE(__half,        bimul_f16,  *)
+BINARY_OP_INPLACE(__nv_bfloat16, bimul_bf16, *)
+BINARY_OP_INPLACE(__half,        bidiv_f16,  /)
+BINARY_OP_INPLACE(__nv_bfloat16, bidiv_bf16, /)
+BINARY_OP_INPLACE_FN(__half,        bimin_f16,  ming)
+BINARY_OP_INPLACE_FN(__nv_bfloat16, bimin_bf16, ming)
+BINARY_OP_INPLACE_FN(__half,        bimax_f16,  maxg)
+BINARY_OP_INPLACE_FN(__nv_bfloat16, bimax_bf16, maxg)
+
 extern "C" __global__ void pick_f32(
     const size_t numel, const size_t num_dims,
     const size_t *dims, const size_t *mask_strides, const size_t *val_strides,

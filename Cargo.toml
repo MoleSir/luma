@@ -4,6 +4,7 @@ members = [
     "luma-tensor",
     "luma-cpu",
     "luma-cuda",
+    "luma-wgpu",
     "luma-nn",
     "luma-optim",
     "luma-dataset",
@@ -13,6 +14,7 @@ members = [
     "luma-onnx",
     "luma-ml",
     "luma-flash-attn",
+    "luma-dist",
 ]
 
 default-members = [
@@ -30,7 +32,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.3.2"
+version = "0.4.0"
 edition = "2024"
 repository = "https://github.com/MoleSir/luma.git"
 description = "A tiny ML framework"
@@ -38,18 +40,20 @@ keywords = ["machine-learning", "auto-grad"]
 license = "MIT"
 
 [workspace.dependencies]
-luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.3.2" }
-luma-cpu = { path = "./luma-cpu", package = "luma-cpu", version = "0.3.2" }
-luma-cuda = { path = "./luma-cuda", package = "luma-cuda", version = "0.3.2" }
-luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.3.2" }
-luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.3.2" }
-luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.3.2" }
-luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.3.2" }
-luma-io = { path = "./luma-io", package = "luma-io", version = "0.3.2" }
-luma-compile = { path = "./luma-compile", package = "luma-compile", version = "0.3.2" }
-luma-onnx = { path = "./luma-onnx", package = "luma-onnx", version = "0.3.2" }
-luma-ml = { path = "./luma-ml", package = "luma-ml", version = "0.3.2" }
-luma-flash-attn = { path = "./luma-flash-attn", package = "luma-flash-attn", version = "0.3.2" }
+luma-tensor = { path = "./luma-tensor", package = "luma-tensor", version = "0.4.0" }
+luma-cpu = { path = "./luma-cpu", package = "luma-cpu", version = "0.4.0" }
+luma-cuda = { path = "./luma-cuda", package = "luma-cuda", version = "0.4.0" }
+luma-wgpu = { path = "./luma-wgpu", package = "luma-wgpu", version = "0.4.0" }
+luma-nn = { path = "./luma-nn", package = "luma-nn", version = "0.4.0" }
+luma-optim = { path = "./luma-optim", package = "luma-optim", version = "0.4.0" }
+luma-dataset = { path = "./luma-dataset", package = "luma-dataset", version = "0.4.0" }
+luma-macros = { path = "./luma-macros", package = "luma-macros", version = "0.4.0" }
+luma-io = { path = "./luma-io", package = "luma-io", version = "0.4.0" }
+luma-compile = { path = "./luma-compile", package = "luma-compile", version = "0.4.0" }
+luma-onnx = { path = "./luma-onnx", package = "luma-onnx", version = "0.4.0" }
+luma-ml = { path = "./luma-ml", package = "luma-ml", version = "0.4.0" }
+luma-flash-attn = { path = "./luma-flash-attn", package = "luma-flash-attn", version = "0.4.0" }
+luma-dist = { path = "./luma-dist", package = "luma-dist", version = "0.4.0" }
 
 thiserror = "2.0"
 serde = { version = "1", features = ["derive"] }
@@ -63,6 +67,7 @@ paste = "1.0.15"
 bytemuck = "1"
 half = { version = "2.7", features = ["bytemuck"] }
 cudarc = "0.19.8"
+wgpu = "30.0.1"
 proc-macro2 = "1.0"
 quote = "1.0"
 syn = "2.0"
@@ -75,3 +80,4 @@ flate2 = "1.1"
 memmap2 = "0.9.9"
 derive_builder = "0.20"
 prost = "0.12.1"
+pollster = "1.0"

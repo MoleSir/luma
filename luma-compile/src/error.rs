@@ -6,7 +6,7 @@
 
 use crate::frontend::verify::VerifyError;
 use crate::graph::Scalar;
-use luma_tensor::{DType, KindTag, Shape};
+use luma_tensor::{DType, DTypeKindTag, Shape};
 
 #[thiserrorctx::context_error]
 pub enum CompileError {
@@ -81,19 +81,19 @@ pub enum ExecuteError {
     UnsupportedOp(String),
 
     #[error("executor: {what}: expected {expected:?}, got {got:?}")]
-    KindMismatch { what: &'static str, expected: KindTag, got: KindTag },
+    KindMismatch { what: &'static str, expected: DTypeKindTag, got: DTypeKindTag },
 
     #[error("executor: scalar {scalar} does not match operand kind {kind:?}")]
-    ScalarKindMismatch { scalar: Scalar, kind: KindTag },
+    ScalarKindMismatch { scalar: Scalar, kind: DTypeKindTag },
 
     #[error("executor: {op} needs two operands of the same numeric kind, got {a:?}/{b:?}")]
-    PairKindMismatch { op: String, a: KindTag, b: KindTag },
+    PairKindMismatch { op: String, a: DTypeKindTag, b: DTypeKindTag },
 
     #[error("executor: Cat inputs must share one kind, got {expected:?}/{got:?}")]
-    CatKindMismatch { expected: KindTag, got: KindTag },
+    CatKindMismatch { expected: DTypeKindTag, got: DTypeKindTag },
 
     #[error("executor: Pick branches must share one kind, got {a:?}/{b:?}")]
-    BranchKindMismatch { a: KindTag, b: KindTag },
+    BranchKindMismatch { a: DTypeKindTag, b: DTypeKindTag },
 
     #[error("executor: scalar Pick is not yet supported — the IR does not record the scalar operand")]
     PickScalarUnsupported,

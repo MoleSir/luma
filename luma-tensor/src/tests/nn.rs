@@ -2,6 +2,12 @@
 
 use super::*;
 use crate::Device;
+use crate::dtype::FloatDType;
+use crate::ops::NnOpDefault;
+
+fn tensor_float_dev<D: Device, S: Into<Shape>>(data: &[f64], shape: S, device: &D, dtype: FloatDType) -> Tensor<D> {
+    Tensor::<D>::from_slice(data, shape, (device, dtype)).unwrap()
+}
 
 #[allow(dead_code)]
 pub fn test_softmax_dim0(device: &impl Device) {
@@ -52,7 +58,7 @@ pub fn test_softmax_grad(device: &impl Device) {
 pub fn test_rms_norm_f32(device: &impl Device) {
     let x = tensor_f32_dev(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3), device);
     let w = tensor_f32_dev(&[1.0, 1.0, 1.0], (3,), device);
-    let out = x.rms_norm(&w, 1e-5).unwrap();
+    let out = x.rms_norm(Some(&w), None, 1e-5).unwrap();
     assert_eq!(out.dims(), &[2, 3]);
     let v = out.to_vec().unwrap();
     for row in v.chunks(3) {
@@ -65,7 +71,7 @@ pub fn test_rms_norm_f32(device: &impl Device) {
 pub fn test_rms_norm_weighted(device: &impl Device) {
     let x = tensor_f32_dev(&[1.0, 2.0, 3.0], (3,), device);
     let w = tensor_f32_dev(&[2.0, 0.0, 1.0], (3,), device);
-    let out = x.rms_norm(&w, 0.0).unwrap();
+    let out = x.rms_norm(Some(&w), None, 0.0).unwrap();
     let v = out.to_vec().unwrap();
     let inv_rms = 1.0_f64 / (14.0_f64 / 3.0_f64).sqrt();
     let e0 = 1.0 * inv_rms * 2.0;
@@ -73,6 +79,260 @@ pub fn test_rms_norm_weighted(device: &impl Device) {
     assert_close(&[v[0]], &[e0], 1e-4, 1e-4);
     assert!((v[1] - 0.0).abs() < 1e-5, "expected 0, got {}", v[1]);
     assert_close(&[v[2]], &[e2], 1e-4, 1e-4);
+}
+
+#[allow(dead_code)]
+pub fn test_rms_norm_bias(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let wdata = [0.5, 1.0, 2.0];
+    let bdata = [0.1, -0.2, 0.3];
+
+    let x = tensor_float_dev(&data, (2, 3), device, dtype);
+    let w = tensor_float_dev(&wdata, (3,), device, dtype);
+    let b = tensor_float_dev(&bdata, (3,), device, dtype);
+    x.set_requires_grad(true);
+    w.set_requires_grad(true);
+    b.set_requires_grad(true);
+    let loss = x.rms_norm(Some(&w), Some(&b), 1e-5).unwrap().sum_all().unwrap();
+    let grads = loss.backward().unwrap();
+
+    let x2 = tensor_float_dev(&data, (2, 3), device, dtype);
+    let w2 = tensor_float_dev(&wdata, (3,), device, dtype);
+    let b2 = tensor_float_dev(&bdata, (3,), device, dtype);
+    x2.set_requires_grad(true);
+    w2.set_requires_grad(true);
+    b2.set_requires_grad(true);
+    let ms = x2.sqr().unwrap().mean_keepdim(1).unwrap();
+    let rms = (ms + 1e-5).sqrt().unwrap();
+    let out = x2.broadcast_div(&rms).unwrap().broadcast_mul(&w2).unwrap().broadcast_add(&b2).unwrap();
+    let loss2 = out.sum_all().unwrap();
+    let grads2 = loss2.backward().unwrap();
+
+    for (t1, t2) in [(&x, &x2), (&w, &w2), (&b, &b2)] {
+        assert_close(&grads.get(t1).unwrap().to_vec().unwrap(), &grads2.get(t2).unwrap().to_vec().unwrap(), tol, tol);
+    }
+}
+
+#[allow(dead_code)]
+pub fn test_rms_norm_grad(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let wdata = [0.5, 1.0, 2.0];
+
+    // Fused path (NnProvide override / composition fallback).
+    let x = tensor_float_dev(&data, (2, 3), device, dtype);
+    let w = tensor_float_dev(&wdata, (3,), device, dtype);
+    x.set_requires_grad(true);
+    w.set_requires_grad(true);
+    let loss = x.rms_norm(Some(&w), None, 1e-5).unwrap().sum_all().unwrap();
+    let grads = loss.backward().unwrap();
+    let gx = grads.get(&x).unwrap().to_vec().unwrap();
+    let gw = grads.get(&w).unwrap().to_vec().unwrap();
+
+    // Reference: the primitive composition, differentiated by autograd.
+    let x2 = tensor_float_dev(&data, (2, 3), device, dtype);
+    let w2 = tensor_float_dev(&wdata, (3,), device, dtype);
+    x2.set_requires_grad(true);
+    w2.set_requires_grad(true);
+    let ms = x2.sqr().unwrap().mean_keepdim(1).unwrap();
+    let rms = (ms + 1e-5).sqrt().unwrap();
+    let out = x2.broadcast_div(&rms).unwrap().broadcast_mul(&w2).unwrap();
+    let loss2 = out.sum_all().unwrap();
+    let grads2 = loss2.backward().unwrap();
+    let gx2 = grads2.get(&x2).unwrap().to_vec().unwrap();
+    let gw2 = grads2.get(&w2).unwrap().to_vec().unwrap();
+
+    assert_close(&gx, &gx2, tol, tol);
+    assert_close(&gw, &gw2, tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_default_softmax(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data = [1.0, 2.0, 3.0, 1.0, 2.0, 3.0];
+
+    let x_default = tensor_float_dev(&data, (2, 3), device, dtype);
+    let x_override = tensor_float_dev(&data, (2, 3), device, dtype);
+    let out_default = NnOpDefault::softmax_forward(&x_default, 1, true).unwrap();
+    let out_override = x_override.softmax(1usize).unwrap();
+    assert_close(&out_default.to_vec().unwrap(), &out_override.to_vec().unwrap(), tol, tol);
+
+    x_default.set_requires_grad(true);
+    x_override.set_requires_grad(true);
+
+    let g_default = NnOpDefault::softmax_forward(&x_default, 1, true).unwrap().sum_all().unwrap().backward().unwrap();
+    let g_override = x_override.softmax(1usize).unwrap().sum_all().unwrap().backward().unwrap();
+    assert_close(&g_default.get(&x_default).unwrap().to_vec().unwrap(), &g_override.get(&x_override).unwrap().to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_log_softmax(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data = [1.0, 2.0, 3.0, 1.0, 2.0, 3.0];
+    let t = tensor_float_dev(&data, (2, 3), device, dtype);
+    let out = t.log_softmax(1usize).unwrap();
+    let expected = t.broadcast_sub(&t.logsumexp_keepdim(1).unwrap()).unwrap();
+    assert_close(&out.to_vec().unwrap(), &expected.to_vec().unwrap(), tol, tol);
+    assert_eq!(out.dims(), &[2, 3]);
+
+    let x = tensor_float_dev(&data, (2, 3), device, dtype);
+    x.set_requires_grad(true);
+    let loss = x.log_softmax(1usize).unwrap().sum_all().unwrap();
+    let grads = loss.backward().unwrap();
+    let g = grads.get(&x).unwrap().to_vec().unwrap();
+    let sm = x.softmax(1usize).unwrap().to_vec().unwrap();
+    let expected_grad: Vec<f64> = sm.iter().map(|v| 1.0 - 3.0 * v).collect();
+    assert_close(&g, &expected_grad, tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_default_rms_norm(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let wdata = [0.5, 1.0, 2.0];
+    let eps = 1e-5;
+
+    let x_default = tensor_float_dev(&data, (2, 3), device, dtype);
+    let w_default = tensor_float_dev(&wdata, (3,), device, dtype);
+    let x_override = tensor_float_dev(&data, (2, 3), device, dtype);
+    let w_override = tensor_float_dev(&wdata, (3,), device, dtype);
+
+    let out_default = NnOpDefault::rms_norm_forward(&x_default, Some(&w_default), None, eps).unwrap();
+    let out_override = x_override.rms_norm(Some(&w_override), None, eps).unwrap();
+    assert_close(&out_default.to_vec().unwrap(), &out_override.to_vec().unwrap(), tol, tol);
+
+    x_default.set_requires_grad(true);
+    w_default.set_requires_grad(true);
+    x_override.set_requires_grad(true);
+    w_override.set_requires_grad(true);
+
+    let g_default = NnOpDefault::rms_norm_forward(&x_default, Some(&w_default), None, eps).unwrap().sum_all().unwrap().backward().unwrap();
+    let g_override = x_override.rms_norm(Some(&w_override), None, eps).unwrap().sum_all().unwrap().backward().unwrap();
+    assert_close(&g_default.get(&x_default).unwrap().to_vec().unwrap(), &g_override.get(&x_override).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&g_default.get(&w_default).unwrap().to_vec().unwrap(), &g_override.get(&w_override).unwrap().to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_layer_norm(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+    let wdata = [0.5, 1.0, 2.0];
+    let bdata = [0.1, -0.2, 0.3];
+    let eps = 1e-5;
+
+    let x = tensor_float_dev(&data, (2, 3), device, dtype);
+    let w = tensor_float_dev(&wdata, (3,), device, dtype);
+    let b = tensor_float_dev(&bdata, (3,), device, dtype);
+    x.set_requires_grad(true);
+    w.set_requires_grad(true);
+    b.set_requires_grad(true);
+    let y = NnOpDefault::layer_norm_forward(&x, Some(&w), Some(&b), eps).unwrap();
+    let grads = y.sum_all().unwrap().backward().unwrap();
+
+    let (dx, dweight, dbias) = NnOpDefault::layer_norm_backward(&x, Some(&w), Some(&b), &y, &y.ones_like().unwrap(), eps).unwrap();
+    assert_close(&dx.to_vec().unwrap(), &grads.get(&x).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dweight.unwrap().to_vec().unwrap(), &grads.get(&w).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dbias.unwrap().to_vec().unwrap(), &grads.get(&b).unwrap().to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_group_norm(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data: Vec<f64> = (1..=24).map(|v| v as f64).collect();
+    let wdata = [0.5, 1.0, 2.0, -1.0];
+    let bdata = [0.1, -0.2, 0.3, 0.4];
+    let eps = 1e-5;
+
+    let x = tensor_float_dev(&data, (2, 4, 3), device, dtype);
+    let w = tensor_float_dev(&wdata, (4,), device, dtype);
+    let b = tensor_float_dev(&bdata, (4,), device, dtype);
+    x.set_requires_grad(true);
+    w.set_requires_grad(true);
+    b.set_requires_grad(true);
+    let y = NnOpDefault::group_norm_forward(&x, 2, Some(&w), Some(&b), eps).unwrap();
+    assert_eq!(y.dims(), &[2, 4, 3]);
+    let grads = y.sum_all().unwrap().backward().unwrap();
+
+    let (dx, dweight, dbias) = NnOpDefault::group_norm_backward(&x, 2, Some(&w), Some(&b), &y, &y.ones_like().unwrap(), eps).unwrap();
+    assert_close(&dx.to_vec().unwrap(), &grads.get(&x).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dweight.unwrap().to_vec().unwrap(), &grads.get(&w).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dbias.unwrap().to_vec().unwrap(), &grads.get(&b).unwrap().to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_conv2d(device: &impl Device, dtype: FloatDType, tol: f64) {
+    // 3x3 input, 2x2 all-ones kernel, stride 1, no padding.
+    let x = tensor_float_dev(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], (1, 1, 3, 3), device, dtype);
+    let w = tensor_float_dev(&[1.0, 1.0, 1.0, 1.0], (1, 1, 2, 2), device, dtype);
+    let y = NnOpDefault::conv2d_forward(&x, &w, None, (1, 1), (0, 0), (1, 1)).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 2, 2]);
+    assert_close(&y.to_vec().unwrap(), &[12.0, 16.0, 24.0, 28.0], tol, tol);
+
+    x.set_requires_grad(true);
+    w.set_requires_grad(true);
+    let y = NnOpDefault::conv2d_forward(&x, &w, None, (1, 1), (0, 0), (1, 1)).unwrap();
+    let grads = y.sum_all().unwrap().backward().unwrap();
+    let (dx, dweight, dbias) = NnOpDefault::conv2d_backward(&x, &w, None, &y, &y.ones_like().unwrap(), (1, 1), (0, 0), (1, 1)).unwrap();
+    assert!(dbias.is_none());
+    assert_close(&dx.to_vec().unwrap(), &grads.get(&x).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dweight.to_vec().unwrap(), &grads.get(&w).unwrap().to_vec().unwrap(), tol, tol);
+
+    // 4x4 input, stride 2, padding 1.
+    let data: Vec<f64> = (1..=16).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 4, 4), device, dtype);
+    let w = tensor_float_dev(&[1.0, 2.0, 3.0, 4.0], (1, 1, 2, 2), device, dtype);
+    x.set_requires_grad(true);
+    w.set_requires_grad(true);
+    let y = NnOpDefault::conv2d_forward(&x, &w, None, (2, 2), (1, 1), (1, 1)).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 3, 3]);
+    let grads = y.sum_all().unwrap().backward().unwrap();
+    let (dx, dweight, _) = NnOpDefault::conv2d_backward(&x, &w, None, &y, &y.ones_like().unwrap(), (2, 2), (1, 1), (1, 1)).unwrap();
+    assert_close(&dx.to_vec().unwrap(), &grads.get(&x).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dweight.to_vec().unwrap(), &grads.get(&w).unwrap().to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_attention(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let qdata = [1.0, 0.0, 0.0, 1.0];
+    let kdata = [1.0, 0.0, 0.0, 1.0];
+    let vdata = [0.0, 1.0, 2.0, 0.0];
+
+    let q = tensor_float_dev(&qdata, (1, 2, 1, 2), device, dtype);
+    let k = tensor_float_dev(&kdata, (1, 2, 1, 2), device, dtype);
+    let v = tensor_float_dev(&vdata, (1, 2, 1, 2), device, dtype);
+    let y = NnOpDefault::scaled_dot_product_attention_forward(&q, &k, &v, None, false, 0).unwrap();
+    assert_eq!(y.dims(), &[1, 2, 1, 2]);
+
+    let s = 1.0 / 2.0f64.sqrt();
+    let a = s.exp();
+    let e0 = a / (a + 1.0);
+    let e1 = 1.0 / (a + 1.0);
+    assert_close(&y.to_vec().unwrap(), &[2.0 * e1, e0, 2.0 * e0, e1], tol, tol);
+
+    for causal in [false, true] {
+        let q = tensor_float_dev(&qdata, (1, 2, 1, 2), device, dtype);
+        let k = tensor_float_dev(&kdata, (1, 2, 1, 2), device, dtype);
+        let v = tensor_float_dev(&vdata, (1, 2, 1, 2), device, dtype);
+        q.set_requires_grad(true);
+        k.set_requires_grad(true);
+        v.set_requires_grad(true);
+        let y = NnOpDefault::scaled_dot_product_attention_forward(&q, &k, &v, None, causal, 0).unwrap();
+        let grads = y.sum_all().unwrap().backward().unwrap();
+        let (dq, dk, dv) =
+            NnOpDefault::scaled_dot_product_attention_backward(&q, &k, &v, &y, &y.ones_like().unwrap(), None, causal, 0).unwrap();
+        assert_close(&dq.to_vec().unwrap(), &grads.get(&q).unwrap().to_vec().unwrap(), tol, tol);
+        assert_close(&dk.to_vec().unwrap(), &grads.get(&k).unwrap().to_vec().unwrap(), tol, tol);
+        assert_close(&dv.to_vec().unwrap(), &grads.get(&v).unwrap().to_vec().unwrap(), tol, tol);
+    }
+
+    // GQA: 2 query heads share 1 KV head.
+    let qdata = [1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, -1.0];
+    let q = tensor_float_dev(&qdata, (1, 2, 2, 2), device, dtype);
+    let k = tensor_float_dev(&kdata, (1, 2, 1, 2), device, dtype);
+    let v = tensor_float_dev(&vdata, (1, 2, 1, 2), device, dtype);
+    q.set_requires_grad(true);
+    k.set_requires_grad(true);
+    v.set_requires_grad(true);
+    let y = NnOpDefault::scaled_dot_product_attention_forward(&q, &k, &v, None, false, 0).unwrap();
+    let grads = y.sum_all().unwrap().backward().unwrap();
+    let (dq, dk, dv) = NnOpDefault::scaled_dot_product_attention_backward(&q, &k, &v, &y, &y.ones_like().unwrap(), None, false, 0).unwrap();
+    assert_close(&dq.to_vec().unwrap(), &grads.get(&q).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dk.to_vec().unwrap(), &grads.get(&k).unwrap().to_vec().unwrap(), tol, tol);
+    assert_close(&dv.to_vec().unwrap(), &grads.get(&v).unwrap().to_vec().unwrap(), tol, tol);
 }
 
 #[allow(dead_code)]
@@ -536,4 +796,317 @@ pub fn test_argmax_eval_large_f32(device: &impl Device) {
     let count = correct_mask.true_count().unwrap();
     let expected = batch - batch / 100; // 1000 - 10 = 990
     assert_eq!(count, expected, "true_count mismatch: expected {}, got {}", expected, count);
+}
+
+#[allow(dead_code)]
+pub fn test_max_pool2d(device: &impl Device, dtype: FloatDType, tol: f64) {
+    // Basic 2x2/stride 2.
+    let data: Vec<f64> = (1..=16).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 4, 4), device, dtype);
+    let y = x.max_pool2d((2, 2), (2, 2), (0, 0), (1, 1), false).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 2, 2]);
+    assert_close(&y.to_vec().unwrap(), &[6.0, 8.0, 14.0, 16.0], tol, tol);
+
+    // Padding is -inf.
+    let x = tensor_float_dev(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], (1, 1, 3, 3), device, dtype);
+    let y = x.max_pool2d((2, 2), (1, 1), (1, 1), (1, 1), false).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 4, 4]);
+    assert_close(&y.to_vec().unwrap(), &[1.0, 2.0, 3.0, 3.0, 4.0, 5.0, 6.0, 6.0, 7.0, 8.0, 9.0, 9.0, 7.0, 8.0, 9.0, 9.0], tol, tol);
+
+    // ceil_mode=True keeps the last partial window.
+    let data: Vec<f64> = (1..=25).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 5, 5), device, dtype);
+    let y = x.max_pool2d((2, 2), (2, 2), (0, 0), (1, 1), true).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 3, 3]);
+    assert_close(&y.to_vec().unwrap(), &[7.0, 9.0, 10.0, 17.0, 19.0, 20.0, 22.0, 24.0, 25.0], tol, tol);
+
+    // Dilation.
+    let y = x.max_pool2d((2, 2), (1, 1), (0, 0), (2, 2), false).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 3, 3]);
+    assert_close(&y.to_vec().unwrap(), &[13.0, 14.0, 15.0, 18.0, 19.0, 20.0, 23.0, 24.0, 25.0], tol, tol);
+
+    // Padding + dilation + ceil_mode (matches PyTorch).
+    let y = x.max_pool2d((3, 3), (2, 2), (1, 1), (2, 2), true).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 2, 2]);
+    assert_close(&y.to_vec().unwrap(), &[19.0, 19.0, 19.0, 19.0], tol, tol);
+
+    // Padding + ceil_mode extends the last row/column.
+    let y = x.max_pool2d((2, 2), (1, 1), (1, 1), (1, 1), true).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 6, 6]);
+    assert_close(
+        &y.to_vec().unwrap(),
+        &[
+            1.0, 2.0, 3.0, 4.0, 5.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0,
+            20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 25.0, 21.0, 22.0, 23.0, 24.0, 25.0, 25.0,
+        ],
+        tol,
+        tol,
+    );
+}
+
+#[allow(dead_code)]
+pub fn test_avg_pool2d(device: &impl Device, dtype: FloatDType, tol: f64) {
+    // Basic 2x2/stride 2.
+    let data: Vec<f64> = (1..=16).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 4, 4), device, dtype);
+    let y = x.avg_pool2d((2, 2), (2, 2), (0, 0), false, true).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 2, 2]);
+    assert_close(&y.to_vec().unwrap(), &[3.5, 5.5, 11.5, 13.5], tol, tol);
+
+    let x = tensor_float_dev(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0], (1, 1, 3, 3), device, dtype);
+
+    // Count padding in the divisor.
+    let y = x.avg_pool2d((2, 2), (1, 1), (1, 1), false, true).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 4, 4]);
+    assert_close(
+        &y.to_vec().unwrap(),
+        &[0.25, 0.75, 1.25, 0.75, 1.25, 3.0, 4.0, 2.25, 2.75, 6.0, 7.0, 3.75, 1.75, 3.75, 4.25, 2.25],
+        tol,
+        tol,
+    );
+
+    // Exclude padding from the divisor.
+    let y = x.avg_pool2d((2, 2), (1, 1), (1, 1), false, false).unwrap();
+    assert_close(&y.to_vec().unwrap(), &[1.0, 1.5, 2.5, 3.0, 2.5, 3.0, 4.0, 4.5, 5.5, 6.0, 7.0, 7.5, 7.0, 7.5, 8.5, 9.0], tol, tol);
+
+    // ceil_mode=True: the last partial window is averaged over real elements.
+    let data: Vec<f64> = (1..=25).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 5, 5), device, dtype);
+    let y = x.avg_pool2d((2, 2), (2, 2), (0, 0), true, true).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 3, 3]);
+    assert_close(&y.to_vec().unwrap(), &[4.0, 6.0, 7.5, 14.0, 16.0, 17.5, 21.5, 23.5, 25.0], tol, tol);
+
+    // Padding + ceil_mode, excluding padding from the divisor.
+    let y = x.avg_pool2d((3, 3), (2, 2), (1, 1), true, false).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 3, 3]);
+    assert_close(&y.to_vec().unwrap(), &[4.0, 5.5, 7.0, 11.5, 13.0, 14.5, 19.0, 20.5, 22.0], tol, tol);
+
+    // Padding + ceil_mode, counting padding in the divisor. The extra cells
+    // added for ceil_mode are still excluded, matching PyTorch.
+    let y = x.avg_pool2d((3, 3), (2, 2), (1, 1), true, true).unwrap();
+    assert_close(
+        &y.to_vec().unwrap(),
+        &[
+            1.7777777777777777,
+            3.6666666666666665,
+            3.111111111111111,
+            7.666666666666667,
+            13.0,
+            9.666666666666666,
+            8.444444444444445,
+            13.666666666666666,
+            9.777777777777779,
+        ],
+        tol,
+        tol,
+    );
+}
+
+#[allow(dead_code)]
+pub fn test_adaptive_avg_pool2d(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data: Vec<f64> = (1..=16).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 4, 4), device, dtype);
+
+    let y = x.adaptive_avg_pool2d((2, 2)).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 2, 2]);
+    assert_close(&y.to_vec().unwrap(), &[3.5, 5.5, 11.5, 13.5], tol, tol);
+
+    let y = x.adaptive_avg_pool2d((1, 1)).unwrap();
+    assert_close(&y.to_vec().unwrap(), &[8.5], tol, tol);
+
+    // Non-divisible input: windows may overlap.
+    let data: Vec<f64> = (1..=25).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 5, 5), device, dtype);
+    let y = x.adaptive_avg_pool2d((2, 2)).unwrap();
+    assert_close(&y.to_vec().unwrap(), &[7.0, 9.0, 17.0, 19.0], tol, tol);
+
+    let y = x.adaptive_avg_pool2d((4, 4)).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 4, 4]);
+    assert_close(
+        &y.to_vec().unwrap(),
+        &[4.0, 5.0, 6.0, 7.0, 9.0, 10.0, 11.0, 12.0, 14.0, 15.0, 16.0, 17.0, 19.0, 20.0, 21.0, 22.0],
+        tol,
+        tol,
+    );
+
+    // Output larger than input: overlapping windows.
+    let y = x.adaptive_avg_pool2d((7, 7)).unwrap();
+    assert_eq!(y.dims(), &[1, 1, 7, 7]);
+    assert_close(
+        &y.to_vec().unwrap(),
+        &[
+            1.0, 1.5, 2.5, 3.0, 3.5, 4.5, 5.0, 3.5, 4.0, 5.0, 5.5, 6.0, 7.0, 7.5, 8.5, 9.0, 10.0, 10.5, 11.0, 12.0, 12.5, 11.0, 11.5, 12.5,
+            13.0, 13.5, 14.5, 15.0, 13.5, 14.0, 15.0, 15.5, 16.0, 17.0, 17.5, 18.5, 19.0, 20.0, 20.5, 21.0, 22.0, 22.5, 21.0, 21.5, 22.5,
+            23.0, 23.5, 24.5, 25.0,
+        ],
+        tol,
+        tol,
+    );
+}
+
+#[allow(dead_code)]
+pub fn test_max_pool2d_grad(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data: Vec<f64> = (1..=25).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 5, 5), device, dtype);
+    x.set_requires_grad(true);
+    let y = NnOpDefault::max_pool2d_forward(&x, (2, 2), (2, 2), (0, 0), (1, 1), true).unwrap();
+    let grads = y.sum_all().unwrap().backward().unwrap();
+    let gx = grads.get(&x).unwrap().clone();
+
+    let dx = NnOpDefault::max_pool2d_backward(&x, &y, &y.ones_like().unwrap(), (2, 2), (2, 2), (0, 0), (1, 1), true).unwrap();
+    assert_close(&gx.to_vec().unwrap(), &dx.to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_avg_pool2d_grad(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data: Vec<f64> = (1..=25).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 5, 5), device, dtype);
+    x.set_requires_grad(true);
+    let y = NnOpDefault::avg_pool2d_forward(&x, (3, 3), (1, 1), (1, 1), true, false).unwrap();
+    let grads = y.sum_all().unwrap().backward().unwrap();
+    let gx = grads.get(&x).unwrap().clone();
+
+    let dx = NnOpDefault::avg_pool2d_backward(&x, &y, &y.ones_like().unwrap(), (3, 3), (1, 1), (1, 1), true, false).unwrap();
+    assert_close(&gx.to_vec().unwrap(), &dx.to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_adaptive_avg_pool2d_grad(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let data: Vec<f64> = (1..=25).map(|v| v as f64).collect();
+    let x = tensor_float_dev(&data, (1, 1, 5, 5), device, dtype);
+    x.set_requires_grad(true);
+    let y = NnOpDefault::adaptive_avg_pool2d_forward(&x, (2, 2)).unwrap();
+    let grads = y.sum_all().unwrap().backward().unwrap();
+    let gx = grads.get(&x).unwrap().clone();
+
+    let dx = NnOpDefault::adaptive_avg_pool2d_backward(&x, &y, &y.ones_like().unwrap(), (2, 2)).unwrap();
+    assert_close(&gx.to_vec().unwrap(), &dx.to_vec().unwrap(), tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_linear(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let x = tensor_float_dev(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (2, 3), device, dtype);
+    let w = tensor_float_dev(&[1.0, 0.0, -1.0, 0.5, 1.0, 0.0], (2, 3), device, dtype);
+    let b = tensor_float_dev(&[0.1, -0.2], (2,), device, dtype);
+
+    let y = x.linear(&w, Some(&b)).unwrap();
+    let expected = x.matmul(&w.transpose_last().unwrap()).unwrap().broadcast_add(&b).unwrap();
+    assert_close(&y.to_vec().unwrap(), &expected.to_vec().unwrap(), tol, tol);
+
+    x.set_requires_grad(true);
+    w.set_requires_grad(true);
+    b.set_requires_grad(true);
+    let loss = x.linear(&w, Some(&b)).unwrap().sum_all().unwrap();
+    let grads = loss.backward().unwrap();
+    assert!(grads.get(&x).is_some());
+    assert!(grads.get(&w).is_some());
+    assert!(grads.get(&b).is_some());
+}
+
+#[allow(dead_code)]
+pub fn test_embedding(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let weight = tensor_float_dev(&[1.0, 2.0, 3.0, 4.0, 5.0, 6.0], (3, 2), device, dtype);
+    let indices = tensor_i32_dev(&[2, 0, 1, 2], (2, 2), device);
+
+    let y = weight.embedding(&indices).unwrap();
+    assert_eq!(y.dims(), &[2, 2, 2]);
+    assert_close(&y.to_vec().unwrap(), &[5.0, 6.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0], tol, tol);
+
+    weight.set_requires_grad(true);
+    let grads = weight.embedding(&indices).unwrap().sum_all().unwrap().backward().unwrap();
+    let gw = grads.get(&weight).unwrap().to_vec().unwrap();
+    assert_close(&gw, &[1.0, 1.0, 1.0, 1.0, 2.0, 2.0], tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_dropout(device: &impl Device) {
+    let data: Vec<f64> = (0..1024).map(|i| (i % 7) as f64).collect();
+    let x = tensor_f32_dev(&data, (1024,), device);
+
+    let y = x.dropout(0.5, false).unwrap();
+    assert_close(&y.to_vec().unwrap(), &x.to_vec().unwrap(), 1e-9, 1e-9);
+
+    let y = x.dropout(0.0, true).unwrap();
+    assert_close(&y.to_vec().unwrap(), &x.to_vec().unwrap(), 1e-9, 1e-9);
+
+    let y = x.dropout(0.5, true).unwrap();
+    let xv = x.to_vec().unwrap();
+    let yv = y.to_vec().unwrap();
+    assert_eq!(xv.len(), yv.len());
+    let mut zeros = 0;
+    let mut kept = 0;
+    for (&a, &b) in xv.iter().zip(yv.iter()) {
+        if b == 0.0 {
+            zeros += 1;
+        } else {
+            assert!((b - 2.0 * a).abs() < 1e-6, "got {b}, want {}", 2.0 * a);
+            kept += 1;
+        }
+    }
+    assert!(zeros > 0 && kept > 0, "expected both dropped and kept elements");
+}
+
+#[allow(dead_code)]
+pub fn test_losses(device: &impl Device, dtype: FloatDType, tol: f64) {
+    let p = tensor_float_dev(&[1.0, 2.0, 3.0], (3,), device, dtype);
+    let t = tensor_float_dev(&[0.0, 0.0, 0.0], (3,), device, dtype);
+    let mse = p.mse_loss(&t).unwrap().to_scalar().unwrap();
+    assert_close(&[mse], &[14.0 / 3.0], tol, tol);
+
+    let log_probs = tensor_float_dev(&[-0.1, -1.0, -2.0, -2.0, -1.0, -0.1], (2, 3), device, dtype);
+    let targets = tensor_i32_dev(&[0, 2], (2,), device);
+    let nll = log_probs.nll_loss(&targets).unwrap().to_scalar().unwrap();
+    assert_close(&[nll], &[0.1], tol, tol);
+
+    let logits = tensor_float_dev(&[1.0, 2.0, 3.0, 0.0, 0.0, 0.0], (2, 3), device, dtype);
+    let ce = logits.cross_entropy_loss(&targets).unwrap().to_scalar().unwrap();
+    let manual = logits.log_softmax(1usize).unwrap().nll_loss(&targets).unwrap().to_scalar().unwrap();
+    assert_close(&[ce], &[manual], tol, tol);
+
+    let bpred = tensor_float_dev(&[0.2, 0.8], (2,), device, dtype);
+    let btarget = tensor_float_dev(&[0.0, 1.0], (2,), device, dtype);
+    let bce = bpred.bce_loss(&btarget).unwrap().to_scalar().unwrap();
+    let expected = -((1.0_f64 - 0.2).ln() + 0.8_f64.ln()) / 2.0;
+    assert_close(&[bce], &[expected], tol, tol);
+}
+
+#[allow(dead_code)]
+pub fn test_loss_grads(device: &impl Device, dtype: FloatDType, tol: f64) {
+    // MSE: d/dp mean((p-t)^2) = 2(p-t)/n
+    let p = tensor_float_dev(&[1.0, 2.0, 3.0], (3,), device, dtype);
+    let t = tensor_float_dev(&[0.0, 0.0, 0.0], (3,), device, dtype);
+    p.set_requires_grad(true);
+    let grads = p.mse_loss(&t).unwrap().backward().unwrap();
+    let gp = grads.get(&p).unwrap().to_vec().unwrap();
+    assert_close(&gp, &[2.0 / 3.0, 4.0 / 3.0, 6.0 / 3.0], tol, tol);
+
+    // NLL: -1/n at the target class.
+    let log_probs = tensor_float_dev(&[-0.1, -1.0, -2.0, -2.0, -1.0, -0.1], (2, 3), device, dtype);
+    let targets = tensor_i32_dev(&[0, 2], (2,), device);
+    log_probs.set_requires_grad(true);
+    let grads = log_probs.nll_loss(&targets).unwrap().backward().unwrap();
+    let gl = grads.get(&log_probs).unwrap().to_vec().unwrap();
+    assert_close(&gl, &[-0.5, 0.0, 0.0, 0.0, 0.0, -0.5], tol, tol);
+
+    // CrossEntropy: (softmax - onehot) / batch.
+    let logits = tensor_float_dev(&[1.0, 2.0, 3.0, 0.0, 0.0, 0.0], (2, 3), device, dtype);
+    logits.set_requires_grad(true);
+    let grads = logits.cross_entropy_loss(&targets).unwrap().backward().unwrap();
+    let gx = grads.get(&logits).unwrap().to_vec().unwrap();
+    let mut expected = logits.softmax(1usize).unwrap().to_vec().unwrap();
+    expected[0] -= 1.0;
+    expected[5] -= 1.0;
+    for v in &mut expected {
+        *v /= 2.0;
+    }
+    assert_close(&gx, &expected, tol, tol);
+
+    // BCE: (-t/p + (1-t)/(1-p)) / n
+    let bpred = tensor_float_dev(&[0.2, 0.8], (2,), device, dtype);
+    let btarget = tensor_float_dev(&[0.0, 1.0], (2,), device, dtype);
+    bpred.set_requires_grad(true);
+    let grads = bpred.bce_loss(&btarget).unwrap().backward().unwrap();
+    let gb = grads.get(&bpred).unwrap().to_vec().unwrap();
+    let expected = [1.0 / 0.8 / 2.0, -1.0 / 0.8 / 2.0];
+    assert_close(&gb, &expected, tol, tol);
 }

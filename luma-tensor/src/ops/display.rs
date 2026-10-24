@@ -28,6 +28,7 @@ impl<D: Device> Tensor<D, Int> {
 
 impl<D: Device> Tensor<D, Float> {
     pub fn allclose(&self, other: &Self, rtol: f64, atol: f64) -> crate::Result<bool> {
+        self.ensure_same_device(other, "allclose")?;
         if self.element_count() != other.element_count() {
             return Ok(false);
         }
@@ -37,6 +38,7 @@ impl<D: Device> Tensor<D, Float> {
 
 impl<D: Device> Tensor<D, Int> {
     pub fn allclose(&self, other: &Self) -> crate::Result<bool> {
+        self.ensure_same_device(other, "allclose")?;
         if self.element_count() != other.element_count() {
             return Ok(false);
         }
@@ -46,6 +48,7 @@ impl<D: Device> Tensor<D, Int> {
 
 impl<D: Device> Tensor<D, Bool> {
     pub fn allclose(&self, other: &Self) -> crate::Result<bool> {
+        self.ensure_same_device(other, "allclose")?;
         if self.element_count() != other.element_count() {
             return Ok(false);
         }

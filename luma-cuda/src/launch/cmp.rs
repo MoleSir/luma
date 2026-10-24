@@ -62,6 +62,9 @@ pub(crate) fn launch_cmp_scalar<T: DeviceRepr>(
     rhs: T,
 ) -> CudaResult<CudaSlice<u8>> {
     let rhs_dev = device.memcpy_stod(&[rhs])?;
-    let broadcast_l = Layout::contiguous(lhs_l.shape().clone());
+    // A scalar has one storage element. Broadcast it with zero strides so the
+    // kernel always reads rhs[0]; passing contiguous strides would make it
+    // read past the one-element allocation.
+    let broadcast_l = Layout::new(lhs_l.shape().clone(), vec![0; lhs_l.shape().rank()], 0);
     launch_cmp(device, op, type_name, module, lhs, &rhs_dev, lhs_l, &broadcast_l)
 }

@@ -222,22 +222,4 @@ impl<D: Device> Tensor<D, Float> {
     pub fn std_all(&self) -> crate::Result<Self> {
         self.var_all()?.sqrt()
     }
-
-    /// Log-sum-exp along `dim`, numerically stable.
-    pub fn logsumexp<Dm: Dim>(&self, dim: Dm) -> crate::Result<Self> {
-        let m = self.max_keepdim(dim)?;
-        let e = self.sub(&m.broadcast_as(self.shape().clone())?)?.exp()?;
-        let s = e.sum_keepdim(dim)?;
-        s.ln()?.add(&m)?.squeeze(dim)
-    }
-
-    pub fn logsumexp_keepdim<Dm: Dim>(&self, dim: Dm) -> crate::Result<Self> {
-        let m = self.max_keepdim(dim)?;
-        let e = self.sub(&m.broadcast_as(self.shape().clone())?)?.exp()?;
-        e.sum_keepdim(dim)?.ln()?.add(&m)
-    }
-
-    pub fn logsumexp_all(&self) -> crate::Result<Self> {
-        self.flatten_all()?.logsumexp(0)
-    }
 }

@@ -4,7 +4,7 @@
 //! into a three-variant enum, enabling heterogeneous collections like
 //! `HashMap<String, DynTensor<D>>` for model serialization (safetensors I/O).
 
-use crate::dtype::{BoolDType, DType, KindTag};
+use crate::dtype::{BoolDType, DType, DTypeKindTag};
 use crate::error::Result;
 use crate::tensor::{Shape, Tensor};
 use crate::{Bool, Device, Float, Int};
@@ -118,9 +118,9 @@ impl<D: Device> DynTensor<D> {
     pub fn from_bytes(bytes: &[u8], dtype: DType, shape: impl Into<Shape>, device: &D) -> Result<Self> {
         let shape = shape.into();
         match dtype.kind() {
-            KindTag::Float => Ok(DynTensor::Float(Tensor::<D, Float>::from_bytes(bytes, shape, (device, dtype.as_float()))?)),
-            KindTag::Int => Ok(DynTensor::Int(Tensor::<D, Int>::from_bytes(bytes, shape, (device, dtype.as_int()))?)),
-            KindTag::Bool => Ok(DynTensor::Bool(Tensor::<D, Bool>::from_bytes(bytes, shape, (device, BoolDType::Bool))?)),
+            DTypeKindTag::Float => Ok(DynTensor::Float(Tensor::<D, Float>::from_bytes(bytes, shape, (device, dtype.as_float()))?)),
+            DTypeKindTag::Int => Ok(DynTensor::Int(Tensor::<D, Int>::from_bytes(bytes, shape, (device, dtype.as_int()))?)),
+            DTypeKindTag::Bool => Ok(DynTensor::Bool(Tensor::<D, Bool>::from_bytes(bytes, shape, (device, BoolDType::Bool))?)),
         }
     }
 

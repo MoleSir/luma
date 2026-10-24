@@ -1,6 +1,6 @@
 use super::super::{Cuda, CudaError, CudaResult, kernel};
-use luma_tensor::{BinaryOp, Layout};
 use cudarc::driver::{CudaSlice, DeviceRepr, LaunchConfig, PushKernelArg};
+use luma_tensor::{BinaryOp, Layout};
 
 pub(crate) fn binary_kernel_name(op: BinaryOp, suffix: &str) -> String {
     let op_str = match op {
@@ -12,6 +12,18 @@ pub(crate) fn binary_kernel_name(op: BinaryOp, suffix: &str) -> String {
         BinaryOp::Minimum => "min",
     };
     format!("b{}_{}", op_str, suffix)
+}
+
+pub(crate) fn binary_inplace_kernel_name(op: BinaryOp, suffix: &str) -> String {
+    let op_str = match op {
+        BinaryOp::Add => "add",
+        BinaryOp::Sub => "sub",
+        BinaryOp::Mul => "mul",
+        BinaryOp::Div => "div",
+        BinaryOp::Maximum => "max",
+        BinaryOp::Minimum => "min",
+    };
+    format!("bi{}_{}", op_str, suffix)
 }
 
 pub(crate) fn launch_binary<T: DeviceRepr>(
@@ -78,7 +90,7 @@ pub(crate) fn launch_binary_inplace<T: DeviceRepr>(
     let dims = dst_l.dims();
     let elem_count = dst_l.shape().element_count();
     let num_dims = dims.len();
-    let kernel_name = binary_kernel_name(op, type_name);
+    let kernel_name = binary_inplace_kernel_name(op, type_name);
     let func = device.load_function(&kernel_name, module)?;
 
     let mut builder = func.builder();
@@ -95,7 +107,6 @@ pub(crate) fn launch_binary_inplace<T: DeviceRepr>(
     builder.arg(&src_strides);
     builder.arg(&dst_view);
     builder.arg(&src_view);
-    builder.arg(&dst_view);
 
     let config = LaunchConfig::for_num_elems(elem_count as u32);
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
@@ -114,7 +125,7 @@ pub(crate) fn launch_binary_scalar_inplace<T: DeviceRepr>(
     let dims = dst_l.dims();
     let elem_count = dst_l.shape().element_count();
     let num_dims = dims.len();
-    let kernel_name = binary_scalar_kernel_name(op, type_name);
+    let kernel_name = binary_scalar_inplace_kernel_name(op, type_name);
     let func = device.load_function(&kernel_name, module)?;
 
     let mut builder = func.builder();
@@ -128,11 +139,22 @@ pub(crate) fn launch_binary_scalar_inplace<T: DeviceRepr>(
     builder.arg(&dst_strides);
     builder.arg(&dst_view);
     builder.arg(&rhs);
-    builder.arg(&dst_view);
 
     let config = LaunchConfig::for_num_elems(elem_count as u32);
     unsafe { builder.launch(config) }.map_err(CudaError::CudaDriver)?;
     Ok(())
+}
+
+pub(crate) fn binary_scalar_inplace_kernel_name(op: BinaryOp, suffix: &str) -> String {
+    let op_str = match op {
+        BinaryOp::Add => "add",
+        BinaryOp::Sub => "sub",
+        BinaryOp::Mul => "mul",
+        BinaryOp::Div => "div",
+        BinaryOp::Maximum => "max",
+        BinaryOp::Minimum => "min",
+    };
+    format!("bsi{}_{}", op_str, suffix)
 }
 
 pub(crate) fn binary_scalar_kernel_name(op: BinaryOp, suffix: &str) -> String {

@@ -121,7 +121,8 @@ impl<D: Device> NumericDTypeKind<D> for Int {
 
 impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     pub(crate) fn binary_impl(&self, rhs: &Self, op: BinaryOp, name: &'static str) -> crate::Result<Self> {
-        let shape = self.same_shape(rhs, name)?.clone();
+        self.ensure_same_device(rhs, name)?;
+        let shape = self.ensure_same_shape(rhs, name)?.clone();
         let s = K::binary_dispatch(&*self.storage_read()?, self.layout(), &*rhs.storage_read()?, rhs.layout(), op)?;
         assert_eq!(self.dtype(), s.dtype());
         Ok(Self::from_storage(s, shape, K::Meta::on_binary(self, rhs, op)))
@@ -135,6 +136,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     pub(crate) fn binary_inplace_impl(&self, rhs: &Self, op: BinaryOp) -> crate::Result<Self> {
+        self.ensure_same_device(rhs, "binary_inplace")?;
         let mut s = self.storage_write()?;
         K::binary_inplace_dispatch(&mut s, self.layout(), &*rhs.storage_read()?, rhs.layout(), op)?;
         Ok(self.clone())
@@ -147,6 +149,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     pub(crate) fn binary_broadcast_impl(&self, rhs: &Self, op: BinaryOp, name: &'static str) -> crate::Result<Self> {
+        self.ensure_same_device(rhs, name)?;
         let out_shape = self.shape().broadcast_shape_binary_op(rhs.shape(), name)?;
         let lhs = self.broadcast_as(out_shape.clone())?;
         let rhs = rhs.broadcast_as(out_shape)?;
@@ -206,7 +209,8 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
 
 impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     pub(crate) fn cmp_impl(&self, rhs: &Self, op: CmpOp, name: &'static str) -> crate::Result<Tensor<D, Bool>> {
-        let shape = self.same_shape(rhs, name)?.clone();
+        self.ensure_same_device(rhs, name)?;
+        let shape = self.ensure_same_shape(rhs, name)?.clone();
         let s = K::cmp_dispatch(&*self.storage_read()?, self.layout(), &*rhs.storage_read()?, rhs.layout(), op)?;
         Ok(Tensor::<D, Bool>::from_storage(s, shape, ()))
     }
@@ -217,6 +221,7 @@ impl<D: Device, K: NumericDTypeKind<D> + ShapeDTypeKind<D>> Tensor<D, K> {
     }
 
     pub(crate) fn broadcast_cmp_impl(&self, rhs: &Self, op: CmpOp, name: &'static str) -> crate::Result<Tensor<D, Bool>> {
+        self.ensure_same_device(rhs, name)?;
         let out_shape = self.shape().broadcast_shape_binary_op(rhs.shape(), name)?;
         let lhs = self.broadcast_as(out_shape.clone())?;
         let rhs = rhs.broadcast_as(out_shape)?;

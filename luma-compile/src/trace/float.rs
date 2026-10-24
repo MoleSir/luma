@@ -3,7 +3,10 @@
 use std::borrow::Cow;
 
 use luma_tensor::dtype::{BoolDType, FloatDType, IntDType};
-use luma_tensor::{BinaryOp, CmpOp, DType, FloatOps, FloatUnaryOp, Layout, ReduceOp, Result, Shape, UnaryOp, ViewOp};
+use luma_tensor::{
+    BinaryOp, CmpOp, DType, Float, FloatMeta, FloatOps, FloatUnaryOp, Layout, NnOpDefault, NnProvide, ReduceOp, Result,
+    Shape, Tensor, UnaryOp, ViewOp,
+};
 
 use super::{Trace, TraceBoolStorage, TraceFloatStorage, TraceIntStorage};
 use super::{inplace_unsupported, readback_unsupported};
@@ -237,22 +240,6 @@ impl FloatOps<Trace> for Trace {
         Ok(Some(TraceFloatStorage { value: out, dtype: src.dtype, device: src.device.clone() }))
     }
 
-    // ---- nn ----
-    fn f_softmax(x: &TraceFloatStorage, layout: &Layout, dim: usize) -> Result<TraceFloatStorage> {
-        let id = x.device.emit(NodeOp::Softmax(dim), vec![x.value], x.dtype.into(), layout.shape().clone())?;
-        Ok(TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() })
-    }
-    fn f_rms_norm(
-        x: &TraceFloatStorage,
-        x_l: &Layout,
-        weight: &TraceFloatStorage,
-        _weight_l: &Layout,
-        eps: f64,
-    ) -> Result<TraceFloatStorage> {
-        let id = x.device.emit(NodeOp::RmsNorm(eps), vec![x.value, weight.value], x.dtype.into(), x_l.shape().clone())?;
-        Ok(TraceFloatStorage { value: id, dtype: x.dtype, device: x.device.clone() })
-    }
-
     // ---- pick ----
     fn f_pick(
         mask: &TraceBoolStorage,
@@ -304,5 +291,33 @@ impl FloatOps<Trace> for Trace {
     // ---- allclose ----
     fn f_allclose(_a: &TraceFloatStorage, _a_l: &Layout, _b: &TraceFloatStorage, _b_l: &Layout, _rtol: f64, _atol: f64) -> Result<bool> {
         readback_unsupported("allclose")
+    }
+}
+
+impl NnProvide<Trace> for Trace {
+    fn softmax(x: &Tensor<Trace, Float>, dim: usize, keepdim: bool) -> Result<Tensor<Trace, Float>> {
+        let s = x.storage_read()?;
+        let id = x.device().emit(NodeOp::Softmax(dim), vec![s.value], s.dtype.into(), x.shape().clone())?;
+        let storage = TraceFloatStorage { value: id, dtype: s.dtype, device: s.device.clone() };
+        let y = Tensor::from_storage(storage, x.shape().clone(), FloatMeta::val());
+        if keepdim { Ok(y) } else { y.squeeze(dim) }
+    }
+
+    fn rms_norm(
+        x: &Tensor<Trace, Float>,
+        weight: Option<&Tensor<Trace, Float>>,
+        bias: Option<&Tensor<Trace, Float>>,
+        eps: f64,
+    ) -> Result<Tensor<Trace, Float>> {
+        match (weight, bias) {
+            (Some(weight), None) => {
+                let xs = x.storage_read()?;
+                let ws = weight.storage_read()?;
+                let id = x.device().emit(NodeOp::RmsNorm(eps), vec![xs.value, ws.value], xs.dtype.into(), x.shape().clone())?;
+                let storage = TraceFloatStorage { value: id, dtype: xs.dtype, device: xs.device.clone() };
+                Ok(Tensor::from_storage(storage, x.shape().clone(), FloatMeta::val()))
+            }
+            (weight, bias) => NnOpDefault::rms_norm_forward(x, weight, bias, eps),
+        }
     }
 }

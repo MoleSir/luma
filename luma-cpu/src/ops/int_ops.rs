@@ -177,10 +177,12 @@ impl IntOps<Cpu> for Cpu {
 
     fn i_to_bytes<'a>(x: &'a <Cpu as Device>::IntStorage, layout: &Layout) -> Result<Cow<'a, [u8]>> {
         if layout.is_contiguous() {
+            let start = layout.start_offset();
+            let count = layout.element_count();
             Ok(match x {
-                CpuIntStorage::I32(d, _) => Cow::Borrowed(bytemuck::cast_slice(d)),
-                CpuIntStorage::U32(d, _) => Cow::Borrowed(bytemuck::cast_slice(d)),
-                CpuIntStorage::U8(d, _) => Cow::Borrowed(d),
+                CpuIntStorage::I32(d, _) => Cow::Borrowed(bytemuck::cast_slice(&d[start..start + count])),
+                CpuIntStorage::U32(d, _) => Cow::Borrowed(bytemuck::cast_slice(&d[start..start + count])),
+                CpuIntStorage::U8(d, _) => Cow::Borrowed(&d[start..start + count]),
             })
         } else {
             let contig = Self::i_contiguous(x, layout)?;

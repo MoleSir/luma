@@ -3,7 +3,10 @@ use luma_tensor::{Device, Float, Int, Tensor};
 use super::module::Module;
 use crate::activate::{GELU, LeakyReLU, ReLU, SiLU, Sigmoid, Tanh};
 use crate::loss::{BCELoss, CrossEntropyLoss, MSELoss};
-use crate::{BatchNorm1d, Dropout, Embedding, LayerNorm, Linear, NnResult, RMSNorm};
+use crate::{
+    AdaptiveAvgPool2d, AvgPool2d, BatchNorm1d, Conv2d, Dropout, Embedding, GroupNorm, LayerNorm, Linear, MaxPool2d, MultiheadAttention,
+    NnResult, RMSNorm,
+};
 
 // ============================================================================================ //
 //                        ModuleForward
@@ -43,7 +46,25 @@ macro_rules! impl_forward_single_float {
     };
 }
 
-impl_forward_single_float!(Linear, BatchNorm1d, RMSNorm, LayerNorm, Dropout, ReLU, LeakyReLU, Sigmoid, Tanh, GELU, SiLU,);
+impl_forward_single_float!(
+    Linear,
+    BatchNorm1d,
+    RMSNorm,
+    LayerNorm,
+    GroupNorm,
+    Dropout,
+    Conv2d,
+    MaxPool2d,
+    AvgPool2d,
+    AdaptiveAvgPool2d,
+    MultiheadAttention,
+    ReLU,
+    LeakyReLU,
+    Sigmoid,
+    Tanh,
+    GELU,
+    SiLU,
+);
 
 impl<D: Device> ModuleForward<D> for Embedding<D> {
     type Input = Tensor<D, Int>;

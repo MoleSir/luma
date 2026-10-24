@@ -1,8 +1,8 @@
-//! Kind inference: validate the graph and assign a `KindTag` to every value.
+//! Kind inference: validate the graph and assign a `DTypeKindTag` to every value.
 
 use std::collections::HashSet;
 
-use luma_tensor::KindTag;
+use luma_tensor::DTypeKindTag;
 
 use crate::graph::{Graph, Node, NodeOp, Scalar, ValueId};
 use crate::{CompileResult, ExecuteError};
@@ -11,30 +11,30 @@ use crate::{CompileResult, ExecuteError};
 //    Kind inference — validate the graph and assign a kind to every value
 // ============================================================================
 
-fn expect_kind(got: KindTag, expected: KindTag, what: &'static str) -> CompileResult<()> {
+fn expect_kind(got: DTypeKindTag, expected: DTypeKindTag, what: &'static str) -> CompileResult<()> {
     if got != expected {
         return Err(ExecuteError::KindMismatch { what, expected, got }.into());
     }
     Ok(())
 }
 
-fn scalar_matches(s: &Scalar, kind: KindTag) -> CompileResult<()> {
+fn scalar_matches(s: &Scalar, kind: DTypeKindTag) -> CompileResult<()> {
     let ok = match (s, kind) {
-        (Scalar::F64(_), KindTag::Float) | (Scalar::I64(_), KindTag::Int) | (Scalar::Bool(_), KindTag::Bool) => true,
+        (Scalar::F64(_), DTypeKindTag::Float) | (Scalar::I64(_), DTypeKindTag::Int) | (Scalar::Bool(_), DTypeKindTag::Bool) => true,
         _ => false,
     };
     if ok { Ok(()) } else { Err(ExecuteError::ScalarKindMismatch { scalar: *s, kind }.into()) }
 }
 
-fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> CompileResult<KindTag> {
-    let input = |i: usize| -> CompileResult<KindTag> {
+fn infer_node_kind(node: &Node, kinds: &[DTypeKindTag]) -> CompileResult<DTypeKindTag> {
+    let input = |i: usize| -> CompileResult<DTypeKindTag> {
         let id = *node.inputs.get(i).ok_or_else(|| ExecuteError::ExpectMoreInputs { op: node.op.to_string(), got: node.inputs.len() })?;
         Ok(kinds.get(id).copied().ok_or_else(|| ExecuteError::UnknownValue(id))?)
     };
-    let same_pair = || -> CompileResult<KindTag> {
+    let same_pair = || -> CompileResult<DTypeKindTag> {
         let a = input(0)?;
         let b = input(1)?;
-        if a != b || a == KindTag::Bool {
+        if a != b || a == DTypeKindTag::Bool {
             return Err(ExecuteError::PairKindMismatch { op: node.op.to_string(), a, b }.into());
         }
         Ok(a)
@@ -54,68 +54,68 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> CompileResult<KindTag> {
             a
         }
         NodeOp::Unary(_) => {
-            expect_kind(input(0)?, KindTag::Float, "Unary")?;
-            KindTag::Float
+            expect_kind(input(0)?, DTypeKindTag::Float, "Unary")?;
+            DTypeKindTag::Float
         }
         NodeOp::UnaryI(_) => {
-            expect_kind(input(0)?, KindTag::Int, "UnaryI")?;
-            KindTag::Int
+            expect_kind(input(0)?, DTypeKindTag::Int, "UnaryI")?;
+            DTypeKindTag::Int
         }
         NodeOp::FloatUnary(_) => {
-            expect_kind(input(0)?, KindTag::Float, "FloatUnary")?;
-            KindTag::Float
+            expect_kind(input(0)?, DTypeKindTag::Float, "FloatUnary")?;
+            DTypeKindTag::Float
         }
         NodeOp::Cmp(_) => {
             same_pair()?;
-            KindTag::Bool
+            DTypeKindTag::Bool
         }
         NodeOp::CmpScalar(s, _) => {
             let a = input(0)?;
             scalar_matches(s, a)?;
-            KindTag::Bool
+            DTypeKindTag::Bool
         }
         NodeOp::And | NodeOp::Or | NodeOp::Xor => {
-            expect_kind(input(0)?, KindTag::Bool, "bool logic")?;
-            expect_kind(input(1)?, KindTag::Bool, "bool logic")?;
-            KindTag::Bool
+            expect_kind(input(0)?, DTypeKindTag::Bool, "bool logic")?;
+            expect_kind(input(1)?, DTypeKindTag::Bool, "bool logic")?;
+            DTypeKindTag::Bool
         }
         NodeOp::Not => {
-            expect_kind(input(0)?, KindTag::Bool, "Not")?;
-            KindTag::Bool
+            expect_kind(input(0)?, DTypeKindTag::Bool, "Not")?;
+            DTypeKindTag::Bool
         }
         NodeOp::Cast(dt) => dt.kind(),
         NodeOp::Reduce(_, _) => {
             let a = input(0)?;
-            if a == KindTag::Bool {
+            if a == DTypeKindTag::Bool {
                 return Err(ExecuteError::UnsupportedOp("Reduce on Bool (use ReduceAll/ReduceAny)".to_string()).into());
             }
             a
         }
         NodeOp::ReduceAll(_) | NodeOp::ReduceAny(_) => {
-            expect_kind(input(0)?, KindTag::Bool, "bool reduce")?;
-            KindTag::Bool
+            expect_kind(input(0)?, DTypeKindTag::Bool, "bool reduce")?;
+            DTypeKindTag::Bool
         }
         NodeOp::ArgReduce(_, _) => {
             let a = input(0)?;
-            if a == KindTag::Bool {
+            if a == DTypeKindTag::Bool {
                 return Err(ExecuteError::UnsupportedOp("ArgReduce on Bool".to_string()).into());
             }
-            KindTag::Int
+            DTypeKindTag::Int
         }
         NodeOp::Matmul => same_pair()?,
         NodeOp::IndexSelect(_) | NodeOp::Gather(_) => {
             let a = input(0)?;
-            expect_kind(input(1)?, KindTag::Int, "index tensor")?;
-            if a == KindTag::Bool {
+            expect_kind(input(1)?, DTypeKindTag::Int, "index tensor")?;
+            if a == DTypeKindTag::Bool {
                 return Err(ExecuteError::UnsupportedOp("index op on Bool".to_string()).into());
             }
             a
         }
         NodeOp::IndexAdd(_) | NodeOp::ScatterAdd(_) => {
             let a = input(0)?;
-            expect_kind(input(1)?, KindTag::Int, "index tensor")?;
+            expect_kind(input(1)?, DTypeKindTag::Int, "index tensor")?;
             let b = input(2)?;
-            if a != b || a == KindTag::Bool {
+            if a != b || a == DTypeKindTag::Bool {
                 return Err(ExecuteError::PairKindMismatch { op: node.op.to_string(), a, b }.into());
             }
             a
@@ -131,11 +131,11 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> CompileResult<KindTag> {
             first
         }
         NodeOp::Softmax(_) | NodeOp::RmsNorm(_) => {
-            expect_kind(input(0)?, KindTag::Float, "nn op")?;
-            KindTag::Float
+            expect_kind(input(0)?, DTypeKindTag::Float, "nn op")?;
+            DTypeKindTag::Float
         }
         NodeOp::Pick => {
-            expect_kind(input(0)?, KindTag::Bool, "Pick mask")?;
+            expect_kind(input(0)?, DTypeKindTag::Bool, "Pick mask")?;
             if node.inputs.len() != 3 {
                 return Err(ExecuteError::PickScalarUnsupported.into());
             }
@@ -147,12 +147,12 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> CompileResult<KindTag> {
             a
         }
         NodeOp::PickTrue(s) | NodeOp::PickFalse(s) => {
-            expect_kind(input(0)?, KindTag::Bool, "Pick mask")?;
+            expect_kind(input(0)?, DTypeKindTag::Bool, "Pick mask")?;
             let a = input(1)?;
             scalar_matches(s, a)?;
             a
         }
-        NodeOp::Arange(_, _, _) => KindTag::Int,
+        NodeOp::Arange(_, _, _) => DTypeKindTag::Int,
         NodeOp::Reshape
         | NodeOp::Transpose(..)
         | NodeOp::Permute(_)
@@ -164,8 +164,8 @@ fn infer_node_kind(node: &Node, kinds: &[KindTag]) -> CompileResult<KindTag> {
     })
 }
 
-pub(crate) fn infer_kinds(graph: &Graph) -> CompileResult<Vec<KindTag>> {
-    let mut kinds = vec![KindTag::Float; graph.values.len()];
+pub(crate) fn infer_kinds(graph: &Graph) -> CompileResult<Vec<DTypeKindTag>> {
+    let mut kinds = vec![DTypeKindTag::Float; graph.values.len()];
     let mut producer: Vec<Option<&Node>> = vec![None; graph.values.len()];
     for node in &graph.nodes {
         for &out in &node.outputs {

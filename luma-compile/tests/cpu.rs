@@ -180,6 +180,11 @@ fn cpu_indexing() {
 
 #[test]
 fn cpu_nn() {
+    common::nn::test_mse_loss(&Cpu::default());
+    common::nn::test_cross_entropy_loss(&Cpu::default());
+    common::nn::test_max_pool2d(&Cpu::default());
+    common::nn::test_avg_pool2d(&Cpu::default());
+    common::nn::test_adaptive_avg_pool2d(&Cpu::default());
     common::nn::test_softmax(&Cpu::default());
     common::nn::test_rms_norm(&Cpu::default());
     common::nn::test_arange(&Cpu::default());

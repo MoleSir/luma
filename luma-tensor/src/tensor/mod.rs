@@ -123,7 +123,7 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
     }
 
     /// Verify `self` and `rhs` have the same shape; return a reference to it.
-    pub fn same_shape(&self, rhs: &Self, op: &'static str) -> crate::Result<&Shape> {
+    pub fn ensure_same_shape(&self, rhs: &Self, op: &'static str) -> crate::Result<&Shape> {
         if self.shape() != rhs.shape() {
             return Err(crate::Error::ShapeMismatchBinaryOp { lhs: self.shape().clone(), rhs: rhs.shape().clone(), op });
         }
@@ -175,6 +175,19 @@ impl<D: Device, K: DTypeKind<D>> Tensor<D, K> {
 impl<D: Device, K1: DTypeKind<D>> Tensor<D, K1> {
     pub fn same_device<K2: DTypeKind<D>>(&self, other: &Tensor<D, K2>) -> bool {
         self.device().same_device(other.device())
+    }
+
+    /// Verify `self` and `other` live on the same device instance.
+    ///
+    /// This is the common, backend-agnostic guard for every multi-tensor op;
+    /// backends only implement the primitive [`Device::same_device`] predicate.
+    #[inline]
+    pub(crate) fn ensure_same_device<K2: DTypeKind<D>>(&self, other: &Tensor<D, K2>, op: &'static str) -> crate::Result<()> {
+        if self.same_device(other) {
+            Ok(())
+        } else {
+            Err(crate::Error::DeviceMismatchBinaryOp { lhs: self.device().name(), rhs: other.device().name(), op })
+        }
     }
 }
 

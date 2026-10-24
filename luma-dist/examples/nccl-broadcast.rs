@@ -1,0 +1,37 @@
+use cudarc::driver::CudaContext;
+use cudarc::group;
+use cudarc::nccl::Comm;
+use cudarc::nccl::result;
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let n_devices = 3;
+    // 获取每个 GPU 的 context
+    let devices: Vec<_> = (0..n_devices).map(|i| CudaContext::new(i).unwrap()).collect();
+    // 获取默认 stream
+    let streams: Vec<_> = devices.iter().map(|d| d.default_stream()).collect();
+    // 从 stream 申请 comm 对象，通过这个 stream 提交任务
+    let comms = Comm::from_devices(streams.clone()).unwrap();
+    // 对每个 gpu 申请发送、接受 buffs
+    let mut sendbuffs: Vec<_> = streams.iter().map(|s| s.alloc_zeros::<f32>(1).unwrap()).collect();
+    let mut recvbuffs: Vec<_> = streams.iter().map(|s| s.alloc_zeros::<f32>(1).unwrap()).collect();
+
+    // gpu 0 的 发送值 为 i
+    streams[0].memcpy_htod(&[12345 as f32], &mut sendbuffs[0])?;
+
+    group!({
+        // 每个 gpu 放置自己的输入输出 buff
+        for (comm, (sendbuff, recvbuff)) in comms.iter().zip(sendbuffs.iter().zip(recvbuffs.iter_mut())) {
+            comm.broadcast(Some(sendbuff), recvbuff, 0).unwrap();
+        }
+    });
+
+    // 检查结果
+    for (i, (stream, recvbuff)) in streams.iter().zip(recvbuffs.iter()).enumerate() {
+        stream.synchronize()?;
+        let mut values = vec![0.0f32];
+        stream.memcpy_dtoh(recvbuff, &mut values)?;
+        println!("GPU {}: result = {:?}", i, values);
+    }
+
+    Ok(())
+}

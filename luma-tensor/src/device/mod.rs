@@ -1,12 +1,17 @@
 pub mod bool_ops;
 pub mod float_ops;
 pub mod int_ops;
+pub mod nn_provide;
+
 pub use bool_ops::BoolOps;
 pub use float_ops::FloatOps;
 pub use int_ops::IntOps;
+pub use nn_provide::NnProvide;
 use crate::{Bool, Float, Int, dtype::Storage};
 
-pub trait Device: 'static + Clone + Send + Sync + Default + FloatOps<Self> + IntOps<Self> + BoolOps<Self> {
+pub trait Device:
+    'static + Clone + Send + Sync + Default + FloatOps<Self> + IntOps<Self> + BoolOps<Self> + NnProvide<Self>
+{
     type FloatStorage: Storage<Self, Float>;
     type IntStorage: Storage<Self, Int>;
     type BoolStorage: Storage<Self, Bool>;

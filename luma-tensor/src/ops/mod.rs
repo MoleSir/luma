@@ -13,7 +13,7 @@ pub mod construct;
 mod display;
 mod indexer;
 mod matmul;
-mod nn;
+pub mod nn;
 mod numeric;
 mod reduce;
 mod shape;
@@ -36,6 +36,7 @@ pub use indexer::{IndexOp, Indexer, Slice};
 pub use transfer::TransferDTypeKind;
 pub use custom::{CustomOp1, CustomOp2, CustomOp3, CustomOp, CustomOpError};
 use crate::{Bool, DTypeKind, Device, Float, Int, Tensor};
+pub use nn::NnOpDefault;
 
 /// A node in the (implicit) computation graph: the operation that produced a
 /// `Float` tensor, holding `Arc` references to its inputs. Only `Float` tensors
@@ -64,8 +65,6 @@ pub enum Op<D: Device> {
     Cat(Vec<Tensor<D, Float>>, usize),
     Pick(Tensor<D, Bool>, Option<Tensor<D, Float>>, Option<Tensor<D, Float>>),
     Copy(Tensor<D, Float>),
-    RmsNorm(Tensor<D, Float>, Tensor<D, Float>, f64),
-    Softmax(Tensor<D, Float>, usize),
     /// Precision cast within the float kind (e.g. f32 -> f64). Records the input
     /// so the gradient can be cast back — the key capability the old design lacked.
     Cast(Tensor<D, Float>),
@@ -174,7 +173,44 @@ impl<D: Device> BaseOpsDTypeKind<D> for Bool {}
 pub trait NumOpsDTypeKind<D: Device>:
     BaseOpsDTypeKind<D> + IndexingAddDTypeKind<D> + MatmulDTypeKind<D> + NumericDTypeKind<D> + ReduceDTypeKind<D> + Sized
 {
+    fn from_i64(val: i64) -> Self::Scalar;
+    fn from_f64(val: f64) -> Self::Scalar;
+    fn into_i64(val: Self::Scalar) -> i64;
+    fn into_f64(val: Self::Scalar) -> f64;
 }
 
-impl<D: Device> NumOpsDTypeKind<D> for Float {}
-impl<D: Device> NumOpsDTypeKind<D> for Int {}
+impl<D: Device> NumOpsDTypeKind<D> for Float {
+    fn from_i64(val: i64) -> Self::Scalar {
+        val as f64
+    }
+
+    fn from_f64(val: f64) -> Self::Scalar {
+        val
+    }
+
+    fn into_i64(val: Self::Scalar) -> i64 {
+        val as i64
+    }
+
+    fn into_f64(val: Self::Scalar) -> f64 {
+        val
+    }
+}
+
+impl<D: Device> NumOpsDTypeKind<D> for Int {
+    fn from_i64(val: i64) -> Self::Scalar {
+        val
+    }
+
+    fn from_f64(val: f64) -> Self::Scalar {
+        val as i64
+    }
+
+    fn into_i64(val: Self::Scalar) -> i64 {
+        val
+    }
+
+    fn into_f64(val: Self::Scalar) -> f64 {
+        val as f64
+    }
+}

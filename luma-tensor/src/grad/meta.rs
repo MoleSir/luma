@@ -41,10 +41,6 @@ pub trait TensorMeta<D: Device, K: DTypeKind<D> + Sized>: Default + Send + Sync 
     // Conditional operations
     fn on_pick(mask: &Tensor<D, Bool>, tv: Option<&Tensor<D, K>>, fv: Option<&Tensor<D, K>>) -> Self;
 
-    // NN operations (Float-specific, but included for completeness)
-    fn on_rms_norm(input: &Tensor<D, K>, weight: &Tensor<D, K>, eps: f64) -> Self;
-    fn on_softmax(input: &Tensor<D, K>, dim: usize) -> Self;
-
     // CustomOp
     fn on_custom_op1(arg: &Tensor<D, K>, op: Box<dyn CustomOp1<D> + Send + Sync>) -> Self;
     fn on_custom_op2(arg1: &Tensor<D, K>, arg2: &Tensor<D, K>, op: Box<dyn CustomOp2<D> + Send + Sync>) -> Self;
@@ -189,14 +185,6 @@ impl<D: Device> FloatMeta<D> {
         Self::record(src.requires_grad(), || Op::Gather(src.clone(), idx.clone(), dim))
     }
 
-    pub fn on_rms_norm(input: &Tensor<D, Float>, weight: &Tensor<D, Float>, eps: f64) -> Self {
-        Self::record(input.requires_grad() || weight.requires_grad(), || Op::RmsNorm(input.clone(), weight.clone(), eps))
-    }
-
-    pub fn on_softmax(input: &Tensor<D, Float>, dim: usize) -> Self {
-        Self::record(input.requires_grad(), || Op::Softmax(input.clone(), dim))
-    }
-
     pub fn on_custom_op1(arg: &Tensor<D, Float>, op: Box<dyn CustomOp1<D> + Send + Sync>) -> Self {
         Self::record(arg.requires_grad(), || Op::CustomOp1(arg.clone(), op))
     }
@@ -334,14 +322,6 @@ impl<D: Device> TensorMeta<D, Float> for FloatMeta<D> {
         FloatMeta::on_pick(mask, tv, fv)
     }
 
-    fn on_rms_norm(input: &Tensor<D, Float>, weight: &Tensor<D, Float>, eps: f64) -> Self {
-        FloatMeta::on_rms_norm(input, weight, eps)
-    }
-
-    fn on_softmax(input: &Tensor<D, Float>, dim: usize) -> Self {
-        FloatMeta::on_softmax(input, dim)
-    }
-
     fn on_custom_op1(arg: &Tensor<D, Float>, op: Box<dyn CustomOp1<D> + Send + Sync>) -> Self {
         FloatMeta::on_custom_op1(arg, op)
     }
@@ -384,8 +364,6 @@ impl<D: Device, K: crate::DTypeKind<D>> TensorMeta<D, K> for () {
     fn on_index_add(_: &Tensor<D, K>, _: &Tensor<D, Int>, _: &Tensor<D, K>, _: usize) -> Self {}
     fn on_scatter_add(_: &Tensor<D, K>, _: &Tensor<D, Int>, _: &Tensor<D, K>, _: usize) -> Self {}
     fn on_pick(_: &Tensor<D, Bool>, _: Option<&Tensor<D, K>>, _: Option<&Tensor<D, K>>) -> Self {}
-    fn on_rms_norm(_: &Tensor<D, K>, _: &Tensor<D, K>, _: f64) -> Self {}
-    fn on_softmax(_: &Tensor<D, K>, _: usize) -> Self {}
     fn on_custom_op1(_: &Tensor<D, K>, _: Box<dyn CustomOp1<D> + Send + Sync>) -> Self {}
     fn on_custom_op2(_: &Tensor<D, K>, _: &Tensor<D, K>, _: Box<dyn CustomOp2<D> + Send + Sync>) -> Self {}
     fn on_custom_op3(_: &Tensor<D, K>, _: &Tensor<D, K>, _: &Tensor<D, K>, _: Box<dyn CustomOp3<D> + Send + Sync>) -> Self {}

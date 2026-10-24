@@ -170,6 +170,7 @@ impl<D: Device> IndexingDTypeKind<D> for Bool {
 impl<D: Device, K: IndexingDTypeKind<D>> Tensor<D, K> {
     /// Select slices along `dim` at the given 1-D `indices`.
     pub fn index_select<Dm: Dim>(&self, indices: &Tensor<D, Int>, dim: Dm) -> crate::Result<Self> {
+        self.ensure_same_device(indices, "index_select")?;
         let dim = dim.to_index(self.shape(), "index_select")?;
         let out_shape = index_select_out_shape(self.shape(), indices.element_count(), dim);
         let storage =
@@ -181,6 +182,7 @@ impl<D: Device, K: IndexingDTypeKind<D>> Tensor<D, K> {
 
     /// Gather along `dim` using an index tensor of the same rank.
     pub fn gather<Dm: Dim>(&self, indices: &Tensor<D, Int>, dim: Dm) -> crate::Result<Self> {
+        self.ensure_same_device(indices, "gather")?;
         let dim = dim.to_index(self.shape(), "gather")?;
         let out_shape = gather_out_shape(indices.shape());
         let storage =
@@ -194,6 +196,8 @@ impl<D: Device, K: IndexingDTypeKind<D>> Tensor<D, K> {
 impl<D: Device, K: IndexingAddDTypeKind<D>> Tensor<D, K> {
     /// `out = self; out[.., idx[i], ..] += src[.., i, ..]`.
     pub fn index_add<Dm: Dim>(&self, indices: &Tensor<D, Int>, src: &Tensor<D, K>, dim: Dm) -> crate::Result<Self> {
+        self.ensure_same_device(indices, "index_add")?;
+        self.ensure_same_device(src, "index_add")?;
         let dim = dim.to_index(self.shape(), "index_add")?;
         let storage = K::index_add_dispatch(
             &*self.storage_read()?,
@@ -211,6 +215,8 @@ impl<D: Device, K: IndexingAddDTypeKind<D>> Tensor<D, K> {
 
     /// `out = self; out[.., idx[i,j,k], k] += src[i,j,k]`.
     pub fn scatter_add<Dm: Dim>(&self, indices: &Tensor<D, Int>, src: &Tensor<D, K>, dim: Dm) -> crate::Result<Self> {
+        self.ensure_same_device(indices, "scatter_add")?;
+        self.ensure_same_device(src, "scatter_add")?;
         let dim = dim.to_index(self.shape(), "scatter_add")?;
         let storage = K::scatter_add_dispatch(
             &*self.storage_read()?,
@@ -450,7 +456,7 @@ impl<D: Device, K: IndexingDTypeKind<D> + crate::ops::shape::ShapeDTypeKind<D>> 
                 }
                 Indexer::Boolean(mask) => {
                     let indices: Vec<i64> = mask.to_vec()?.into_iter().enumerate().filter(|(_, v)| *v).map(|(i, _)| i as i64).collect();
-                    let idx_tensor = Tensor::<D, Int>::from_slice(&indices, indices.len(), ())?;
+                    let idx_tensor = Tensor::<D, Int>::from_slice(&indices, indices.len(), x.device())?;
                     let out = x.index_select(&idx_tensor, current_dim)?;
                     current_dim += 1;
                     out

@@ -113,7 +113,9 @@ impl BoolOps<Cpu> for Cpu {
     fn b_to_bytes<'a>(x: &'a <Cpu as Device>::BoolStorage, layout: &Layout) -> Result<Cow<'a, [u8]>> {
         // bool is not Pod, so bytemuck doesn't work — convert manually.
         if layout.is_contiguous() {
-            let bytes: Vec<u8> = x.device().collect_alloc(x.0.iter().map(|&b| b as u8));
+            let start = layout.start_offset();
+            let count = layout.element_count();
+            let bytes: Vec<u8> = x.device().collect_alloc(x.0[start..start + count].iter().map(|&b| b as u8));
             Ok(Cow::Owned(bytes))
         } else {
             let contig = Self::b_contiguous(x, layout)?;

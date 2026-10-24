@@ -85,9 +85,8 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
 
     /// Copy the data from `src` into `self` **in-place**, preserving [`TensorId`].
     pub fn copy_(&mut self, src: &Self) -> crate::Result<()> {
-        if self.shape() != src.shape() {
-            return Err(Error::ShapeMismatchBinaryOp { lhs: self.shape().clone(), rhs: src.shape().clone(), op: "copy_" });
-        }
+        self.ensure_same_device(src, "copy_")?;
+        self.ensure_same_shape(src, "copy_")?;
 
         let src_storage = K::contiguous_dispatch(&*src.storage_read()?, src.layout())?;
 
@@ -224,6 +223,9 @@ impl<D: Device, K: ShapeDTypeKind<D>> Tensor<D, K> {
             return Err(Error::OpRequiresAtLeastOneTensor { op: "cat" });
         }
         let first = arrs[0].as_ref();
+        for arg in &arrs[1..] {
+            first.ensure_same_device(arg.as_ref(), "cat")?;
+        }
         let dim = dim.to_index(first.shape(), "cat")?;
 
         let shapes: Vec<&Shape> = arrs.iter().map(|a| a.as_ref().shape()).collect();

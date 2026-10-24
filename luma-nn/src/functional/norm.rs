@@ -1,5 +1,5 @@
 use crate::NnResult;
-use luma_tensor::{D, Device, Tensor};
+use luma_tensor::{Device, Tensor};
 
 /// Applies Layer Normalization over a mini-batch of inputs.
 ///
@@ -19,23 +19,26 @@ pub fn layer_norm<Dev: Device>(
     bias: Option<&Tensor<Dev>>,
     eps: f64,
 ) -> NnResult<Tensor<Dev>> {
-    // 1. Calculate Mean and Variance along the last dimension
-    let mean = input.mean_keepdim(D::Minus1)?;
-    let var = input.var_keepdim(D::Minus1)?;
+    Ok(input.layer_norm(weight, bias, eps)?)
+}
 
-    // 2. Normalize: (x - mean) / sqrt(var + eps)
-    let std = (var + eps).sqrt()?;
-    let input_normalized = input.broadcast_sub(&mean)?.broadcast_div(&std)?;
-
-    // 3. Apply Affine Transform: x * weight + bias
-    let out = match (weight, bias) {
-        (Some(w), Some(b)) => input_normalized.broadcast_mul(w)?.broadcast_add(b)?,
-        (Some(w), None) => input_normalized.broadcast_mul(w)?,
-        (None, Some(b)) => input_normalized.broadcast_add(b)?,
-        (None, None) => input_normalized,
-    };
-
-    Ok(out)
+/// Applies Group Normalization over `(C/G, ...)` with `num_groups` groups.
+///
+/// ## Arguments
+///
+/// * `input` - Input tensor of shape `(N, C, ...)`.
+/// * `num_groups` - Number of groups; must divide the channel count.
+/// * `weight` - Optional per-channel scale tensor of shape `(C,)`.
+/// * `bias` - Optional per-channel shift tensor of shape `(C,)`.
+/// * `eps` - A value added to the denominator for numerical stability.
+pub fn group_norm<Dev: Device>(
+    input: &Tensor<Dev>,
+    num_groups: usize,
+    weight: Option<&Tensor<Dev>>,
+    bias: Option<&Tensor<Dev>>,
+    eps: f64,
+) -> NnResult<Tensor<Dev>> {
+    Ok(input.group_norm(num_groups, weight, bias, eps)?)
 }
 
 /// Applies Root Mean Square Normalization.
@@ -48,20 +51,14 @@ pub fn layer_norm<Dev: Device>(
 /// ## Arguments
 ///
 /// * `input` - Input tensor.
-/// * `weight` - Scale tensor ($\gamma$).
+/// * `weight` - Optional scale tensor ($\gamma$).
+/// * `bias` - Optional shift tensor ($\beta$).
 /// * `eps` - A value added to the denominator for numerical stability.
-pub fn rms_norm<Dev: Device>(input: &Tensor<Dev>, weight: &Tensor<Dev>, eps: f64) -> NnResult<Tensor<Dev>> {
-    // 1. Calculate Mean of Squares: Mean(x^2)
-    let variance = input.sqr()?.mean_keepdim(D::Minus1)?;
-
-    // 2. Calculate RMS: sqrt(variance + eps)
-    let rms = (variance + eps).sqrt()?;
-
-    // 3. Normalize: x / rms
-    let input_normalized = input.broadcast_div(&rms)?;
-
-    // 4. Scale: x * weight
-    let out = input_normalized.broadcast_mul(weight)?;
-
-    Ok(out)
+pub fn rms_norm<Dev: Device>(
+    input: &Tensor<Dev>,
+    weight: Option<&Tensor<Dev>>,
+    bias: Option<&Tensor<Dev>>,
+    eps: f64,
+) -> NnResult<Tensor<Dev>> {
+    Ok(input.rms_norm(weight, bias, eps)?)
 }

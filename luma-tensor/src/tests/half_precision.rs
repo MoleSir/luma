@@ -123,7 +123,7 @@ pub fn test_half_softmax(device: &impl Device, dtype: FloatDType, _tol: f64) {
 pub fn test_half_rms_norm(device: &impl Device, dtype: FloatDType, tol: f64) {
     let x = t(&[1.0, 2.0, 3.0, 4.0], (2, 2), device, dtype);
     let w = t(&[1.0, 1.0], (2,), device, dtype);
-    let out = x.rms_norm(&w, 1e-5).unwrap();
+    let out = x.rms_norm(Some(&w), None, 1e-5).unwrap();
     let v = out.to_vec().unwrap();
     // Row 0: x / sqrt(mean(x^2)+eps) = [1,2]/sqrt(2.5) since eps is negligible.
     let inv = 1.0 / (2.5f64 + 1e-5).sqrt();

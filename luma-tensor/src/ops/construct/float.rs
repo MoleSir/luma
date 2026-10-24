@@ -80,11 +80,11 @@ impl<D: Device> Tensor<D, Float> {
     }
 
     pub fn rand_like(&self, lo: f64, hi: f64) -> Result<Self> {
-        Self::rand(lo, hi, self.shape().clone(), self.dtype())
+        Self::rand(lo, hi, self.shape().clone(), (self.device(), self.dtype()))
     }
 
     pub fn randn_like(&self, mean: f64, std: f64) -> Result<Self> {
-        Self::randn(mean, std, self.shape().clone(), self.dtype())
+        Self::randn(mean, std, self.shape().clone(), (self.device(), self.dtype()))
     }
 
     pub fn eye(n: usize, options: impl Into<TensorCreationOptions<D, Float>>) -> Result<Self> {

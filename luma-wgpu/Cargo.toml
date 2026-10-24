@@ -1,0 +1,19 @@
+[package]
+name = "luma-wgpu"
+version = { workspace = true }
+edition = { workspace = true }
+repository = { workspace = true }
+description = "luma wgpu device (skeleton)"
+keywords = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+luma-tensor = { workspace = true }
+wgpu = { workspace = true }
+thiserror = { workspace = true }
+half = { workspace = true }
+pollster = { workspace = true }
+bytemuck = { workspace = true }
+[dev-dependencies]
+luma-cpu = { workspace = true }
+luma-tensor = { workspace = true, features = ["test-utils"] }

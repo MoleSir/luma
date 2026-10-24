@@ -3,8 +3,8 @@
 
 use std::sync::LazyLock;
 
-use luma_tensor::tests::*;
 use luma_tensor::dtype::{FloatDType, IntDType};
+use luma_tensor::tests::*;
 use luma_tensor::{Int, Shape, Tensor};
 
 use luma_cpu::Cpu;
@@ -94,6 +94,7 @@ fn cuda_cmp() {
     numeric::test_ge_f32(dev);
     numeric::test_gt_f32(dev);
     numeric::test_le_f32(dev);
+    numeric::test_cmp_scalar_f32(dev);
 }
 
 #[test]
@@ -385,6 +386,26 @@ fn cuda_nn() {
     nn::test_softmax_numerical_stability(dev);
     nn::test_rms_norm_f32(dev);
     nn::test_rms_norm_weighted(dev);
+    nn::test_rms_norm_grad(dev, FloatDType::F64, 1e-9);
+    nn::test_rms_norm_bias(dev, FloatDType::F64, 1e-9);
+    nn::test_layer_norm(dev, FloatDType::F64, 1e-9);
+    nn::test_group_norm(dev, FloatDType::F64, 1e-9);
+    nn::test_linear(dev, FloatDType::F64, 1e-9);
+    nn::test_embedding(dev, FloatDType::F64, 1e-9);
+    nn::test_dropout(dev);
+    nn::test_losses(dev, FloatDType::F64, 1e-9);
+    nn::test_loss_grads(dev, FloatDType::F64, 1e-9);
+    nn::test_max_pool2d(dev, FloatDType::F64, 1e-9);
+    nn::test_avg_pool2d(dev, FloatDType::F64, 1e-9);
+    nn::test_adaptive_avg_pool2d(dev, FloatDType::F64, 1e-9);
+    nn::test_max_pool2d_grad(dev, FloatDType::F64, 1e-9);
+    nn::test_avg_pool2d_grad(dev, FloatDType::F64, 1e-9);
+    nn::test_adaptive_avg_pool2d_grad(dev, FloatDType::F64, 1e-9);
+    nn::test_conv2d(dev, FloatDType::F64, 1e-9);
+    nn::test_attention(dev, FloatDType::F64, 1e-9);
+    nn::test_default_softmax(dev, FloatDType::F64, 1e-9);
+    nn::test_default_rms_norm(dev, FloatDType::F64, 1e-9);
+    nn::test_log_softmax(dev, FloatDType::F64, 1e-9);
     nn::test_cross_entropy_chain_f32(dev);
     nn::test_cross_entropy_basic_f32(dev);
     nn::test_cross_entropy_mnist_shape_f32(dev);

@@ -5,7 +5,7 @@ use crate::{Cpu, CpuBoolStorage, CpuFloatStorage, CpuIntStorage, dispatch_float,
 use crate::dispatch::{int_ids_as_usize, usize_to_int_storage};
 use crate::kernels::element::CpuNum;
 use crate::allocator::AllocVec;
-use crate::kernels::{elementwise as ew, indexing, matmul, nn, reduce};
+use crate::kernels::{elementwise as ew, indexing, matmul, reduce};
 use luma_tensor::{BinaryOp, BoolDType, CmpOp, DType, FloatDType, FloatUnaryOp, IntDType, ReduceOp, UnaryOp};
 use luma_tensor::{FloatOps, Device, Error, Layout, Result, Shape, Storage};
 
@@ -296,11 +296,13 @@ impl FloatOps<Cpu> for Cpu {
 
     fn f_to_bytes<'a>(x: &'a <Cpu as Device>::FloatStorage, layout: &Layout) -> Result<Cow<'a, [u8]>> {
         if layout.is_contiguous() {
+            let start = layout.start_offset();
+            let count = layout.element_count();
             Ok(match x {
-                CpuFloatStorage::F32(d, _) => Cow::Borrowed(bytemuck::cast_slice(d)),
-                CpuFloatStorage::F64(d, _) => Cow::Borrowed(bytemuck::cast_slice(d)),
-                CpuFloatStorage::F16(d, _) => Cow::Borrowed(bytemuck::cast_slice(d)),
-                CpuFloatStorage::BF16(d, _) => Cow::Borrowed(bytemuck::cast_slice(d)),
+                CpuFloatStorage::F32(d, _) => Cow::Borrowed(bytemuck::cast_slice(&d[start..start + count])),
+                CpuFloatStorage::F64(d, _) => Cow::Borrowed(bytemuck::cast_slice(&d[start..start + count])),
+                CpuFloatStorage::F16(d, _) => Cow::Borrowed(bytemuck::cast_slice(&d[start..start + count])),
+                CpuFloatStorage::BF16(d, _) => Cow::Borrowed(bytemuck::cast_slice(&d[start..start + count])),
             })
         } else {
             let contig = Self::f_contiguous(x, layout)?;
@@ -649,39 +651,6 @@ impl FloatOps<Cpu> for Cpu {
                 debug_assert_eq!(shape.dims(), out_shape.dims(), "cpu f_cat shape must match the layer");
                 Ok(CpuFloatStorage::F64(v, srcs[0].0.device().clone()))
             }
-        }
-    }
-
-    fn f_softmax(x: &<Cpu as Device>::FloatStorage, l: &Layout, dim: usize) -> Result<<Cpu as Device>::FloatStorage> {
-        match x {
-            CpuFloatStorage::F32(d, _) => Ok(CpuFloatStorage::F32(nn::softmax(d, l, dim, x.device())?, x.device().clone())),
-            CpuFloatStorage::F64(d, _) => Ok(CpuFloatStorage::F64(nn::softmax(d, l, dim, x.device())?, x.device().clone())),
-            CpuFloatStorage::F16(d, _) => Ok(CpuFloatStorage::F16(nn::softmax(d, l, dim, x.device())?, x.device().clone())),
-            CpuFloatStorage::BF16(d, _) => Ok(CpuFloatStorage::BF16(nn::softmax(d, l, dim, x.device())?, x.device().clone())),
-        }
-    }
-
-    fn f_rms_norm(
-        x: &<Cpu as Device>::FloatStorage,
-        x_l: &Layout,
-        weight: &<Cpu as Device>::FloatStorage,
-        weight_l: &Layout,
-        eps: f64,
-    ) -> Result<<Cpu as Device>::FloatStorage> {
-        match (x, weight) {
-            (CpuFloatStorage::F32(d, _), CpuFloatStorage::F32(w, _)) => {
-                Ok(CpuFloatStorage::F32(nn::rms_norm(d, x_l, w, weight_l, eps as f32, x.device())?, x.device().clone()))
-            }
-            (CpuFloatStorage::F64(d, _), CpuFloatStorage::F64(w, _)) => {
-                Ok(CpuFloatStorage::F64(nn::rms_norm(d, x_l, w, weight_l, eps, x.device())?, x.device().clone()))
-            }
-            (CpuFloatStorage::F16(d, _), CpuFloatStorage::F16(w, _)) => {
-                Ok(CpuFloatStorage::F16(nn::rms_norm(d, x_l, w, weight_l, half::f16::from_f64(eps), x.device())?, x.device().clone()))
-            }
-            (CpuFloatStorage::BF16(d, _), CpuFloatStorage::BF16(w, _)) => {
-                Ok(CpuFloatStorage::BF16(nn::rms_norm(d, x_l, w, weight_l, half::bf16::from_f64(eps), x.device())?, x.device().clone()))
-            }
-            (l, r) => Err(Error::DTypeMismatch { lhs: l.dtype(), rhs: r.dtype(), op: "rms_norm" }),
         }
     }
 

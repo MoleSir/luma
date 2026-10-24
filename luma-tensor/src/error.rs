@@ -1,5 +1,5 @@
 use std::str::Utf8Error;
-use crate::{DType, Shape, ops::CustomOpError};
+use crate::{DType, DTypeKindTag, Shape, ops::CustomOpError};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -12,6 +12,9 @@ pub enum Error {
 
     #[error("dtype mismatch in {op}, lhs: {lhs:?}, rhs: {rhs:?}")]
     DTypeMismatchBinaryOp { lhs: DType, rhs: DType, op: &'static str },
+
+    #[error("dtype kind mismatch: {expected:?}, got: {got:?}")]
+    DTypeKindMismatch { expected: DTypeKindTag, got: DTypeKindTag },
 
     /// A `Float`/`Int` tensor holds a concrete precision (`f32`/`f64`, ...) decided at
     /// runtime; two operands must share the same precision. Use `.cast(..)` to align them.

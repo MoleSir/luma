@@ -295,6 +295,17 @@ pub fn test_gt_f32(device: &impl Device) {
     assert_eq!(c.to_vec().unwrap(), vec![false, true, false]);
 }
 
+#[allow(dead_code)]
+pub fn test_cmp_scalar_f32(device: &impl Device) {
+    let a = tensor_f32_dev(&[1.0, 2.0, 3.0, 4.0], (4,), device);
+    assert_eq!(a.eq_scalar(2.0).unwrap().to_vec().unwrap(), vec![false, true, false, false]);
+    assert_eq!(a.ne_scalar(2.0).unwrap().to_vec().unwrap(), vec![true, false, true, true]);
+    assert_eq!(a.lt_scalar(2.0).unwrap().to_vec().unwrap(), vec![true, false, false, false]);
+    assert_eq!(a.le_scalar(2.0).unwrap().to_vec().unwrap(), vec![true, true, false, false]);
+    assert_eq!(a.gt_scalar(2.0).unwrap().to_vec().unwrap(), vec![false, false, true, true]);
+    assert_eq!(a.ge_scalar(2.0).unwrap().to_vec().unwrap(), vec![false, true, true, true]);
+}
+
 // ---- Clamp ----
 
 #[allow(dead_code)]

@@ -6,6 +6,10 @@ use std::vec;
 pub struct Shape(pub(crate) Vec<usize>);
 
 impl Shape {
+    pub fn new(dims: impl Into<Vec<usize>>) -> Self {
+        Self(dims.into())
+    }
+
     pub fn scalar() -> Self {
         Self(vec![])
     }

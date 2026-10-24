@@ -96,9 +96,8 @@ fn op_inputs<D: Device>(op: &Op<D>) -> Vec<&Tensor<D, Float>> {
         | Op::Cast(a)
         | Op::IndexSelect(a, _, _)
         | Op::Gather(a, _, _)
-        | Op::Softmax(a, _) 
         | Op::CustomOp1(a, _) => vec![a],
-        Op::IndexAdd(a, _, b, _) | Op::ScatterAdd(a, _, b, _) | Op::RmsNorm(a, b, _) => vec![a, b],
+        Op::IndexAdd(a, _, b, _) | Op::ScatterAdd(a, _, b, _) => vec![a, b],
         Op::Cat(args, _) => args.iter().collect(),
         Op::Pick(_, tv, fv) => tv.iter().chain(fv.iter()).collect(),
         Op::CustomOp3(a, b, c, _) => vec![a, b, c],
@@ -299,15 +298,6 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
             }
         }
 
-        // ---- softmax: g_in = y * (g - sum(g*y, dim, keepdim)) ----
-        Op::Softmax(input, dim) => {
-            let y = node; // softmax output
-            let gy = grad.mul(y)?;
-            let s = gy.sum_keepdim(*dim)?;
-            let g = y.mul(&grad.sub(&s.broadcast_as(grad.shape().clone())?)?)?;
-            grads.or_insert(input)?.impl_add_(&g)?;
-        }
-
         // ---- slice: dilate (step>1) + pad back to arg shape ----
         Op::Slice(arg, dim, start, _end, step) => {
             let arg_dtype = arg.dtype();
@@ -344,9 +334,6 @@ fn backward_op<D: Device>(node: &Tensor<D, Float>, op: &Op<D>, grad: &Tensor<D, 
             let arg_grad = pad_grad_along(arg, body_grad_ref, *dim, *start, body_len)?;
             grads.or_insert(arg)?.impl_add_(&arg_grad)?;
         }
-
-        // ---- not yet wired ----
-        Op::RmsNorm(..) => return Err(crate::Error::BackwardNotSupported("rms_norm")),
 
         Op::CustomOp1(arg, cop) => {
             let arg_grad = cop.backward(arg, node, grad)?;
